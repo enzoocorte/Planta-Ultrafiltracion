@@ -14,17 +14,16 @@
 
 ---
 
-## 🗺️ Mapa de Navegación de los 6 Hitos de Trabajo
+## 🗺️ Mapa de Navegación de los 5 Hitos de Trabajo (Consolidado)
 
 Cada hito cuenta con su propia carpeta autocontenida con documentación técnica, esquemas de conexión, firmware compilado y probado, simuladores o plantillas de datos:
 
 ```mermaid
 flowchart TD
-    H1["⚡ HITO 1: Control de Accionamiento de Potencia (NEMA 34 + DM860)<br>• Dominio de potencia, microstepping, rampa y prevención térmica SW4"] --> H2["🌀 HITO 2: Bomba Peristáltica MBP-2000, Web & OTA<br>• Calibración hidráulica mL/rev, control web táctil y actualización inalámbrica"]
-    H2 --> H3["📊 HITO 3: Instrumentación y Sensores Disponibles<br>• Caudalímetros YF-S401, Sonda TDS, DS18B20 y Conversor ADC ADS1115"]
-    H3 --> H4["🌪️ HITO 4: Reactor de Coagulación-Sedimentador Cónico<br>• Driver L298N, paleta PWM, gradiente Camp-Stein, boya y Jar Test"]
-    H4 --> H5["🌐 HITO 5: Integración Global, Automatización Total & SCADA<br>• Sincronización FSM, enclavamientos TMP ≤ 0.50 atm y telemetría completa"]
-    H5 --> H6["🧪 HITO 6: Ensayos de Membrana FX100, Darcy y Vida Útil<br>• Resistencia Rm y Rf, remoción turbidez/TDS y validación de tesis doctoral"]
+    H1["⚡ HITO 1: Bomba Peristáltica MBP-2000 & Accionamiento NEMA 34<br>• Montaje 8 cables Serie 3A, DM860, bornera ESP32, simulador y Web Wi-Fi"] --> H2["📊 HITO 2: Instrumentación y Sensores Disponibles<br>• Caudalímetros YF-S401, Sonda TDS, Temp DS18B20 y Conversor ADS1115"]
+    H2 --> H3["🌪️ HITO 3: Reactor de Coagulación-Sedimentador Cónico<br>• Driver L298N, paleta PWM, gradiente Camp-Stein, boya inox y Jar Test"]
+    H3 --> H4["🌐 HITO 4: Integración Global, Automatización Total & SCADA<br>• Sincronización FSM, enclavamientos TMP ≤ 0.50 atm y telemetría completa"]
+    H4 --> H5["🧪 HITO 5: Ensayos de Membrana FX100, Darcy y Vida Útil<br>• Resistencia Rm y Rf, remoción turbidez/TDS y validación de tesis doctoral"]
 ```
 
 ---
@@ -32,33 +31,22 @@ flowchart TD
 ## 🧭 ¿Qué se busca y qué encontrarán en cada carpeta?
 
 ### 📁 [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/)
-* **Objetivo de los Alumnos**: Lograr el control estable del motor NEMA 34 ($4\text{ Nm}$, $6\text{ A}$) y el driver DM860 desde el ESP32, comprendiendo la física del accionamiento.
+* **Objetivo de los Alumnos**: Dejar la bomba peristáltica MBP-2000 funcionando a la perfección con el motor NEMA 34 ($4.5\text{ Nm}$, 8 cables) y el driver DM860, tanto por consola serie como por Wi-Fi desde el celular con el shield de borneras.
 * **Qué aprenderán aquí**:
-  * Por qué el transformador entrega $24\text{ VAC}$ y el driver rectifica internamente a un bus de $\approx 34\text{ VDC}$.
-  * Cómo identificar las fases A y B del motor con tester o cortocircuito.
-  * Por qué el switch **SW4 en `OFF`** es vital para reducir la corriente al 50% en reposo y evitar que el motor hierva.
-  * Generación de pulsos por hardware LEDC del ESP32 a 0% de uso de CPU.
+  * Por qué el bobinado en **Bipolar Serie (3.0A)** entrega los $4.5\text{ Nm}$ completos protegiendo el transformador de $24\text{ VAC}$ y evitando sobrecalentamientos.
+  * Por qué el switch **SW4 en `OFF`** activa la reducción al 50% de corriente en reposo.
+  * Cómo conectar a tornillo el ESP32 en su shield de borneras (D18 a PUL+, D19 a DIR+, GND común).
+  * Control determinístico por hardware LEDC del ESP32 a 0% de uso de CPU.
 * **Archivos Clave**:
-  * `README.md`: Documento formal del hito con las secciones 1.1 a 1.8.
-  * `Guia_Conexionado_Fisico_DM860.md`: Manual paso a paso de cableado de taller.
-  * `Hito1_ControlMotor/Hito1_ControlMotor.ino`: Firmware listo para probar por Monitor Serie (`R30`, `R60`, `DIR`, `STOP`).
+  * `bomba/bomba.ino`: Firmware oficial con **Control Wi-Fi**, Dashboard Web táctil, cálculo de caudal en L/min, litros totales y ArduinoOTA.
+  * `bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`: Manual ilustrado de conexionado de la bornera.
+  * `bomba/Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`: Puesta a punto según hoja oficial de CNC Insumos S.R.L.
+  * `simulador_bomba.html`: Simulador visual interactivo de rampa, frecuencia y calor.
+  * `Hito1_ControlMotor/Hito1_ControlMotor.ino`: Firmware modular de prueba serie (115200 baudios).
 
 ---
 
-### 📁 [`02_Hito2_Bomba_Peristaltica_NEMA34/`](./02_Hito2_Bomba_Peristaltica_NEMA34/)
-* **Objetivo de los Alumnos**: Integrar el cabezal de la bomba peristáltica MBP-2000, establecer la curva característica de caudal vs. RPM y habilitar el control inalámbrico.
-* **Qué aprenderán aquí**:
-  * Relación de desplazamiento positivo volumétrico ($\approx 4.2\text{ mL/revolución}$).
-  * Rampa de aceleración ($35\text{ RPM/s}$) para que los rodillos venzan la compresión elastomérica de la manguera sin trabarse.
-  * Servidor Web embebido en el ESP32 y programación inalámbrica por Wi-Fi (*ArduinoOTA*).
-* **Archivos Clave**:
-  * `README.md`: Teoría mecatrónica de la bomba peristáltica.
-  * `simulador_bomba.html`: Simulador interactivo en HTML5 para visualizar rampa y calor.
-  * `firmware_bomba_nema34/firmware_bomba_nema34.ino`: Firmware con Dashboard web para celular y PC.
-
----
-
-### 📁 [`03_Hito3_Instrumentacion_Sensores/`](./03_Hito3_Instrumentacion_Sensores/)
+### 📁 [`02_Hito2_Instrumentacion_Sensores/`](./02_Hito2_Instrumentacion_Sensores/)
 * **Objetivo de los Alumnos**: Conectar y calibrar los sensores físicos disponibles en el laboratorio para monitorear el proceso en tiempo real.
 * **Qué aprenderán aquí**:
   * Lectura de pulsos de microflujo con los caudalímetros de efecto Hall YF-S401 ($98\text{ pulsos/seg} = 1\text{ L/min}$).
@@ -72,7 +60,7 @@ flowchart TD
 
 ---
 
-### 📁 [`04_Hito4_Reactor_Sedimentador_Agitador/`](./04_Hito4_Reactor_Sedimentador_Agitador/)
+### 📁 [`03_Hito3_Reactor_Sedimentador_Agitador/`](./03_Hito3_Reactor_Sedimentador_Agitador/)
 * **Objetivo de los Alumnos**: Automatizar el pretratamiento fisicoquímico en el reactor cónico antes de enviar el agua a la membrana.
 * **Qué aprenderán aquí**:
   * Ecuación del Gradiente de Velocidad de Camp-Stein ($G = \sqrt{P / (\mu V)}$).
@@ -86,7 +74,7 @@ flowchart TD
 
 ---
 
-### 📁 [`05_Hito5_Integracion_Automatizacion_IoT/`](./05_Hito5_Integracion_Automatizacion_IoT/)
+### 📁 [`04_Hito4_Integracion_Automatizacion_IoT/`](./04_Hito4_Integracion_Automatizacion_IoT/)
 * **Objetivo de los Alumnos**: Poner en marcha la planta completa de manera sincronizada y autónoma.
 * **Qué aprenderán aquí**:
   * Integración de los 3 transductores de presión hidráulica ($P_1, P_2, P_3$).
@@ -100,13 +88,13 @@ flowchart TD
 
 ---
 
-### 📁 [`06_Hito6_Ensayos_Membrana_VidaUtil/`](./06_Hito6_Ensayos_Membrana_VidaUtil/)
+### 📁 [`05_Hito5_Ensayos_Membrana_VidaUtil/`](./05_Hito5_Ensayos_Membrana_VidaUtil/)
 * **Objetivo de los Alumnos**: Obtención de los datos experimentales para la redacción final de la Tesis de Ingeniería Industrial y aportes a la Beca Doctoral.
 * **Qué aprenderán aquí**:
   * Modelo matemático de la Ley de Darcy para ultrafiltración:
     $$J = \frac{Q_p}{A_m} = \frac{\text{TMP}}{\mu(T) \cdot (R_m + R_{\text{torta}} + R_{\text{poros}})}$$
   * Determinación experimental de la resistencia de la membrana limpia ($R_m$).
-  * Comparación de velocidad de ensuciamiento: Agua cruda turbia vs. Sobrenadante clarificado del Hito 4.
+  * Comparación de velocidad de ensuciamiento: Agua cruda turbia vs. Sobrenadante clarificado del Hito 3.
   * Eficiencia del ciclo de Retrolavado (*Backwash*) para extender la vida útil del módulo FX100.
   * Verificación de calidad de agua tratada según los estándares del Código Alimentario Argentino (CAA).
 * **Archivos Clave**:
