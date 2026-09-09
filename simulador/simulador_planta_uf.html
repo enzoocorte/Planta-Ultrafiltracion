@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador SCADA - Planta Piloto de Ultrafiltración FX100</title>
+  <style>
+    :root {
+      --bg-main: #0b0f19;
+      --bg-card: #151d30;
+      --bg-card-hover: #1c2742;
+      --border: #263554;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.3);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #a855f7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg-main); color: var(--text-main); padding: 16px; min-height: 100vh; overflow-x: hidden; }
+
+    header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 20px; background: var(--bg-card); border-radius: 12px;
+      border: 1px solid var(--border); margin-bottom: 16px;
+    }
+    .header-title h1 { font-size: 20px; color: var(--accent); letter-spacing: 0.5px; }
+    .header-title p { font-size: 12px; color: var(--text-muted); }
+    .header-status { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+    .badge { padding: 4px 10px; border-radius: 20px; font-weight: bold; }
+    .badge-online { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
+    .badge-ip { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+    /* Layout Grid */
+    .grid-main {
+      display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px;
+    }
+    @media (max-width: 1100px) { .grid-main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border);
+      padding: 18px; margin-bottom: 16px; position: relative;
+    }
+    .card-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+      border-bottom: 1px solid var(--border); padding-bottom: 8px;
+    }
+    .card-header h2 { font-size: 15px; color: var(--text-main); display: flex; align-items: center; gap: 8px; }
+    .card-header span { font-size: 11px; color: var(--text-muted); }
+
+    /* P&ID Canvas */
+    #pidCanvas {
+      width: 100%; height: 320px; background: #070a12; border-radius: 8px;
+      border: 1px solid #1a233a; display: block;
+    }
+
+    /* Controls & Gauges */
+    .grid-metrics {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 12px;
+    }
+    .metric-box {
+      background: #090d16; border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px; text-align: center;
+    }
+    .metric-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
+    .metric-val { font-size: 22px; font-weight: 800; font-family: monospace; margin: 4px 0; color: var(--accent); }
+    .metric-unit { font-size: 10px; color: var(--text-muted); }
+
+    /* Control Buttons */
+    .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .btn {
+      padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold;
+      font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 6px;
+    }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--accent); color: #090d16; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #090d16; }
+    .btn-purple { background: var(--purple); color: #fff; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-outline:hover { background: var(--bg-card-hover); color: var(--text-main); }
+
+    /* Slider */
+    .slider-container { margin: 12px 0; background: #090d16; padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+    .slider-header { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+    input[type=range] { width: 100%; accent-color: var(--accent); height: 6px; border-radius: 3px; background: #263554; }
+
+    /* Diagnostic Box */
+    .diag-panel {
+      background: #0e1626; border-left: 4px solid var(--warning); padding: 12px;
+      border-radius: 0 8px 8px 0; font-size: 12px; margin-top: 12px;
+    }
+    .switch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
+    .dip-box { background: #090d16; border: 1px solid var(--border); padding: 6px; border-radius: 4px; text-align: center; }
+    .dip-label { font-size: 10px; color: var(--text-muted); }
+    .dip-val { font-size: 12px; font-weight: bold; color: var(--accent); cursor: pointer; }
+
+    /* Live Chart Canvas */
+    #chartCanvas {
+      width: 100%; height: 200px; background: #070a12; border-radius: 8px;
+      border: 1px solid #1a233a; display: block; margin-top: 10px;
+    }
+
+    /* Serial Console */
+    .console-box {
+      background: #05070d; border: 1px solid #1e293b; border-radius: 8px;
+      padding: 10px; font-family: monospace; font-size: 11px; height: 160px;
+      overflow-y: auto; color: #34d399; line-height: 1.4;
+    }
+    .console-line { margin-bottom: 2px; }
+    .console-time { color: #64748b; }
+    .console-err { color: #f87171; }
+    .console-warn { color: #fbbf24; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-title">
+      <h1>SIMULADOR DE PLANTA PILOTO: ULTRAFILTRACIÓN FX100</h1>
+      <p>Tesis de Grado en Ingeniería Industrial • Automatización con ESP32 & Driver DM860</p>
+    </div>
+    <div class="header-status">
+      <span class="badge badge-ip">mDNS: http://bomba-uf.local (192.168.50.37)</span>
+      <span class="badge badge-online" id="esp32StatusBadge">● ESP32 RUNNING</span>
+    </div>
+  </header>
+
+  <div class="grid-main">
+    <!-- COLUMNA IZQUIERDA: P&ID INTERACTIVO Y GRÁFICOS -->
+    <div>
+      <!-- CARD P&ID ANIMADO -->
+      <div class="card">
+        <div class="card-header">
+          <h2>📐 Diagrama P&ID y Flujo de Proceso en Tiempo Real</h2>
+          <span id="fsmStateBadge" class="badge" style="background: rgba(56,189,248,0.2); color: var(--accent);">ESTADO: ESPERA</span>
+        </div>
+        <canvas id="pidCanvas" width="700" height="320"></canvas>
+      </div>
+
+      <!-- CARD GRÁFICA DE PARÁMETROS HIDRÁULICOS -->
+      <div class="card">
+        <div class="card-header">
+          <h2>📈 Curvas de Tesis: TMP, Flujo Darcy (J) y Ensuciamiento (Fouling)</h2>
+          <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11px;" onclick="exportarCSV()">📥 Descargar CSV para Tesis</button>
+        </div>
+        <div class="grid-metrics">
+          <div class="metric-box">
+            <div class="metric-title">TMP Actual</div>
+            <div class="metric-val" id="metricTMP">0.00</div>
+            <div class="metric-unit">atm (Límite: 0.50)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-title">Flux de Membrana (J)</div>
+            <div class="metric-val" id="metricJ">0.0</div>
+            <div class="metric-unit">LMH (L/m²·h)</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-title">Permeado Total</div>
+            <div class="metric-val" id="metricVol">0.00</div>
+            <div class="metric-unit">Litros Producidos</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-title">Turbidez Salida</div>
+            <div class="metric-val" id="metricTurb" style="color: var(--success);">0.15</div>
+            <div class="metric-unit">NTU (Agua Potable)</div>
+          </div>
+        </div>
+        <canvas id="chartCanvas" width="700" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- COLUMNA DERECHA: DASHBOARD DE CONTROL Y DIAGNÓSTICO MECATRÓNICO -->
+    <div>
+      <!-- CARD CONTROL BOMBA MBP-2000 (ESP32 WEB) -->
+      <div class="card">
+        <div class="card-header">
+          <h2>🎮 Control de Accionamiento MBP-2000 (NEMA 34)</h2>
+          <span style="font-size: 11px; color: var(--accent);">GPIO 18 (PUL) / GPIO 19 (DIR)</span>
+        </div>
+
+        <div class="grid-metrics">
+          <div class="metric-box" style="grid-column: span 2;">
+            <div class="metric-title">Velocidad Comandada</div>
+            <div class="metric-val" id="dispRPM" style="font-size: 34px;">0.0</div>
+            <div class="metric-unit">RPM (Frecuencia: <span id="dispFreq">0</span> Hz)</div>
+          </div>
+          <div class="metric-box" style="grid-column: span 2;">
+            <div class="metric-title">Temperatura NEMA 34</div>
+            <div class="metric-val" id="dispMotorTemp" style="font-size: 34px; color: var(--success);">28.5 °C</div>
+            <div class="metric-unit" id="dispMotorTempDesc">Normal (SW4 en OFF)</div>
+          </div>
+        </div>
+
+        <div class="slider-container">
+          <div class="slider-header">
+            <span>Fijar RPM de Bomba:</span>
+            <strong id="sliderValTxt" style="color: var(--accent);">30 RPM</strong>
+          </div>
+          <input type="range" id="rpmSlider" min="0" max="120" value="30" oninput="actualizarSlider(this.value)">
+        </div>
+
+        <div class="btn-group">
+          <button class="btn btn-primary" onclick="cmdStart()">▶ INICIAR BOMBA</button>
+          <button class="btn btn-danger" onclick="cmdStop()">⏹ DETENER</button>
+          <button class="btn btn-warning" onclick="cmdToggleDir()">🔄 INVERTIR GIRO (<span id="dirTxtBtn">CW: Filtración</span>)</button>
+          <button class="btn btn-purple" onclick="iniciarCicloFSM()">⚡ SECUENCIA FSM AUTO</button>
+        </div>
+      </div>
+
+      <!-- CARD DIAGNÓSTICO ELÉCTRICO Y DE BORNERA (EDUCATIVO) -->
+      <div class="card">
+        <div class="card-header">
+          <h2>🛠️ Diagnóstico Eléctrico del Driver Leadshine DM860</h2>
+          <span style="color: var(--warning);">¡Evita Calentamientos y Ruidos!</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">
+          Haz clic en los switches para simular las causas físicas de sobrecalentamiento y ruidos que ocurrían en tu banco:
+        </p>
+
+        <div class="switch-grid">
+          <div class="dip-box">
+            <div class="dip-label">SW1-SW3 (Amperes)</div>
+            <div class="dip-val" id="dipCurrent" onclick="toggleCurrent()">3.8A RMS</div>
+          </div>
+          <div class="dip-box" style="border: 1px solid var(--warning);">
+            <div class="dip-label">SW4 (Idle Current)</div>
+            <div class="dip-val" id="dipSW4" style="color: var(--success);" onclick="toggleSW4()">OFF (50% Reposo)</div>
+          </div>
+          <div class="dip-box">
+            <div class="dip-label">SW5-SW8 (Micropasos)</div>
+            <div class="dip-val" id="dipSteps">1600 P/R</div>
+          </div>
+          <div class="dip-box">
+            <div class="dip-label">Modo Bornera</div>
+            <div class="dip-val" id="dipWiring" style="color: var(--success);" onclick="toggleWiring()">Cátodo (GND)</div>
+          </div>
+        </div>
+
+        <div class="diag-panel" id="diagAlertBox">
+          <strong>✅ Estado Eléctrico Óptimo:</strong> Driver configurado en Cátodo Común a GND y SW4 en OFF. El motor trabaja frío y con pulsos limpios por silicio LEDC.
+        </div>
+      </div>
+
+      <!-- CARD CONSOLA SERIE VIRTUAL ESP32 -->
+      <div class="card">
+        <div class="card-header">
+          <h2>💻 Monitor Serie Virtual ESP32 (115200 Baud)</h2>
+          <button class="btn btn-outline" style="padding: 2px 8px; font-size: 10px;" onclick="limpiarConsola()">Limpiar</button>
+        </div>
+        <div class="console-box" id="serialConsole">
+          <div class="console-line"><span class="console-time">[00:00:01]</span> ESP32-D0WD-V3 inicializado a 240MHz. Flash: 4MB.</div>
+          <div class="console-line"><span class="console-time">[00:00:01]</span> Conectado a Wi-Fi 'Box804'. IP: http://192.168.50.37</div>
+          <div class="console-line"><span class="console-time">[00:00:02]</span> Servidor Web listo en http://bomba-uf.local</div>
+          <div class="console-line"><span class="console-time">[00:00:02]</span> ArduinoOTA activo para cargas por Wi-Fi.</div>
+          <div class="console-line"><span class="console-time">[00:00:03]</span> Hardware Timer LEDC asignado a GPIO 18 (PUL) y GPIO 19 (DIR).</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===================================================================
+    // MOTOR DE FÍSICA, HIDRÁULICA Y SIMULACIÓN MECATRÓNICA
+    // ===================================================================
+    
+    // Variables de Estado de la Bomba
+    let bombaOn = false;
+    let dirHorario = true; // true = Filtracion, false = Backwash
+    let rpmObjetivo = 0.0;
+    let rpmActual = 0.0;
+    let aceleracionRampa = 35.0; // RPM/s
+
+    // Configuración del Driver DM860
+    let sw4_idle_half = true; // true = OFF (50% corriente), false = ON (100% permanente)
+    let wiring_correct = true; // true = Catodo Comun (GND), false = Anodo 5V con 3.3V
+    let motorTemp = 28.5; // °C
+
+    // Física de la Membrana FX100 (Darcy y Fouling)
+    const Am = 2.2; // Área interfacial m²
+    let P1 = 0.0; // atm (Entrada)
+    let P2 = 0.0; // atm (Retentado)
+    let P3 = 0.0; // atm (Permeado)
+    let TMP = 0.0; // atm
+    let caudalPermeado = 0.0; // L/min
+    let fluxJ = 0.0; // LMH
+    let volumenPermeado = 0.0; // Litros
+    let resistenciaFouling = 1.0; // Resistencia de ensuciamiento acumulada
+    let turbidezPermeado = 0.15; // NTU
+    let tempAgua = 21.0; // °C
+
+    // Reactor de Coagulación / Sedimentador
+    let fsmEstado = "STANDBY";
+    let fsmTiempoSeg = 0;
+    let agitadorRPM = 0.0;
+    let turbidezReactor = 650.0; // NTU inicial (Agua turbia de río)
+
+    // Canvas P&ID
+    const canvas = document.getElementById('pidCanvas');
+    const ctx = canvas.getContext('2d');
+    let animAngle = 0.0;
+
+    // Buffer de Datos para Gráficas
+    const maxDataPoints = 60;
+    let historyTMP = new Array(maxDataPoints).fill(0);
+    let historyJ = new Array(maxDataPoints).fill(0);
+    let historyTime = new Array(maxDataPoints).fill(0);
+    let simTimeSec = 0;
+
+    // CSV Log
+    let csvData = [["Tiempo_seg", "RPM_Bomba", "P1_atm", "P2_atm", "P3_atm", "TMP_atm", "Caudal_Lmin", "Flux_LMH", "Volumen_L", "Temp_Motor_C"]];
+
+    // ===================================================================
+    // BUCLE PRINCIPAL DE SIMULACIÓN (50 Hz / cada 20 ms)
+    // ===================================================================
+    setInterval(function() {
+      const dt = 0.02; // 20 ms
+      simTimeSec += dt;
+
+      // 1. Rampa de Aceleración Suave
+      if (bombaOn) {
+        if (rpmActual < rpmObjetivo) {
+          rpmActual += aceleracionRampa * dt;
+          if (rpmActual > rpmObjetivo) rpmActual = rpmObjetivo;
+        } else if (rpmActual > rpmObjetivo) {
+          rpmActual -= aceleracionRampa * dt;
+          if (rpmActual < rpmObjetivo) rpmActual = rpmObjetivo;
+        }
+      } else {
+        if (rpmActual > 0) {
+          rpmActual -= aceleracionRampa * dt * 1.8;
+          if (rpmActual < 0) rpmActual = 0;
+        }
+      }
+
+      // 2. Modelo Térmico del Motor NEMA 34
+      let targetTemp = 28.0;
+      if (bombaOn) {
+        targetTemp = 36.0 + (rpmActual / 120.0) * 12.0; // Sube a ~48°C a fondo
+      } else {
+        if (!sw4_idle_half) {
+          // SW4 en ON: 100% de corriente en reposo -> ¡Se calienta a 82°C!
+          targetTemp = 82.0;
+        } else {
+          targetTemp = 28.5; // SW4 en OFF: 50% de corriente -> Se enfría rápido
+        }
+      }
+      motorTemp += (targetTemp - motorTemp) * (dt * 0.15);
+
+      // 3. Modelo Hidráulico de Ultrafiltración (Ley de Darcy)
+      if (bombaOn && rpmActual > 0.5) {
+        // La bomba peristáltica MBP-2000 desplaza ~4.2 mL por revolución
+        let Q_bomba = (rpmActual * 4.2) / 1000.0; // L/min (0 a 0.5 L/min)
+        
+        if (dirHorario) {
+          // Modo Filtración Normal
+          P1 = 0.12 + (Q_bomba * 0.45) * resistenciaFouling;
+          P2 = P1 * 0.72;
+          P3 = 0.02;
+          TMP = ((P1 + P2) / 2.0) - P3;
+
+          // Límite de seguridad FX100 (0.50 atm)
+          if (TMP > 0.50) {
+            logSerial("🚨 ALARMA CRÍTICA: TMP excedió 0.50 atm. Apagando bomba por enclavamiento de seguridad!", "err");
+            cmdStop();
+          }
+
+          // Corrección por temperatura TCF = exp(0.0239 * (20 - T))
+          let TCF = Math.exp(0.0239 * (20.0 - tempAgua));
+          caudalPermeado = Q_bomba * 0.85 / resistenciaFouling;
+          fluxJ = (caudalPermeado * 60.0) / Am; // LMH
+
+          volumenPermeado += (caudalPermeado / 60.0) * dt;
+          resistenciaFouling += 0.00015 * dt * (turbidezReactor / 100.0); // Ensuciamiento progresivo
+        } else {
+          // Modo Retrolavado (Backwash Inverso)
+          P1 = 0.02;
+          P2 = 0.05;
+          P3 = 0.28;
+          TMP = ((P1 + P2) / 2.0) - P3; // TMP negativa
+          caudalPermeado = -Q_bomba * 0.9;
+          fluxJ = (caudalPermeado * 60.0) / Am;
+          resistenciaFouling = Math.max(1.0, resistenciaFouling - 0.005 * dt); // Limpieza de membrana
+        }
+      } else {
+        P1 = 0; P2 = 0; P3 = 0; TMP = 0; caudalPermeado = 0; fluxJ = 0;
+      }
+
+      // 4. Animación P&ID
+      animAngle += (rpmActual / 60.0) * (Math.PI * 2) * dt * (dirHorario ? 1 : -1);
+      dibujarPID();
+
+      // 5. Actualización de Displays UI
+      actualizarDisplays();
+
+    }, 20);
+
+    // Registro de Historial de Gráficas (cada 500 ms)
+    setInterval(function() {
+      historyTMP.push(TMP); historyTMP.shift();
+      historyJ.push(Math.max(0, fluxJ)); historyJ.shift();
+      dibujarGraficas();
+
+      if (bombaOn) {
+        csvData.push([
+          simTimeSec.toFixed(1),
+          rpmActual.toFixed(1),
+          P1.toFixed(3),
+          P2.toFixed(3),
+          P3.toFixed(3),
+          TMP.toFixed(3),
+          caudalPermeado.toFixed(3),
+          fluxJ.toFixed(1),
+          volumenPermeado.toFixed(3),
+          motorTemp.toFixed(1)
+        ]);
+      }
+    }, 500);
+
+    // ===================================================================
+    // DIBUJO DEL DIAGRAMA P&ID EN CANVAS
+    // ===================================================================
+    function dibujarPID() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // A. REACTOR / SEDIMENTADOR CÓNICO (Izquierda)
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      
+      // Cilindro superior
+      ctx.beginPath();
+      ctx.rect(40, 60, 110, 110);
+      ctx.stroke();
+      // Cono inferior
+      ctx.beginPath();
+      ctx.moveTo(40, 170);
+      ctx.lineTo(95, 230);
+      ctx.lineTo(150, 170);
+      ctx.stroke();
+
+      // Líquido adentro
+      let colorAgua = `rgba(180, 83, 9, ${Math.min(1.0, turbidezReactor / 400.0)})`; // Marrón turbio
+      ctx.fillStyle = colorAgua;
+      ctx.beginPath();
+      ctx.moveTo(42, 90);
+      ctx.lineTo(148, 90);
+      ctx.lineTo(148, 170);
+      ctx.lineTo(95, 228);
+      ctx.lineTo(42, 170);
+      ctx.closePath();
+      ctx.fill();
+
+      // Paleta Agitadora
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(95, 40); ctx.lineTo(95, 160);
+      ctx.stroke();
+      // Aspas
+      let aspaOffset = Math.sin(animAngle * (agitadorRPM / (rpmActual || 1))) * 25;
+      ctx.fillStyle = '#cbd5e1';
+      ctx.fillRect(95 - aspaOffset, 140, aspaOffset * 2, 12);
+
+      // Motor Agitador arriba
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(80, 25, 30, 20);
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('Motor DC', 75, 20);
+      ctx.fillText('Sedimentador', 60, 250);
+
+      // B. TUBERÍA HACIA BOMBA
+      ctx.strokeStyle = (bombaOn && dirHorario) ? '#38bdf8' : '#334155';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(148, 120);
+      ctx.lineTo(230, 120);
+      ctx.stroke();
+
+      // C. BOMBA PERISTÁLTICA MBP-2000
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(260, 120, 30, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Rotor y Rodillos giratorios
+      ctx.save();
+      ctx.translate(260, 120);
+      ctx.rotate(animAngle);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(-18, 0); ctx.lineTo(18, 0);
+      ctx.moveTo(0, -18); ctx.lineTo(0, 18);
+      ctx.stroke();
+      // Rodillos
+      ctx.fillStyle = '#38bdf8';
+      [-18, 18].forEach(x => {
+        ctx.beginPath(); ctx.arc(x, 0, 5, 0, Math.PI * 2); ctx.fill();
+      });
+      [0].forEach(x => {
+        ctx.beginPath(); ctx.arc(0, 18, 5, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.restore();
+      ctx.fillText('NEMA 34 (MBP-2000)', 205, 170);
+
+      // D. TUBERÍA HACIA FILTRO FX100 (con Manómetro P1)
+      ctx.strokeStyle = (bombaOn) ? '#38bdf8' : '#334155';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(290, 120); ctx.lineTo(400, 120);
+      ctx.stroke();
+
+      // Manómetro P1
+      dibujarManometro(340, 120, 'P1: ' + P1.toFixed(2) + ' atm');
+
+      // E. MÓDULO DE FIBRA HUECA FRESENIUS FX100
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.fillRect(400, 70, 60, 140);
+      ctx.strokeRect(400, 70, 60, 140);
+
+      // Fibras capilares internas
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 1;
+      for (let y = 80; y <= 200; y += 8) {
+        ctx.beginPath(); ctx.moveTo(405, y); ctx.lineTo(455, y); ctx.stroke();
+      }
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText('Filtro FX100', 402, 60);
+
+      // Salida Retentado (Arriba hacia P2)
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(460, 90); ctx.lineTo(520, 90);
+      ctx.stroke();
+      dibujarManometro(520, 90, 'P2: ' + P2.toFixed(2) + ' atm');
+
+      // Salida Permeado (Abajo hacia P3 y Tanque)
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(460, 180); ctx.lineTo(540, 180); ctx.lineTo(540, 240); ctx.lineTo(590, 240);
+      ctx.stroke();
+      dibujarManometro(500, 180, 'P3: ' + P3.toFixed(2) + ' atm');
+
+      // F. TANQUE DE PERMEADO (Agua Potable)
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(590, 200, 80, 80);
+      // Nivel de agua limpia
+      let hLimpia = Math.min(70, volumenPermeado * 15);
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.5)';
+      ctx.fillRect(592, 278 - hLimpia, 76, hLimpia);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillText('Tanque Permeado', 590, 295);
+    }
+
+    function dibujarManometro(x, y, texto) {
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y - 20, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '9px monospace';
+      ctx.fillText(texto, x - 25, y - 36);
+    }
+
+    // ===================================================================
+    // DIBUJO DE GRÁFICAS DE TESIS EN CANVAS
+    // ===================================================================
+    function dibujarGraficas() {
+      const c = document.getElementById('chartCanvas');
+      const g = c.getContext('2d');
+      g.clearRect(0, 0, c.width, c.height);
+
+      // Cuadrícula de fondo
+      g.strokeStyle = '#1e293b';
+      g.lineWidth = 1;
+      for (let y = 20; y < c.height; y += 35) {
+        g.beginPath(); g.moveTo(40, y); g.lineTo(c.width - 20, y); g.stroke();
+      }
+
+      // Eje TMP (Azul) - Escala 0 a 0.6 atm
+      g.strokeStyle = '#38bdf8';
+      g.lineWidth = 2;
+      g.beginPath();
+      for (let i = 0; i < maxDataPoints; i++) {
+        let x = 40 + i * ((c.width - 60) / (maxDataPoints - 1));
+        let y = c.height - 20 - (historyTMP[i] / 0.6) * (c.height - 40);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.stroke();
+
+      // Eje Flux J (Verde) - Escala 0 a 30 LMH
+      g.strokeStyle = '#10b981';
+      g.lineWidth = 2;
+      g.beginPath();
+      for (let i = 0; i < maxDataPoints; i++) {
+        let x = 40 + i * ((c.width - 60) / (maxDataPoints - 1));
+        let y = c.height - 20 - (historyJ[i] / 30.0) * (c.height - 40);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.stroke();
+
+      // Leyenda
+      g.fillStyle = '#38bdf8'; g.font = '11px sans-serif';
+      g.fillText('— TMP (atm)', 50, 18);
+      g.fillStyle = '#10b981';
+      g.fillText('— Flux Darcy J (LMH)', 150, 18);
+      g.fillStyle = '#ef4444';
+      g.fillText('--- Límite TMP (0.50 atm)', 300, 18);
+
+      // Línea roja de límite de 0.50 atm
+      let yLim = c.height - 20 - (0.50 / 0.6) * (c.height - 40);
+      g.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+      g.setLineDash([4, 4]);
+      g.beginPath(); g.moveTo(40, yLim); g.lineTo(c.width - 20, yLim); g.stroke();
+      g.setLineDash([]);
+    }
+
+    // ===================================================================
+    // ACTUALIZACIÓN DE ELEMENTOS UI Y TELEMETRÍA
+    // ===================================================================
+    function actualizarDisplays() {
+      document.getElementById('dispRPM').innerText = rpmActual.toFixed(1);
+      document.getElementById('dispFreq').innerText = Math.round((rpmActual * 1600) / 60);
+      
+      document.getElementById('metricTMP').innerText = TMP.toFixed(2);
+      document.getElementById('metricJ').innerText = fluxJ.toFixed(1);
+      document.getElementById('metricVol').innerText = volumenPermeado.toFixed(2);
+      
+      // Color y temperatura de motor
+      let tempBox = document.getElementById('dispMotorTemp');
+      tempBox.innerText = motorTemp.toFixed(1) + ' °C';
+      if (motorTemp > 65.0) {
+        tempBox.style.color = 'var(--danger)';
+        document.getElementById('dispMotorTempDesc').innerText = '🔥 SOBRECALENTADO (SW4 en ON)';
+      } else if (motorTemp > 45.0) {
+        tempBox.style.color = 'var(--warning)';
+        document.getElementById('dispMotorTempDesc').innerText = 'En Marcha (Carga Normal)';
+      } else {
+        tempBox.style.color = 'var(--success)';
+        document.getElementById('dispMotorTempDesc').innerText = 'Frío / Óptimo (SW4 en OFF)';
+      }
+    }
+
+    // ===================================================================
+    // ACCIONES DEL USUARIO (COMANDOS WEB DEL ESP32)
+    // ===================================================================
+    function actualizarSlider(val) {
+      document.getElementById('sliderValTxt').innerText = val + ' RPM';
+      rpmObjetivo = parseFloat(val);
+      if (bombaOn) logSerial(`[WEB] Setpoint RPM actualizado a: ${val} RPM`);
+    }
+
+    function cmdStart() {
+      bombaOn = true;
+      if (rpmObjetivo < 1.0) {
+        rpmObjetivo = 30.0;
+        document.getElementById('rpmSlider').value = 30;
+        document.getElementById('sliderValTxt').innerText = '30 RPM';
+      }
+      logSerial(`[ESP32] Bomba INICIADA. Acelerando suavemente a ${rpmObjetivo} RPM (Rampa: 35 RPM/s)...`);
+    }
+
+    function cmdStop() {
+      bombaOn = false;
+      logSerial(`[ESP32] Bomba DETENIDA. Desacelerando motor a 0 RPM...`);
+    }
+
+    function cmdToggleDir() {
+      dirHorario = !dirHorario;
+      let txt = dirHorario ? "CW: Filtración hacia FX100" : "CCW: Retrolavado (Backwash)";
+      document.getElementById('dirTxtBtn').innerText = txt;
+      logSerial(`[ESP32] Sentido de giro cambiado a: ${txt}`);
+    }
+
+    // Diagnósticos del DM860
+    function toggleSW4() {
+      sw4_idle_half = !sw4_idle_half;
+      let el = document.getElementById('dipSW4');
+      let diag = document.getElementById('diagAlertBox');
+
+      if (sw4_idle_half) {
+        el.innerText = 'OFF (50% Reposo)';
+        el.style.color = 'var(--success)';
+        diag.innerHTML = '<strong>✅ Estado Térmico Óptimo:</strong> SW4 en OFF reduce la corriente al 50% en reposo. El motor NEMA 34 se mantendrá tibio (~30°C).';
+        logSerial('[DM860] SW4 configurado en OFF -> Standstill Current reducido al 50%.');
+      } else {
+        el.innerText = 'ON (100% Reposo)';
+        el.style.color = 'var(--danger)';
+        diag.innerHTML = '<strong>🚨 ALERTA DE SOBRECALENTAMIENTO:</strong> SW4 en ON mantiene el 100% de corriente permanente a las bobinas. ¡El motor alcanzará >80°C y quemará al tacto!';
+        logSerial('[DM860 ALERTA] SW4 puesto en ON -> Corriente continua inyectada. El motor se sobrecalentará!', 'warn');
+      }
+    }
+
+    function toggleWiring() {
+      wiring_correct = !wiring_correct;
+      let el = document.getElementById('dipWiring');
+      let diag = document.getElementById('diagAlertBox');
+
+      if (wiring_correct) {
+        el.innerText = 'Cátodo (GND)';
+        el.style.color = 'var(--success)';
+        aceleracionRampa = 35.0;
+        diag.innerHTML = '<strong>✅ Cableado Correcto:</strong> Cátodo Común a GND del ESP32. Niveles lógicos de 3.3V nítidos sin conducción parásita.';
+        logSerial('[BORNERA] Cableado en Cátodo Común (PUL- y DIR- a GND). Señales limpias.');
+      } else {
+        el.innerText = 'Ánodo 5V (RUIDO)';
+        el.style.color = 'var(--danger)';
+        aceleracionRampa = 10.0;
+        diag.innerHTML = '<strong>🚨 ALERTA DE RUIDO ELÉCTRICO:</strong> Conectar 5V en ánodo común con ESP32 (3.3V) causa que el optoacoplador nunca se apague del todo (1.7V residual). Causa ruidos, pérdida de pasos y vibración!';
+        logSerial('[BORNERA ERROR] Ánodo 5V con ESP32 de 3.3V: Conducción parásita en optoacoplador. Ruido y jitter presentes!', 'err');
+      }
+    }
+
+    function toggleCurrent() {
+      logSerial('[DM860] Corriente fijada en 3.8A RMS (Ideal para NEMA 34 de 4 Nm).');
+    }
+
+    // Secuencia FSM Completa
+    function iniciarCicloFSM() {
+      logSerial('=== INICIANDO SECUENCIA AUTOMÁTICA DEL REACTOR Y FILTRO ===');
+      fsmEstado = "MEZCLA_RAPIDA";
+      agitadorRPM = 150;
+      document.getElementById('fsmStateBadge').innerText = "FSM: 1. MEZCLA RÁPIDA (150 RPM)";
+      logSerial('[FSM] Etapa 1: Mezcla Rápida (150 RPM / Gradiente G=400 s⁻¹) - Coagulante Opuntia/Moringa.');
+
+      setTimeout(() => {
+        fsmEstado = "MEZCLA_LENTA";
+        agitadorRPM = 30;
+        document.getElementById('fsmStateBadge').innerText = "FSM: 2. MEZCLA LENTA (30 RPM)";
+        logSerial('[FSM] Etapa 2: Floculación Lenta (30 RPM / Gradiente G=35 s⁻¹) - Crecimiento de flóculos.');
+      }, 5000);
+
+      setTimeout(() => {
+        fsmEstado = "SEDIMENTACION";
+        agitadorRPM = 0;
+        turbidezReactor = 15.0; // Sobrenadante clarificado
+        document.getElementById('fsmStateBadge').innerText = "FSM: 3. SEDIMENTACIÓN (0 RPM)";
+        logSerial('[FSM] Etapa 3: Decantación gravitacional de lodos. Sobrenadante clarificado a 15 NTU.');
+      }, 10000);
+
+      setTimeout(() => {
+        fsmEstado = "FILTRACION_UF";
+        document.getElementById('fsmStateBadge').innerText = "FSM: 4. FILTRACIÓN UF FX100";
+        logSerial('[FSM] Etapa 4: Arranque automático de bomba MBP-2000 hacia membrana FX100.');
+        cmdStart();
+      }, 14000);
+    }
+
+    // Consola Serie
+    function logSerial(msg, type = "info") {
+      const consoleBox = document.getElementById('serialConsole');
+      const d = new Date();
+      const timeStr = `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}]`;
+      
+      let line = document.createElement('div');
+      line.className = 'console-line';
+      if (type === 'err') line.className += ' console-err';
+      if (type === 'warn') line.className += ' console-warn';
+      line.innerHTML = `<span class="console-time">${timeStr}</span> ${msg}`;
+      consoleBox.appendChild(line);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+
+    function limpiarConsola() {
+      document.getElementById('serialConsole').innerHTML = '';
+    }
+
+    // Exportar CSV
+    function exportarCSV() {
+      let csvContent = "data:text/csv;charset=utf-8," + csvData.map(e => e.join(",")).join("\n");
+      let encodedUri = encodeURI(csvContent);
+      let link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "ensayo_ultrafiltracion_tesis.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      logSerial('[EXPORT] Archivo CSV descargado exitosamente para análisis en Excel/Python.');
+    }
+  </script>
+</body>
+</html>

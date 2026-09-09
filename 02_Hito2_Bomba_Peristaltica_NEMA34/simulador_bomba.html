@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador de Accionamiento NEMA 34 & Driver DM860</title>
+  <style>
+    :root {
+      --bg: #0b0f19; --card: #151d30; --border: #263554;
+      --text: #f1f5f9; --muted: #94a3b8; --accent: #38bdf8;
+      --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+    .container { width: 100%; max-width: 800px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    h1 { font-size: 22px; color: var(--accent); margin-bottom: 4px; }
+    p.sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media(max-width: 650px) { .grid { grid-template-columns: 1fr; } }
+    .metric-box { background: #070a12; border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+    .metric-val { font-size: 32px; font-weight: 800; font-family: monospace; color: var(--accent); margin: 4px 0; }
+    .metric-unit { font-size: 11px; color: var(--muted); }
+    canvas { background: #070a12; border: 1px solid var(--border); border-radius: 10px; width: 100%; height: 180px; display: block; margin-bottom: 16px; }
+    .switch-panel { background: #0e1626; border: 1px solid var(--warning); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+    .switch-header { font-size: 13px; font-weight: bold; color: var(--warning); margin-bottom: 8px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .btn { padding: 10px 18px; border: none; border-radius: 6px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.2s; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #090d16; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-warning { background: var(--warning); color: #090d16; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>SIMULADOR DE ACCIONAMIENTO NEMA 34 (DM860)</h1>
+      <p class="sub">Hito 2: Física de Rampa, Frecuencia LEDC y Comportamiento Térmico del Motor</p>
+
+      <div class="grid">
+        <div class="metric-box">
+          <div class="metric-unit">VELOCIDAD ACTUAL</div>
+          <div class="metric-val" id="dispRPM">0.0</div>
+          <div class="metric-unit">RPM (Frecuencia: <span id="dispFreq">0</span> Hz)</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-unit">TEMPERATURA NEMA 34</div>
+          <div class="metric-val" id="dispTemp" style="color: var(--success);">28.5 °C</div>
+          <div class="metric-unit" id="dispTempStatus">Normal (SW4 en OFF)</div>
+        </div>
+      </div>
+
+      <canvas id="rotorCanvas" width="750" height="180"></canvas>
+
+      <div class="switch-panel">
+        <div class="switch-header">⚙️ INTERRUPTOR DE SEGURIDAD SW4 (STANDSTILL CURRENT):</div>
+        <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
+          Haz clic para alternar el interruptor y simular el motivo del sobrecalentamiento:
+        </p>
+        <button class="btn btn-outline" id="btnSW4" onclick="toggleSW4()" style="color: var(--success); border-color: var(--success);">
+          SW4 = OFF (50% Corriente en Reposo - Óptimo)
+        </button>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <label style="font-size: 12px; color: var(--muted); display: flex; justify-content: space-between;">
+          <span>Ajustar Setpoint de Velocidad:</span>
+          <strong id="sliderTxt" style="color: var(--accent);">30 RPM</strong>
+        </label>
+        <input type="range" id="sliderRPM" min="0" max="120" value="30" style="width: 100%; margin-top: 6px;" oninput="document.getElementById('sliderTxt').innerText = this.value + ' RPM'; setpointRPM = parseFloat(this.value);">
+      </div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="startMotor()">▶ INICIAR</button>
+        <button class="btn btn-danger" onclick="stopMotor()">⏹ DETENER</button>
+        <button class="btn btn-warning" onclick="toggleDir()">🔄 INVERTIR GIRO (<span id="dirTxt">Horario</span>)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let motorOn = false;
+    let dirHoraria = true;
+    let setpointRPM = 30.0;
+    let currentRPM = 0.0;
+    let sw4_off = true;
+    let tempMotor = 28.5;
+    let rotorAngle = 0.0;
+
+    const canvas = document.getElementById('rotorCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function toggleSW4() {
+      sw4_off = !sw4_off;
+      let b = document.getElementById('btnSW4');
+      if (sw4_off) {
+        b.innerText = "SW4 = OFF (50% Corriente en Reposo - Óptimo)";
+        b.style.color = "var(--success)";
+        b.style.borderColor = "var(--success)";
+      } else {
+        b.innerText = "SW4 = ON (100% Corriente Permanente - ¡CALIENTA!)";
+        b.style.color = "var(--danger)";
+        b.style.borderColor = "var(--danger)";
+      }
+    }
+
+    function startMotor() { motorOn = true; }
+    function stopMotor() { motorOn = false; }
+    function toggleDir() {
+      dirHoraria = !dirHoraria;
+      document.getElementById('dirTxt').innerText = dirHoraria ? "Horario" : "Antihorario";
+    }
+
+    setInterval(() => {
+      const dt = 0.02; // 20 ms
+      
+      // Rampa 35 RPM/s
+      if (motorOn) {
+        if (currentRPM < setpointRPM) {
+          currentRPM += 35.0 * dt;
+          if (currentRPM > setpointRPM) currentRPM = setpointRPM;
+        } else if (currentRPM > setpointRPM) {
+          currentRPM -= 35.0 * dt;
+          if (currentRPM < setpointRPM) currentRPM = setpointRPM;
+        }
+      } else {
+        if (currentRPM > 0) {
+          currentRPM -= 50.0 * dt;
+          if (currentRPM < 0) currentRPM = 0;
+        }
+      }
+
+      // Modelo Térmico
+      let targetT = 28.0;
+      if (motorOn) {
+        targetT = 35.0 + (currentRPM / 120.0) * 12.0;
+      } else {
+        targetT = sw4_off ? 28.5 : 82.0; // SW4 ON calienta a 82°C en reposo!
+      }
+      tempMotor += (targetT - tempMotor) * (dt * 0.15);
+
+      // Rotación
+      rotorAngle += (currentRPM / 60.0) * Math.PI * 2 * dt * (dirHoraria ? 1 : -1);
+
+      // Displays
+      document.getElementById('dispRPM').innerText = currentRPM.toFixed(1);
+      document.getElementById('dispFreq').innerText = Math.round((currentRPM * 1600) / 60);
+      
+      let tBox = document.getElementById('dispTemp');
+      tBox.innerText = tempMotor.toFixed(1) + " °C";
+      if (tempMotor > 65) {
+        tBox.style.color = "var(--danger)";
+        document.getElementById('dispTempStatus').innerText = "🔥 SOBRECALENTADO (SW4 en ON)";
+      } else if (tempMotor > 45) {
+        tBox.style.color = "var(--warning)";
+        document.getElementById('dispTempStatus').innerText = "En Marcha (Carga Normal)";
+      } else {
+        tBox.style.color = "var(--success)";
+        document.getElementById('dispTempStatus').innerText = "Frío / Óptimo (SW4 en OFF)";
+      }
+
+      // Dibujar Rotor y Tren de Pulsos
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Cabezal Peristáltico a la izquierda
+      ctx.save();
+      ctx.translate(120, 90);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, 45, 0, Math.PI * 2); ctx.stroke();
+      
+      ctx.rotate(rotorAngle);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#64748b';
+      ctx.beginPath(); ctx.moveTo(-30, 0); ctx.lineTo(30, 0); ctx.moveTo(0, -30); ctx.lineTo(0, 30); ctx.stroke();
+      
+      ctx.fillStyle = '#38bdf8';
+      [-30, 30].forEach(x => { ctx.beginPath(); ctx.arc(x, 0, 8, 0, Math.PI * 2); ctx.fill(); });
+      [0].forEach(x => { ctx.beginPath(); ctx.arc(0, 30, 8, 0, Math.PI * 2); ctx.fill(); });
+      ctx.restore();
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Cabezal MBP-2000 (NEMA 34)', 40, 160);
+
+      // Tren de Pulsos LEDC a la derecha
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      let freq = (currentRPM * 1600) / 60;
+      let periodoPix = freq > 0 ? Math.max(8, 2000 / freq) : 0;
+      let startX = 240;
+      
+      for (let x = startX; x < canvas.width - 20; x += periodoPix) {
+        if (freq === 0) {
+          ctx.moveTo(startX, 100); ctx.lineTo(canvas.width - 20, 100); break;
+        }
+        ctx.moveTo(x, 100);
+        ctx.lineTo(x, 60);
+        ctx.lineTo(x + periodoPix / 2, 60);
+        ctx.lineTo(x + periodoPix / 2, 100);
+        ctx.lineTo(x + periodoPix, 100);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#10b981';
+      ctx.fillText('Tren de Pulsos Hardware LEDC (GPIO 18): ' + Math.round(freq) + ' Hz', 240, 45);
+
+    }, 20);
+  </script>
+</body>
+</html>

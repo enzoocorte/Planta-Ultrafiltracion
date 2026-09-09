@@ -1,0 +1,24 @@
+# Compilación Arduino / PlatformIO / ESP32
+*.bin
+*.hex
+*.elf
+*.o
+*.a
+*.d
+*.tmp
+*.log
+.build/
+build/
+.pio/
+.vscode/
+.idea/
+
+# Sistema Operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Archivos de respaldo
+*.bak
+*.orig
+*~
