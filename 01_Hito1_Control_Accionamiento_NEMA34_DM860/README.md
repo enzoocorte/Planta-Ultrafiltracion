@@ -315,3 +315,14 @@ El Hito 1 se considera **OFICIALMENTE APROBADO** para el informe de tesis cuando
 - [ ] **Inversión de Sentido Fiable**: El cambio entre modo Filtración (CW) y Retrolavado (CCW) se ejecuta de forma inmediata y limpia.
 - [ ] **Estabilidad Térmica Comprobada**: Tras operar durante $20\text{ minutos}$ continuos a $60\text{ RPM}$ y luego estar en reposo $10\text{ minutos}$, la carcasa del motor NEMA 34 permanece tibia ($< 45^\circ\text{C}$), comprobando que el switch SW4 en `OFF` protege las bobinas.
 - [ ] **Torque de Arrastre Efectivo**: El motor vence con total facilidad la resistencia del tubo peristáltico elastomérico comprimido por los rodillos de la bomba MBP-2000.
+
+---
+
+### 📂 Índice de Archivos y Módulos de este Hito:
+
+1. 💻 **[`bomba/bomba.ino`](./bomba/bomba.ino)**: Firmware oficial con **Control Inalámbrico Wi-Fi**, Dashboard Web responsivo (para celular y notebook), ArduinoOTA y consola serie.
+2. 📖 **[`bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`](./bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md)**: Manual de montaje con el shield de borneras a tornillo del ESP32.
+3. ⚙️ **[`Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md)**: Puesta a punto de los 8 cables del motor (CNC Insumos S.R.L.) y calibración de los DIP switches en Bipolar Serie (3A).
+4. 🔌 **[`Guia_Conexionado_Fisico_DM860.md`](./Guia_Conexionado_Fisico_DM860.md)**: Manual de conexionado eléctrico paso a paso.
+5. 💻 **[`Hito1_ControlMotor/Hito1_ControlMotor.ino`](./Hito1_ControlMotor/Hito1_ControlMotor.ino)**: Firmware base modular por puerto serie (115200 baudios).
+6. ⚡ **[`Guia_Alimentacion_y_Masa_Comun.md`](./Guia_Alimentacion_y_Masa_Comun.md)**: Técnica de distribución de masa y calibración del LM2596 a 5.00V.
