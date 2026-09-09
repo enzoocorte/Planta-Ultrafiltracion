@@ -59,26 +59,29 @@ El driver digital Leadshine DM860 cuenta con dos bloques de borneras independien
 
 ---
 
-## 🌀 3. Identificación y Conexión de las Fases del Motor NEMA 34
+## 🌀 3. Identificación y Conexión de las Fases del Motor NEMA 34 (8 Cables - Modelo FX3.162)
 
-El motor paso a paso posee 4 cables correspondientes a dos bobinas independientes (Fase A y Fase B).
+Según el plano oficial del fabricante (**CNC Insumos S.R.L.**), el motor posee **8 cables** agrupados en 4 bobinados (2 bobinados por fase).
 
-### Cómo identificar las parejas en el taller sin dudar:
-* **Método 1 (Con Multímetro)**:
-  * Poner el tester en medición de continuidad o resistencia baja ($200\,\Omega$).
-  * Medir entre pares de cables.
-  * Los dos cables que marquen resistencia baja ($\approx 0.5\text{ a }1.5\,\Omega$) o hagan sonar el "beep" pertenecen a la **Misma Fase**.
-  * Entre cables de fases distintas debe marcar circuito abierto ($\infty$).
-* **Método 2 (Prueba Rápida de Cortocircuito sin Instrumental)**:
-  * Con el motor desenchufado, gira el eje con los dedos (debe girar suave y liviano).
-  * Junta y haz contacto entre dos cables al azar:
-    * Si el eje **se pone duro y pesado para girar**, ¡esos dos cables forman una fase!
-    * Si sigue girando liviano, no son pareja.
+### ⭐ Conexión Bipolar SERIE (Consumo 3.0A - Recomendada para Bomba Peristáltica):
+Entrega el torque máximo de **$4.5\text{ Nm}$** con solo **$3.0\text{ A}$** de corriente, evitando calentar el motor y relajando el transformador:
+* **Fase A**:
+  * Cable **ROJO** ──► Borne **`A+`** del DM860
+  * Cable **AMARILLO** + Cable **AZUL** ──► **Unir entre sí y aislar con cinta** (NO van al driver)
+  * Cable **NEGRO** ──► Borne **`A-`** del DM860
+* **Fase B**:
+  * Cable **BLANCO** ──► Borne **`B+`** del DM860
+  * Cable **NARANJA** + Cable **MARRÓN** ──► **Unir entre sí y aislar con cinta** (NO van al driver)
+  * Cable **VERDE** ──► Borne **`B-`** del DM860
 
-### Conexión a la Bornera:
-* Pareja 1 ➔ Borne **`A+`** y Borne **`A-`**.
-* Pareja 2 ➔ Borne **`B+`** y Borne **`B-`**.
-> *Nota: Si al encender el motor gira al revés de lo deseado, simplemente inviertes los cables de una sola fase (ej. cambias A+ por A-).*
+### Conexión Alternativa Bipolar PARALELO (Consumo 6.0A):
+Para altas velocidades (>600 RPM):
+* **Rojo + Azul** (unidos) ──► Borne **`A+`**
+* **Amarillo + Negro** (unidos) ──► Borne **`A-`**
+* **Blanco + Marrón** (unidos) ──► Borne **`B+`**
+* **Naranja + Verde** (unidos) ──► Borne **`B-`**
+
+> *Para el detalle completo con tablas de inductancia y resistencia, consultar [Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md](./Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md).*
 
 ---
 
