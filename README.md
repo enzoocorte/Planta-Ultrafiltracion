@@ -3,12 +3,14 @@
 
 ---
 
-## 👥 Equipo del Proyecto
-* **Director de Tesis**: Enzo (Director de Proyecto)
-* **Tesistas**: 2 Alumnos de Ingeniería Industrial
+## 👥 Equipo del Proyecto & Contexto Académico
+* **Codirector de Tesis**: **Ing. Enzo** *(Investigador Doctoral — Tesis Doctoral en Tratamiento de Aguas y Procesos de Separación por Membranas)*
+* **Tesistas de Grado (Ingeniería Industrial)**: **Antonella Guitián** & **Owen Cañizares**
 * **Asesor Técnico y Arquitectura de Control**: Antigravity AI
 * **Microcontrolador Principal**: ESP32 NodeMCU (38 Pines USB-C, Dual Core 240 MHz)
 * **Membrana de Ultrafiltración**: Fresenius Medical Care FX100 (Polisulfona / Helixone®, $A_m = 2.2\text{ m}^2$)
+
+> 📘 **DOCUMENTO PRINCIPAL**: Para una explicación exhaustiva de la arquitectura del sistema, el flujo de proceso y la guía detallada de qué se busca en cada hito, consultar el **[MANUAL_GENERAL_Y_GUIA_DE_NAVEGACION.md](./MANUAL_GENERAL_Y_GUIA_DE_NAVEGACION.md)**.
 
 ---
 
