@@ -18,12 +18,12 @@ Este repositorio está organizado en **6 carpetas modulares independientes**, es
 
 ```
 SistemaUF/
-├── 📁 01_Hito1_Materiales_Inventario_Armado/       # Compras, unboxing, inventario real y distribución de potencia
-├── 📁 02_Hito2_Bomba_Peristaltica_NEMA34/          # Puesta a punto MBP-2000, driver DM860, rampa y firmware didáctico
-├── 📁 03_Hito3_Instrumentacion_Sensores/           # Caudalímetros YF-S401, Sonda TDS, DS18B20, ADC ADS1115 y ferretería
-├── 📁 04_Hito4_Reactor_Sedimentador_Agitador/      # Driver L298N, paleta PWM, boya de nivel y ensayo de turbidez
-├── 📁 05_Hito5_Integracion_Automatizacion_IoT/     # Automatización completa, seguridad TMP ≤ 0.50 atm y Web Dashboard
-└── 📁 06_Hito6_Ensayos_Membrana_VidaUtil/          # Protocolo de ensayos, Ley de Darcy, Fouling y datos de tesis
+├── 📁 01_Hito1_Control_Accionamiento_NEMA34_DM860/ # ⚡ HITO 1: Control de Accionamiento de Potencia (NEMA 34 + DM860 + ESP32)
+├── 📁 02_Hito2_Bomba_Peristaltica_NEMA34/          # 🌀 HITO 2: Bomba MBP-2000, Rampa de Caudal (mL/rev), Web y OTA
+├── 📁 03_Hito3_Instrumentacion_Sensores/           # 📊 HITO 3: Caudalímetros YF-S401, Sonda TDS, DS18B20 y ADS1115
+├── 📁 04_Hito4_Reactor_Sedimentador_Agitador/      # 🌪️ HITO 4: Driver L298N, paleta PWM, boya de nivel y turbidez
+├── 📁 05_Hito5_Integracion_Automatizacion_IoT/     # 🌐 HITO 5: Automatización completa, seguridad TMP ≤ 0.50 atm y SCADA
+└── 📁 06_Hito6_Ensayos_Membrana_VidaUtil/          # 🧪 HITO 6: Protocolo de ensayos, Ley de Darcy, Fouling y Tesis
 ```
 
 ---
@@ -32,7 +32,7 @@ SistemaUF/
 
 ```mermaid
 flowchart LR
-    H1["📦 HITO 1<br>Materiales & Armado"] --> H2["🌀 HITO 2<br>Bomba NEMA 34"]
+    H1["⚡ HITO 1<br>Potencia NEMA 34"] --> H2["🌀 HITO 2<br>Bomba & Dashboard"]
     H2 --> H3["📊 HITO 3<br>Sensores & TDS"]
     H3 --> H4["🌪️ HITO 4<br>Sedimentador L298N"]
     H4 --> H5["🌐 HITO 5<br>Integración & IoT"]
