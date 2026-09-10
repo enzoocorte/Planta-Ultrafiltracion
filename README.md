@@ -60,6 +60,7 @@ flowchart LR
 ---
 
 ## 🚀 Cómo Empezar a Trabajar
-1. Navega a la carpeta del hito en el que estés trabajando (ej. `02_Hito2_Bomba_Peristaltica_NEMA34`).
+1. Navega a la carpeta del hito en el que estés trabajando (ej. [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/)).
 2. Lee el archivo `README.md` de esa carpeta para comprender los fundamentos físicos y las conexiones.
 3. Abre el archivo de firmware `.ino` en Arduino IDE y súbelo al ESP32.
+4. Consulta el entregable y completa cada casilla de la lista de verificación para certificar el avance de tu tesis.

@@ -1,6 +1,26 @@
-# 🌪️ HITO 4: Reactor de Coagulación / Floculación & Sedimentador Cónico
+# 🌪️ HITO 3: Reactor de Coagulación / Floculación & Sedimentador Cónico
+## Pretratamiento Fisicoquímico, Gradiente de Camp-Stein y Control por L298N con Boya de Seguridad
+**Tesistas**: Antonella Guitián & Owen Cañizares  
+**Codirector**: Ing. Enzo (Investigación Doctoral en Membranas)
 
-Este hito aborda el tratamiento fisicoquímico previo a la membrana de ultrafiltración. El objetivo es desestabilizar coloides y partículas suspendidas mediante coagulantes naturales (*Opuntia ficus-indica* o *Moringa oleifera*), promover la formación de flóculos sedimentables y clarificar el agua antes de enviarla al módulo FX100.
+Este hito aborda el tratamiento fisicoquímico previo al módulo de ultrafiltración. El objetivo es desestabilizar coloides y partículas suspendidas mediante coagulantes naturales (*Opuntia ficus-indica* o Moringa), promover la formación de flóculos sedimentables y clarificar el agua antes de enviarla a la membrana FX100, evitando su colmatación prematura.
+
+---
+
+## 🎯 Entregable Maestro del Hito 3
+* **Reactor Floculador-Sedimentador Automatizado en Operación**: Módulo mecatrónico compuesto por el motor agitador comandado por modulación PWM vía driver Puente H L298N, supervisión continua de nivel con boya de acero inoxidable contra marcha en seco (`GPIO 32`), y ejecución estandarizada del ciclo de Jar Test (Mezcla Rápida $150\text{ RPM}$, Mezcla Lenta $30\text{ RPM}$, Decantación $0\text{ RPM}$) alcanzando una remoción de turbidez $\ge 85\%$ en el sobrenadante.
+
+---
+
+## 📋 Lista de Verificación Maestra (Checklist del Hito 3)
+- [ ] Conexión del driver Puente H L298N completada: `GPIO 4` (ENA sin jumper), `GPIO 16` (IN1), `GPIO 17` (IN2).
+- [ ] Alimentación de $12\text{V DC}$ conectada al L298N y masa compartida (GND común con ESP32).
+- [ ] Boya de acero inoxidable instalada en el reactor y conectada entre `GPIO 32` y `GND`.
+- [ ] Enclavamiento verificado: motor se apaga en seco si el nivel cae por debajo de la cota mínima.
+- [ ] Firmware `firmware_sedimentador.ino` cargado en el ESP32 respondiendo a comandos serie a 115200 baudios.
+- [ ] Solución madre de *Opuntia ficus-indica* al $1\%\text{ p/v}$ preparada según protocolo estandarizado.
+- [ ] Ensayo de Jar Test ejecutado con agua sintética de bentonita ($\approx 500\text{ NTU}$).
+- [ ] Medición de turbidez del sobrenadante clarificado y confirmación de remoción previa al ingreso a la membrana FX100.
 
 ---
 
@@ -19,13 +39,13 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 * $N_p$: Número de potencia del impulsor.
 
 ```
-┌──────────────────────────────┬──────────────────┬───────────────────┬────────────────────────────────────────────┐
-│ Etapa del Proceso            │ Velocidad Agitador│ Gradiente G (s⁻¹) │ Objetivo de Proceso                        │
-├──────────────────────────────┼──────────────────┼───────────────────┼────────────────────────────────────────────┤
-│ 1. Mezcla Rápida (Coagulación)│ 150 RPM (PWM 220)│ ~ 350 - 450 s⁻¹   │ Dispersión homogénea del biopolímero (1 min)│
-│ 2. Mezcla Lenta (Floculación) │ 30 RPM  (PWM 80) │ ~ 25 - 40 s⁻¹     │ Colisión y crecimiento de flóculos (15 min) │
-│ 3. Sedimentación Estática    │ 0 RPM   (PWM 0)  │ 0 s⁻¹             │ Decantación gravitacional de lodos (30 min)│
-└──────────────────────────────┴──────────────────┴───────────────────┴────────────────────────────────────────────┘
+┌──────────────────────────────┬──────────────────┬───────────────────┬──────────────┬────────────────────────────────────────────┐
+│ Etapa del Proceso            │ Velocidad Agitador│ Gradiente G (s⁻¹) │ Tiempo (t)   │ Objetivo de Proceso                        │
+├──────────────────────────────┼──────────────────┼───────────────────┼──────────────┼────────────────────────────────────────────┤
+│ 1. Mezcla Rápida (Coagulación)│ 150 RPM (PWM 220)│ ~ 350 - 450 s⁻¹   │ 60 s (1 min) │ Dispersión homogénea del biopolímero       │
+│ 2. Mezcla Lenta (Floculación) │ 30 RPM  (PWM 80) │ ~ 25 - 40 s⁻¹     │ 15 min       │ Colisión y crecimiento de flóculos         │
+│ 3. Sedimentación Estática    │ 0 RPM   (PWM 0)  │ 0 s⁻¹             │ 30 min       │ Decantación gravitacional hacia fondo cónico│
+└──────────────────────────────┴──────────────────┴───────────────────┴──────────────┴────────────────────────────────────────────┘
 ```
 
 ---
@@ -48,20 +68,30 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
                                     ▼
                      [ BOYA DE NIVEL EN ACERO INOXIDABLE ]
                      • Cable 1 ──► GPIO 32 (con INPUT_PULLUP interno)
-                     • Cable 2 ──► GND
+                     • Cable 2 ──► GND Común
                      • Función: Si el flotante baja (tanque vacío), frena el motor.
 ```
 
 ---
 
-## 🧪 3. Protocolo de Ensayo de Remoción de Turbidez (Jar Test)
+## 🧪 3. Protocolo Resumido de Ensayo de Jar Test
 
-1. Llenar el reactor con $5\text{ Litros}$ de agua turbia sintética (agua con arcilla/tierra tamizada, $\approx 500\text{ NTU}$).
-2. Tomar una muestra testigo y medir turbidez/TDS inicial.
+1. Llenar el reactor con $5\text{ Litros}$ de agua turbia sintética ($\approx 500\text{ NTU}$).
+2. Tomar muestra testigo inicial ($T_0$).
 3. Iniciar la secuencia automática en el firmware:
-   * Dosificar la solución coagulante de *Opuntia* ($20\text{ mg/L}$).
-   * Iniciar **Mezcla Rápida (150 RPM)** durante $60\text{ s}$.
-   * Pasar a **Mezcla Lenta (30 RPM)** durante $15\text{ min}$.
-   * Detener el motor (**0 RPM**) y dejar decantar $30\text{ min}$.
-4. Tomar muestra del sobrenadante clarificado:
-   $$\text{Eficiencia de Remoción } \eta (\%) = \left(\frac{\text{Turbidez Inicial} - \text{Turbidez Sobrenadante}}{\text{Turbidez Inicial}}\right) \times 100$$
+   * Dosificar coagulante de *Opuntia* ($20\text{ mg/L}$).
+   * Mezcla Rápida ($150\text{ RPM}$) durante $60\text{ s}$.
+   * Mezcla Lenta ($30\text{ RPM}$) durante $15\text{ min}$.
+   * Sedimentación ($0\text{ RPM}$) durante $30\text{ min}$.
+4. Tomar muestra del sobrenadante clarificado ($T_f$) y calcular la eficiencia:
+   $$\eta (\%) = \left(\frac{T_0 - T_f}{T_0}\right) \times 100$$
+
+---
+
+## 📂 Estructura y Navegación de Subcarpetas de este Hito:
+
+* 📁 **[`01_Protocolos_y_Teoria_Floculacion/`](./01_Protocolos_y_Teoria_Floculacion/)**:
+  * 🧪 **[`Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md)**: Protocolo químico detallado de extracción de mucílago de *Opuntia*, dimensionamiento del gradiente $G$, cinética de floculación, entregable y lista de verificación.
+* 📁 **[`02_Firmware_Control_Agitador/`](./02_Firmware_Control_Agitador/)**:
+  * ⚙️ **[`Guia_Control_Agitador_L298N_y_Boya.md`](./02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md)**: Manual de conexiones del Puente H, modulación PWM, seguridad de nivel, entregable y lista de verificación.
+  * 💻 **[`firmware_sedimentador/firmware_sedimentador.ino`](./02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino)**: Sketch de Arduino para ESP32 con Máquina de Estados Finitos (FSM) no bloqueante.

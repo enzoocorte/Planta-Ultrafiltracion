@@ -137,13 +137,16 @@ El driver digital DM860 posee 8 pequeños interruptores deslizantes en su latera
 
 ---
 
-## 📋 6. Checklist de Puesta en Marcha en el Banco
+## 🎯 Entregable Concreto de esta Guía
+* **Configuración del accionamiento NEMA 34 en Bipolar Serie 3A y driver DM860 optimizado**: Motor cableado con sus 4 bobinas en serie, DIP switches configurados a $3.14\text{ A RMS}$ con $50\%$ de corriente de reposo (`SW4=OFF`) y $1600\text{ P/R}$ con giro suave sin calentamiento del motor ni del transformador.
 
-1. [ ] ¿Los cables Amarillo-Azul y Naranja-Marrón están empalmados y bien aislados?
-2. [ ] ¿Los 4 cables restantes (Rojo, Negro, Blanco, Verde) están ajustados en `A+, A-, B+, B-`?
-3. [ ] ¿Los interruptores **SW1 a SW8** están exactamente como en el gráfico superior?
-4. [ ] ¿El switch **SW4 está en OFF**?
-5. [ ] ¿El transformador de 24 VAC está conectado a los bornes `AC / AC`?
-6. [ ] ¿El ESP32 tiene cargado el firmware `Hito1_ControlMotor.ino`?
+---
 
-¡Listo! Con esta puesta a punto el conjunto motor-driver operará con su máxima eficiencia mecatrónica, torque de 4.5 Nm garantizado y funcionamiento térmico óptimo.
+## 📋 Lista de Verificación (Checklist de Avance)
+- [ ] Bobinados serie empalmados y aislados: Amarillo con Azul; Naranja con Marrón.
+- [ ] Conexión a bornes de potencia del driver verificada: Rojo en `A+`, Negro en `A-`, Blanco en `B+`, Verde en `B-`.
+- [ ] DIP Switches configurados para $3.14\text{ A RMS}$: SW1 `ON`, SW2 `OFF`, SW3 `ON`.
+- [ ] Reducción de corriente en reposo al $50\%$ verificada: **SW4 en `OFF`**.
+- [ ] Resolución de micropasos configurada a $1600\text{ P/R}$ ($8\mu\text{pasos}$): SW5 `ON`, SW6 `OFF`, SW7 `ON`, SW8 `ON`.
+- [ ] Transformador de $24\text{ VAC}$ ($150\text{ VA}$) conectado a bornes `AC / AC` operando a menos del $50\%$ de su potencia nominal.
+- [ ] Prueba de rotación continua a $30\text{ RPM}$ durante $10\text{ minutos}$ con temperatura del motor $\le 35^\circ\text{C}$.

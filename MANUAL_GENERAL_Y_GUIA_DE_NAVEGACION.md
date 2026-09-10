@@ -38,11 +38,12 @@ flowchart TD
   * Cómo conectar a tornillo el ESP32 en su shield de borneras (D18 a PUL+, D19 a DIR+, GND común).
   * Control determinístico por hardware LEDC del ESP32 a 0% de uso de CPU.
 * **Archivos Clave**:
-  * `bomba/bomba.ino`: Firmware oficial con **Control Wi-Fi**, Dashboard Web táctil, cálculo de caudal en L/min, litros totales y ArduinoOTA.
-  * `bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`: Manual ilustrado de conexionado de la bornera.
-  * `bomba/Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`: Puesta a punto según hoja oficial de CNC Insumos S.R.L.
-  * `simulador_bomba.html`: Simulador visual interactivo de rampa, frecuencia y calor.
-  * `Hito1_ControlMotor/Hito1_ControlMotor.ino`: Firmware modular de prueba serie (115200 baudios).
+  * [`03_Firmware_Control_Bomba/bomba/bomba.ino`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/bomba/bomba.ino): Firmware oficial con **Control Wi-Fi**, Dashboard Web táctil, cálculo de caudal en L/min, litros totales y ArduinoOTA.
+  * [`03_Firmware_Control_Bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md): Manual ilustrado de conexionado de la bornera.
+  * [`02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md): Puesta a punto según hoja oficial de CNC Insumos S.R.L.
+  * [`01_Hardware_y_Cableado/Guia_Conexionado_Fisico_DM860.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/01_Hardware_y_Cableado/Guia_Conexionado_Fisico_DM860.md): Conexión de potencia y señales lógicas en cátodo común.
+  * [`04_Simulador_Interactivo/simulador_bomba.html`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/04_Simulador_Interactivo/simulador_bomba.html): Simulador visual interactivo de rampa, frecuencia y disipación de calor.
+  * [`03_Firmware_Control_Bomba/Hito1_ControlMotor/Hito1_ControlMotor.ino`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/Hito1_ControlMotor/Hito1_ControlMotor.ino): Firmware modular de prueba serie (115200 baudios).
 
 ---
 
@@ -54,9 +55,10 @@ flowchart TD
   * Medición de calidad de agua en partes por millón ($\text{ppm}$) con la sonda analógica de TDS.
   * Manejo del bus I2C y conversión analógica-digital de alta precisión con el chip **ADS1115 de 16 bits**.
 * **Archivos Clave**:
-  * `README.md`: Ecuaciones de calibración y teoría de señales.
-  * `Guia_Montaje_Hidraulico_Sensores.md`: Dónde intercalar cada sensor en la cañería.
-  * `firmware_sensores_test/firmware_sensores_test.ino`: Firmware de prueba integral que imprime telemetría en formato CSV por puerto serie.
+  * [`README.md`](./02_Hito2_Instrumentacion_Sensores/README.md): Ecuaciones de calibración, tabla de sensores y teoría de señales.
+  * [`01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md): Dónde y cómo intercalar cada sensor en la cañería.
+  * [`01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md): Fórmulas de conversión analógica, ganancia y compensación térmica.
+  * [`02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino): Firmware de prueba integral que imprime telemetría en formato CSV por puerto serie.
 
 ---
 
@@ -69,8 +71,10 @@ flowchart TD
   * Sedimentación estática ($0\text{ RPM}$) y decantación de lodos.
   * Control de velocidad PWM con el driver Puente H **L298N** y corte de seguridad por **boya de nivel de acero inoxidable**.
 * **Archivos Clave**:
-  * `README.md`: Teoría de coagulación-floculación y protocolo del Jar Test.
-  * `firmware_sedimentador/firmware_sedimentador.ino`: Firmware con Máquina de Estados Finitos (FSM).
+  * [`README.md`](./03_Hito3_Reactor_Sedimentador_Agitador/README.md): Fundamentos de ingeniería química, gradiente $G$ y esquema de conexiones.
+  * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Protocolo completo de preparación de solución madre de *Opuntia*, dosificación y cálculo de remoción $\eta$.
+  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Guía de conexión pin a pin, modulación PWM y enclavamiento de nivel.
+  * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware con Máquina de Estados Finitos (FSM) no bloqueante.
 
 ---
 
@@ -83,8 +87,9 @@ flowchart TD
   * **Enclavamiento de Seguridad Mandatorio**: Si $\text{TMP} > 0.50\text{ atm}$, el ESP32 apaga la bomba de inmediato para proteger los capilares de Polisulfona.
   * Dashboard SCADA web unificado con control simultáneo de bomba, agitador, boya y telemetría.
 * **Archivos Clave**:
-  * `README.md`: Arquitectura global y especificaciones de compras finales.
-  * `firmware_planta_completa/firmware_planta_completa.ino`: Firmware maestro integral del sistema.
+  * [`README.md`](./04_Hito4_Integracion_Automatizacion_IoT/README.md): Arquitectura global del SCADA, enclavamientos y especificaciones de transductores.
+  * [`01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md`](./04_Hito4_Integracion_Automatizacion_IoT/01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md): Explicación detallada de enclavamientos, cálculo de TMP y endpoints REST.
+  * [`02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino`](./04_Hito4_Integracion_Automatizacion_IoT/02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino): Firmware maestro integral del sistema.
 
 ---
 
@@ -92,14 +97,16 @@ flowchart TD
 * **Objetivo de los Alumnos**: Obtención de los datos experimentales para la redacción final de la Tesis de Ingeniería Industrial y aportes a la Beca Doctoral.
 * **Qué aprenderán aquí**:
   * Modelo matemático de la Ley de Darcy para ultrafiltración:
-    $$J = \frac{Q_p}{A_m} = \frac{\text{TMP}}{\mu(T) \cdot (R_m + R_{\text{torta}} + R_{\text{poros}})}$$
+    $$J = \frac{Q_p}{A_m} = \frac{\text{TMP}}{\mu(T) \cdot (R_m + R_{\text{torta}} + R_{\text{irrev}})}$$
   * Determinación experimental de la resistencia de la membrana limpia ($R_m$).
   * Comparación de velocidad de ensuciamiento: Agua cruda turbia vs. Sobrenadante clarificado del Hito 3.
   * Eficiencia del ciclo de Retrolavado (*Backwash*) para extender la vida útil del módulo FX100.
   * Verificación de calidad de agua tratada según los estándares del Código Alimentario Argentino (CAA).
 * **Archivos Clave**:
-  * `README.md`: Metodología experimental y diseño de ensayos.
-  * `plantilla_datos_ensayo_tesis.csv`: Archivo preparado para registrar ensayos y graficar en Excel o Python.
+  * [`README.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/README.md): Metodología experimental y diseño de ensayos de transporte.
+  * [`01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md): Protocolo completo de ensayos Darcy, factor de temperatura TCF y normas CAA.
+  * [`02_Planillas_y_Datos_Tesis/Guia_Analisis_Datos_Graficos_Tesis.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/Guia_Analisis_Datos_Graficos_Tesis.md): Guía de procesamiento de datos con script de Python para figuras de tesis a 300 DPI y guía de Excel.
+  * [`02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv`](./05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv): Matriz de datos experimental segundo a segundo.
 
 ---
 

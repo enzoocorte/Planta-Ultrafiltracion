@@ -1,6 +1,6 @@
 /* ==============================================================================
  * PROYECTO DE TESIS DE INGENIERÍA INDUSTRIAL - PLANTA DE ULTRAFILTRACIÓN FX100
- * HITO 5: FIRMWARE MAESTRO DE INTEGRACIÓN GLOBAL, CONTROL SCADA & IOT
+ * HITO 4: FIRMWARE MAESTRO DE INTEGRACIÓN GLOBAL, CONTROL SCADA & IOT
  * ==============================================================================
  * 
  * INTEGRACIÓN DE SUBSISTEMAS:

@@ -318,11 +318,20 @@ El Hito 1 se considera **OFICIALMENTE APROBADO** para el informe de tesis cuando
 
 ---
 
-### 📂 Índice de Archivos y Módulos de este Hito:
+### 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
-1. 💻 **[`bomba/bomba.ino`](./bomba/bomba.ino)**: Firmware oficial con **Control Inalámbrico Wi-Fi**, Dashboard Web responsivo (para celular y notebook), ArduinoOTA y consola serie.
-2. 📖 **[`bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`](./bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md)**: Manual de montaje con el shield de borneras a tornillo del ESP32.
-3. ⚙️ **[`Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./Montaje/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md)**: Puesta a punto de los 8 cables del motor (CNC Insumos S.R.L.) y calibración de los DIP switches en Bipolar Serie (3A).
-4. 🔌 **[`Guia_Conexionado_Fisico_DM860.md`](./Guia_Conexionado_Fisico_DM860.md)**: Manual de conexionado eléctrico paso a paso.
-5. 💻 **[`Hito1_ControlMotor/Hito1_ControlMotor.ino`](./Hito1_ControlMotor/Hito1_ControlMotor.ino)**: Firmware base modular por puerto serie (115200 baudios).
-6. ⚡ **[`Guia_Alimentacion_y_Masa_Comun.md`](./Guia_Alimentacion_y_Masa_Comun.md)**: Técnica de distribución de masa y calibración del LM2596 a 5.00V.
+* 📁 **[`01_Hardware_y_Cableado/`](./01_Hardware_y_Cableado/)**:
+  * 🔌 **[`Guia_Conexionado_Fisico_DM860.md`](./01_Hardware_y_Cableado/Guia_Conexionado_Fisico_DM860.md)**: Manual de taller de conexión pin a pin al driver.
+  * ⚡ **[`Guia_Alimentacion_y_Masa_Comun.md`](./01_Hardware_y_Cableado/Guia_Alimentacion_y_Masa_Comun.md)**: Esquema de circuitos AC/DC, masa común y calibración del LM2596 a 5.00V.
+  * 🚰 **[`Guia_Ferreteria_e_Hidraulica_Base.md`](./01_Hardware_y_Cableado/Guia_Ferreteria_e_Hidraulica_Base.md)**: Mangueras de silicona, racores G1/4" y espigas.
+  * 📦 **[`Inventario_Consolidado.md`](./01_Hardware_y_Cableado/Inventario_Consolidado.md)**: Listado de componentes disponibles y faltantes.
+* 📁 **[`02_Montaje_y_Optimizacion_Motor/`](./02_Montaje_y_Optimizacion_Motor/)**:
+  * ⚙️ **[`GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md)**: Conexión de 8 cables en Bipolar Serie (3A) según hoja técnica oficial de CNC Insumos S.R.L.
+  * 📷 `IMG_20251128_112538.jpg` e `IMG_20251128_112640.jpg`: Fotografías originales del fabricante.
+* 📁 **[`03_Firmware_Control_Bomba/`](./03_Firmware_Control_Bomba/)**:
+  * 💻 **[`bomba/bomba.ino`](./03_Firmware_Control_Bomba/bomba/bomba.ino)**: Firmware oficial de la planta con **Control Inalámbrico Wi-Fi**, Dashboard Web responsivo táctil, cálculo de caudal en L/min y ArduinoOTA.
+  * 📖 **[`Guia_Montaje_Bomba_y_Bornera_ESP32.md`](./03_Firmware_Control_Bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md)**: Manual ilustrado de fijación a tornillo en el shield de borneras.
+  * 💻 **[`Hito1_ControlMotor/Hito1_ControlMotor.ino`](./03_Firmware_Control_Bomba/Hito1_ControlMotor/Hito1_ControlMotor.ino)**: Firmware modular de prueba en banco por Monitor Serie (115200 baudios).
+* 📁 **[`04_Simulador_Interactivo/`](./04_Simulador_Interactivo/)**:
+  * 🎮 **[`simulador_bomba.html`](./04_Simulador_Interactivo/simulador_bomba.html)**: Simulador gráfico interactivo ejecutable en cualquier navegador web.
+  * 📄 **[`README_Simulador.md`](./04_Simulador_Interactivo/README_Simulador.md)**: Guía de uso, entregable y lista de verificación del simulador.

@@ -86,3 +86,20 @@ En la pantalla verás un panel oscuro estilo SCADA industrial:
 4. **Cálculo en Tiempo Real**:
    * Muestra el **Caudal instantáneo en L/min** ($Q = \text{RPM} \times 4.2\text{ mL/rev}$).
    * Muestra el **Volumen total bombeado en Litros** acumulado durante la prueba.
+
+---
+
+## 🎯 Entregable Concreto de esta Guía
+* **Módulo de bombeo peristáltico inalámbrico operativo**: ESP32 montado en shield de borneras a tornillo, firmware `bomba.ino` cargado, y accionamiento de la bomba controlado en tiempo real vía Wi-Fi (Dashboard Web local en `http://bomba.local` o AP `192.168.4.1`) con rampas suaves de aceleración e inversión de giro.
+
+---
+
+## 📋 Lista de Verificación (Checklist de Avance)
+- [ ] ESP32 calzado firmemente en el shield de borneras con conector USB-C hacia el exterior.
+- [ ] Conexión a tornillo firme de `D18` a `PUL+`, `D19` a `DIR+`, y `GND` a `PUL-` / `DIR-`.
+- [ ] Alimentación del ESP32 probada: $5.00\text{ VDC}$ desde el LM2596 al pin `VIN` y `GND`.
+- [ ] Firmware `bomba.ino` compilado y subido correctamente vía Arduino IDE.
+- [ ] Conexión Wi-Fi establecida: acceso al dashboard en `http://bomba.local` o mediante AP `Bomba_Peristaltica_UF`.
+- [ ] Respuesta de la bomba peristáltica verificada con los botones de preseteo (10, 30, 60 y 100 RPM).
+- [ ] Inversión de giro comprobada (Horario para filtración, Antihorario para retrolavado).
+- [ ] Acumulador de volumen de líquido bombeado funcionando en la interfaz web.

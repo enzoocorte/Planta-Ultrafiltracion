@@ -119,12 +119,23 @@ Para altas velocidades (>600 RPM):
 
 ---
 
-## 🚀 6. Checklist de Seguridad Pre-Arranque
+## 🎯 Entregable Concreto de esta Guía
+* **Circuito de potencia y control del DM860 100% cableado**: Conexión de alimentación AC de 24V, aislamiento de bobinados en serie del motor NEMA 34 y señales lógicas en Cátodo Común a 3.3V desde el ESP32.
 
-- [ ] ¿El interruptor **SW4** está verificado físicamente en **`OFF`**?
-- [ ] ¿Los cables `PUL-` y `DIR-` están firmemente conectados a la masa común (`GND`)?
-- [ ] ¿Los cables del transformador de $24\text{ VAC}$ están en los bornes `AC/AC` sin tocar masa?
-- [ ] ¿Las fases A y B del motor están apretadas con firmeza en sus respectivas borneras?
-- [ ] ¿El ESP32 fue flasheado con el código [`Hito1_ControlMotor.ino`](./Hito1_ControlMotor/Hito1_ControlMotor.ino)?
+---
 
-¡Cumplido este checklist, se puede enchufar el transformador a 220V e iniciar las pruebas serie con total seguridad!
+## 📋 Lista de Verificación (Checklist de Avance)
+- [ ] Transformador de 24 VAC desconectado de la red de 220V durante el proceso de cableado.
+- [ ] Conexión de los 2 cables secundarios de 24 VAC a los bornes `AC / AC` del DM860 con cable taller $\ge 1.5\text{ mm}^2$.
+- [ ] Fases del motor NEMA 34 conectadas en Bipolar Serie:
+  - [ ] Cable Amarillo y Cable Azul empalmados entre sí y aislados.
+  - [ ] Cable Naranja y Cable Marrón empalmados entre sí y aislados.
+  - [ ] Cable Rojo a `A+` y Cable Negro a `A-`.
+  - [ ] Cable Blanco a `B+` y Cable Verde a `B-`.
+- [ ] Conexión de señales lógicas al ESP32:
+  - [ ] `GPIO 18` conectado a `PUL+`.
+  - [ ] `GPIO 19` conectado a `DIR+`.
+  - [ ] `GND` del ESP32 puenteado a `PUL-` y `DIR-`.
+  - [ ] `ENA+` y `ENA-` dejados al aire (desconectados).
+- [ ] Verificación visual de los DIP switches: **SW4 verificado en `OFF`**.
+- [ ] Encendido seguro: LED verde encendido en el DM860 sin alarma roja.

@@ -1,6 +1,22 @@
-# 📊 HITO 3: Instrumentación y Sensores Disponibles (Caudal, TDS, Temperatura y ADC)
+# 📊 HITO 2: Instrumentación y Sensores Disponibles (Caudal, TDS, Temperatura y ADC)
 
 Este hito tiene como objetivo instrumentar la planta piloto con los sensores físicos ya disponibles en el laboratorio, aprender a leer señales digitales y analógicas en el ESP32, comprender el funcionamiento del conversor ADC ADS1115 de 16 bits y visualizar toda la telemetría en la computadora.
+
+---
+
+## 🎯 Entregable Maestro del Hito 2
+* **Módulo de telemetría de instrumentación operando al 100%**: Adquisición periódica y continua (1 Hz) de Caudal de Permeado ($Q_p$), Caudal de Retentado ($Q_c$), Temperatura del agua ($^\circ\text{C}$) y Sólidos Totales Disueltos ($\text{ppm}$) transmitidos por puerto serie o bus I2C sin falsas lecturas ni ruido eléctrico.
+
+---
+
+## 📋 Lista de Verificación Maestra (Checklist del Hito 2)
+- [ ] Conexión del bus I2C (`GPIO 21` SDA, `GPIO 22` SCL) al módulo ADS1115 verificada con escáner I2C.
+- [ ] Sonda sumergible DS18B20 conectada a `GPIO 34` con su resistencia de pull-up de $4.7\text{ k}\Omega$ a 3.3V.
+- [ ] Caudalímetro de Permeado montado en tubería y conectado al pin de interrupción `GPIO 27`.
+- [ ] Caudalímetro de Retentado montado en tubería y conectado al pin de interrupción `GPIO 14`.
+- [ ] Sonda analógica TDS cableada al canal analógico A0 del ADS1115 y sumergida en la celda de flujo.
+- [ ] Firmware `firmware_sensores_test.ino` subido al ESP32 transmitiendo telemetría en tiempo real a 115200 baudios.
+- [ ] Calibración térmica validada: el factor de viscosidad Darcy $TCF = \exp(0.0239 \times (20 - T))$ responde dinámicamente a la temperatura.
 
 ---
 
@@ -43,35 +59,10 @@ flowchart TD
 
 ---
 
-## 📐 3. Fundamentos Matemáticos y Conversión de Señales
+## 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
-### A. Conversor ADC ADS1115 de 16 Bits
-* A diferencia del convertidor interno del ESP32 (que tiene ruido y no linealidad), el **ADS1115** ofrece **16 bits de resolución ($65.536$ niveles)**.
-* Con ganancia $\text{GAIN\_ONE}$ ($\pm 4.096\text{V}$), cada conteo digital (*LSB*) equivale a:
-  $$\text{Resolución} = \frac{4.096\text{ V}}{32768\text{ cuentas}} = 0.125\text{ mV por cuenta}$$
-* **Cálculo de Voltaje Real**:
-  $$V_{\text{medido}} (\text{V}) = \text{Cuentas ADS} \times 0.000125\text{ V}$$
-
-### B. Cálculo de Sólidos Totales Disueltos (TDS en ppm)
-A partir del voltaje analógico medido en el canal A0 y compensado por la temperatura del agua $T$:
-$$V_{25} = \frac{V_{\text{medido}}}{1.0 + 0.02 \times (T - 25.0)}$$
-$$\text{TDS} (\text{ppm}) = (133.42 \times V_{25}^3 - 255.86 \times V_{25}^2 + 857.39 \times V_{25}) \times 0.5$$
-
-### C. Medición de Caudal con YF-S401
-* Cada vuelta de la turbinita interna con imán activa el sensor de efecto Hall.
-* Factor de calibración para el modelo YF-S401: **$98\text{ pulsos por segundo} = 1.0\text{ L/min}$**.
-$$Q (\text{L/min}) = \frac{\text{Pulsos en } 1\text{ segundo}}{98.0}$$
-
----
-
-## 💻 4. Cómo Probar los Sensores en el Laboratorio
-
-1. Abre el sketch [`firmware_sensores_test.ino`](./firmware_sensores_test/firmware_sensores_test.ino) en Arduino IDE.
-2. Asegúrate de tener instaladas las librerías:
-   * **`Adafruit ADS1X15`**
-   * **`OneWire`** y **`DallasTemperature`**
-3. Sube el código al ESP32 y abre el Monitor Serie a **115200 baudios**.
-4. Verás la telemetría en tiempo real:
-   ```text
-   [TELEMETRIA] Temp: 21.4 °C | TDS: 142.5 ppm | Caudal Permeado: 0.38 L/min | Caudal Retentado: 0.12 L/min
-   ```
+* 📁 **[`01_Guias_Montaje_y_Calibracion/`](./01_Guias_Montaje_y_Calibracion/)**:
+  * 🚰 **[`Guia_Montaje_Hidraulico_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md)**: Instalación física de caudalímetros y sondas en tubería con entregable y checklist.
+  * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
+* 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
+  * 💻 **[`firmware_sensores_test/firmware_sensores_test.ino`](./02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino)**: Sketch oficial de adquisición de datos en tiempo real y transmisión serie en formato CSV.
