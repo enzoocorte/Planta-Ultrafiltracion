@@ -293,16 +293,17 @@ Seguir estrictamente esta secuencia antes de energizar la planta:
    * Conectar los cables de la Fase B en `B+` y `B-`.
 4. **Conexión de la Alimentación de Potencia**:
    * Conectar los dos cables secundarios de $24\text{ VAC}$ del transformador a los bornes `AC / AC` del DM860.
-5. **Carga del Firmware**:
-   * Conectar el ESP32 a la PC por el cable USB.
-   * Subir el sketch [`Hito1_ControlMotor.ino`](./firmware_hito1_motor/Hito1_ControlMotor.ino) desde Arduino IDE.
-   * Abrir el Monitor Serie a **115200 baudios**.
+5. **Carga del Firmware (Elegir según la necesidad)**:
+   * 🌟 **Opción Principal y Definitiva (Recomendada para la Tesis)**:  
+     Subir el sketch [`bomba/bomba.ino`](./03_Firmware_Control_Bomba/bomba/bomba.ino) desde Arduino IDE.  
+     *Incluye Control Inalámbrico Wi-Fi, Servidor Web local (Dashboard táctil en `http://bomba.local` o AP `192.168.4.1`), cálculo de caudal en L/min y litros totales, y actualizaciones OTA.*
+   * 🧪 **Opción de Diagnóstico Rápido en Banco (Solo Serial)**:  
+     Subir el sketch [`Hito1_ControlMotor/Hito1_ControlMotor.ino`](./03_Firmware_Control_Bomba/Hito1_ControlMotor/Hito1_ControlMotor.ino).  
+     *Código mínimo sin Wi-Fi que solo responde por el Monitor Serie a 115200 baudios para verificar giro y pulsos por cable USB.*
 6. **Encendido y Secuencia de Prueba**:
    * Enchufar el transformador a $220\text{V}$ (el LED verde del DM860 se encenderá fijo).
-   * En el Monitor Serie enviar el comando: **`R30`** (verificar que el motor empiece a girar suave a $30\text{ RPM}$).
-   * Enviar **`DIR`** (verificar que invierta el sentido de giro limpiamente sin trabarse).
-   * Enviar **`R60`** y **`R100`** (verificar la rampa continua y suave).
-   * Enviar **`STOP`** (verificar que frene y que el motor pase a reposo frío).
+   * Si cargaste `bomba.ino`: Conéctate por Wi-Fi y controla la velocidad desde la interfaz táctil.
+   * Si cargaste `Hito1_ControlMotor.ino`: Abre el Monitor Serie a 115200 baudios y prueba con comandos `R30`, `DIR`, `R60`, `STOP`.
 
 ---
 

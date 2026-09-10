@@ -53,7 +53,7 @@ Para que la planta funcione de forma autónoma sin depender de tener una computa
 
 ## 📱 4. Cómo Conectarse y Manejar la Bomba por Wi-Fi
 
-El firmware [`bomba.ino`](./bomba.ino) cuenta con un sistema híbrido inteligente:
+El firmware [`bomba/bomba.ino`](./bomba/bomba.ino) cuenta con un sistema híbrido inteligente:
 
 ### Modo A: Conexión Automática a tu Router
 Si la red Wi-Fi de la planta (`Box804`, clave `plantapiloto2`) está encendida:
