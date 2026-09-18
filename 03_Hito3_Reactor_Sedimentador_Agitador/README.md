@@ -95,3 +95,5 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 * 📁 **[`02_Firmware_Control_Agitador/`](./02_Firmware_Control_Agitador/)**:
   * ⚙️ **[`Guia_Control_Agitador_L298N_y_Boya.md`](./02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md)**: Manual de conexiones del Puente H, modulación PWM, seguridad de nivel, entregable y lista de verificación.
   * 💻 **[`firmware_sedimentador/firmware_sedimentador.ino`](./02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino)**: Sketch de Arduino para ESP32 con Máquina de Estados Finitos (FSM) no bloqueante.
+* 📁 **[`03_Compras_y_Ferreteria_Hidraulica/`](./03_Compras_y_Ferreteria_Hidraulica/)**:
+  * 🚰 **[`Guia_Compras_Hidraulicas_y_Locales_Salta.md`](./03_Compras_y_Ferreteria_Hidraulica/Guia_Compras_Hidraulicas_y_Locales_Salta.md)**: Guía de adaptación de 1/2" a 1/4", ensamble con bujes de bronce, lista para mostrador y locales en Salta Capital.
