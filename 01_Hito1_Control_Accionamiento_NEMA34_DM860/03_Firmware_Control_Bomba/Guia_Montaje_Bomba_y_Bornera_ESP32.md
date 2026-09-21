@@ -19,26 +19,24 @@ Esta guía explica cómo conectar físicamente el **ESP32 con su Shield de Borne
 Gracias al shield de borneras, todos los cables quedan fijados con tornillos de bornera clema, sin cables sueltos ni falsos contactos:
 
 ```
-    SHIELD BORNERAS ESP32 (38 PINES)                 DRIVER LEADSHINE DM860
-  ┌─────────────────────────────────┐              ┌────────────────────────┐
-  │  Borne a tornillo [ D18 ] ──────┼─────────────►│ Borne [ PUL+ ]         │
-  │  Borne a tornillo [ D19 ] ──────┼─────────────►│ Borne [ DIR+ ]         │
-  │  Borne a tornillo [ GND ] ──────┼─┬───────────►│ Borne [ PUL- ]         │
-  │                                 │ └───────────►│ Borne [ DIR- ]         │
-  │  Borne a tornillo [ VIN ] ◄─────┼── (+5.00V)   │                        │
-  │  Borne a tornillo [ GND ] ◄─────┼── (0V Masa)  │ Bornes ENA+ / ENA-     │
-  └─────────────────────────────────┘              │ (DESCONECTADOS)        │
-                                                   └────────────────────────┘
+    SHIELD BORNERAS ESP32 (38 PINES ZS-1057)         DRIVER LEADSHINE DM860
+  ┌─────────────────────────────────────────┐      ┌────────────────────────┐
+  │  Borne a tornillo [ VIN ] (+5V USB) ────┼──┬──►│ Borne [ PUL+ ]         │
+  │                                         │  └──►│ Borne [ DIR+ ]         │
+  │  Borne a tornillo [ P18 / D18 ] ────────┼─────►│ Borne [ PUL- ] (Paso)  │
+  │  Borne a tornillo [ P19 / D19 ] ────────┼─────►│ Borne [ DIR- ] (Giro)  │
+  │                                         │      │                        │
+  │  Orientación: Pin 3V3 con Borne 3V3     │      │ Bornes ENA+ / ENA-     │
+  │  y Pin VIN con Borne VIN (no girar 180°)│      │ (DESCONECTADOS)        │
+  └─────────────────────────────────────────┘      └────────────────────────┘
 ```
 
-### Detalle de los cables a atornillar:
-1. **Paso (STEP)**: Un cable flexible desde el borne **`D18`** del shield al borne **`PUL+`** del DM860.
-2. **Dirección (DIR)**: Un cable flexible desde el borne **`D19`** del shield al borne **`DIR+`** del DM860.
-3. **Masa Común (GND)**:
-   * Saca un cable desde el borne **`GND`** del shield.
-   * Llévalo a uno de tus conectores rápidos a presión y desde allí distribuye a los bornes **`PUL-`** y **`DIR-`** del DM860.
+### Detalle de los cables a atornillar (Configuración Ánodo Común a 5V):
+1. **Ánodo Común (+5V)**: Un cable desde el borne **`VIN`** del shield hacia los bornes **`PUL+`** y **`DIR+`** del DM860 puenteados entre sí. Al usar 5V directos de `VIN`, el optoacoplador del DM860 conmuta con su corriente nominal de 13 mA, asegurando inmunidad total a ruidos inductivos.
+2. **Paso (STEP)**: Un cable flexible desde el borne **`P18`** del shield al borne **`PUL-`** del DM860.
+3. **Dirección (DIR)**: Un cable flexible desde el borne **`P19`** del shield al borne **`DIR-`** del DM860.
 4. **Habilitación (ENA)**:
-   * **Dejar `ENA+` y `ENA-` vacíos (al aire)**. El driver se mantiene habilitado con torque permanente.
+   * **Dejar `ENA+` y `ENA-` vacíos (al aire)**. El driver se mantiene habilitado con torque permanente de retención.
 
 ---
 

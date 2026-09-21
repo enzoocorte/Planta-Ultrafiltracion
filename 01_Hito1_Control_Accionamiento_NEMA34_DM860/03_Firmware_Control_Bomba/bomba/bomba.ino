@@ -1,84 +1,85 @@
 /* ==============================================================================
  * PROYECTO DE TESIS DE INGENIERÍA INDUSTRIAL - PLANTA DE ULTRAFILTRACIÓN FX100
- * HITO 1: MONTAJE Y ACCIONAMIENTO DE BOMBA PERISTÁLTICA MBP-2000 (NEMA 34 + DM860)
- * CONTROL INALÁMBRICO WI-FI + SERVIDOR WEB TÁCTIL + ARDUINO OTA + CONSOLA SERIE
+ * HITO 1: ACCIONAMIENTO Y CONTROL DE BOMBA PERISTÁLTICA MBP-2000
+ * MOTOR PASO A PASO NEMA 34 (4.5 Nm) + DRIVER LEADSHINE DM860
  * ==============================================================================
- * 
- * ESQUEMA DE CONEXIÓN CON EL SHIELD DE BORNERAS DEL ESP32 (38 PINES):
- * - Borne [ GPIO 18 / D18 ] ──► Borne PUL+ del Driver DM860 (Pulsos STEP)
- * - Borne [ GPIO 19 / D19 ] ──► Borne DIR+ del Driver DM860 (Sentido DIR)
- * - Borne [ GND ]           ──► Bornes PUL- y DIR- puenteados (Cátodo Común)
- * - Borne [ VIN ]           ──► 5.00V DC regulados desde el Step-Down LM2596
- * - Borne [ GND ]           ──► 0V (Masa) de la fuente
- * 
- * MOTOR NEMA 34 (8 CABLES) EN BIPOLAR SERIE (3A):
- * - Amarillo + Azul unidos entre sí y aislados.
- * - Naranja + Marrón unidos entre sí y aislados.
- * - Rojo a A+, Negro a A-, Blanco a B+, Verde a B-.
+ * CONEXIÓN FÍSICA PROBADA EN BANCO (ÁNODO COMÚN A 5V):
+ * - Shield Borne [ VIN ] (5V) ──► Borne [ PUL+ ] y [ DIR+ ] del DM860 (Puenteados)
+ * - Shield Borne [ P18 ]      ──► Borne [ PUL- ] del DM860 (Pulsos de paso)
+ * - Shield Borne [ P19 ]      ──► Borne [ DIR- ] del DM860 (Sentido de giro)
+ * - Bornes [ ENA+ / ENA- ]    ──► VACÍOS (Driver habilitado permanentemente)
  * ============================================================================== */
 
 #include <WiFi.h>
 #include <WebServer.h>
-#include <ESPmDNS.h>
-#include <ArduinoOTA.h>
 
-// ------------------------------------------------------------------------------
-// 1. CREDENCIALES WI-FI (Planta Piloto)
-// ------------------------------------------------------------------------------
-const char* ssid_red     = "Box804";
-const char* password_red = "plantapiloto2";
+// ==============================================================================
+// 1. CONFIGURACIÓN DE PINES Y PARÁMETROS MECÁNICOS
+// ==============================================================================
+const uint8_t PIN_PUL = 18; // Borne P18 -> Señal de pulsos (STEP)
+const uint8_t PIN_DIR = 19; // Borne P19 -> Señal de dirección (DIR)
 
-// Red Wi-Fi autónoma (si no hay router en el laboratorio)
-const char* ap_ssid      = "Bomba_Peristaltica_UF";
-const char* ap_pass      = "plantapiloto2";
+// DM860 configurado en 1600 pulsos por revolución (SW5:ON, SW6:OFF, SW7:ON, SW8:ON)
+const uint16_t PULSOS_POR_REV = 1600; 
+
+// Calibración volumétrica del cabezal peristáltico MBP-2000 (4.2 mL por vuelta)
+const float ML_POR_VUELTA = 4.2f;
+
+// Rampa de aceleración: 30 RPM por segundo para cuidar los engranajes y evitar tirones
+const float ACELERACION_RPM_SEG = 30.0f;
+
+// ==============================================================================
+// 2. CREDENCIALES WI-FI (Router de Laboratorio y Red Propia de Emergencia)
+// ==============================================================================
+const char* ssid_router = "Box804";
+const char* pass_router = "plantapiloto2";
+
+const char* ssid_ap     = "Bomba_Peristaltica_UF";
+const char* pass_ap     = "plantapiloto2";
 
 WebServer server(80);
 
-// ------------------------------------------------------------------------------
-// 2. ASIGNACIÓN DE PINES EN EL SHIELD DE BORNERAS DEL ESP32
-// ------------------------------------------------------------------------------
-const uint8_t PIN_PUL = 18; // Borne D18 -> Paso (STEP)
-const uint8_t PIN_DIR = 19; // Borne D19 -> Dirección (DIR)
-
-// Driver DM860 configurado en 1600 pulsos/rev (8 micropasos)
-const uint16_t PULSOS_POR_REV = 1600; 
-
-// Calibración volumétrica del cabezal peristáltico MBP-2000
-// Cada vuelta desplaza exactamente 4.2 mL
-const float ML_POR_REVOLUCION = 4.2; 
-
-// ------------------------------------------------------------------------------
+// ==============================================================================
 // 3. VARIABLES DE ESTADO Y CONTROL
-// ------------------------------------------------------------------------------
+// ==============================================================================
 bool bombaEnMarcha = false;
 bool sentidoHorario = true; // true = Filtración hacia FX100, false = Retrolavado
 
-float rpm_objetivo = 0.0;
-float rpm_actual   = 0.0;
-const float ACELERACION_RPM_SEG = 35.0; // Rampa suave: 35 RPM por segundo
+float rpm_objetivo = 30.0f; // Velocidad de consigna elegida por el usuario
+float rpm_actual   = 0.0f;  // Velocidad instantánea siguiendo la rampa
 
-float caudal_actual_Lmin = 0.0;
-float volumen_total_L    = 0.0;
+float caudal_Lmin = 0.0f;   // Caudal instantáneo en Litros/minuto
+float volumen_L   = 0.0f;   // Volumen total acumulado en Litros
 
+uint32_t frecuencia_hz_actual = 0;
 unsigned long t_ultimo_loop_ms = 0;
 
-// ------------------------------------------------------------------------------
-// 4. GENERADOR DE PULSOS POR SILICIO (HARDWARE LEDC TIMER) - 0% CARGA DE CPU
-// ------------------------------------------------------------------------------
-void fijarFrecuenciaMotor(float rpm) {
-  if (rpm > 0.5 && bombaEnMarcha) {
-    // Ecuación Fundamental: f (Hz) = (RPM * 1600) / 60
-    float frecuencia_hz = (rpm * (float)PULSOS_POR_REV) / 60.0f;
-    ledcWriteTone(PIN_PUL, frecuencia_hz); // Generación directa por timer de silicio
+// ==============================================================================
+// 4. GENERADOR DE PULSOS POR HARDWARE (LEDC TIMER - 10 BITS)
+// ==============================================================================
+// En Ánodo Común (PUL+ a 5V):
+// - Pin en HIGH (Duty 100% / 1023) -> Optoacoplador APAGADO (Motor en reposo)
+// - Pin alternando a 50% (Duty 512) -> Tren de pulsos cuadrados limpios
+void actualizarPulsosMotor(float rpm, bool marcha) {
+  if (marcha && rpm >= 3.0f) {
+    // Ecuación fundamental: f (Hz) = (RPM * Pulsos_Rev) / 60
+    uint32_t f = (uint32_t)((rpm * (float)PULSOS_POR_REV) / 60.0f);
+    if (f != frecuencia_hz_actual) {
+      ledcChangeFrequency(PIN_PUL, f, 10);
+      ledcWrite(PIN_PUL, 512); // 50% ciclo de trabajo simétrico
+      frecuencia_hz_actual = f;
+    }
   } else {
-    ledcWriteTone(PIN_PUL, 0);             // Frecuencia cero (detenido)
-    digitalWrite(PIN_PUL, LOW);
+    if (frecuencia_hz_actual != 0) {
+      ledcWrite(PIN_PUL, 1023); // Nivel ALTO continuo -> Optoacoplador apagado en reposo
+      frecuencia_hz_actual = 0;
+    }
   }
 }
 
-// ------------------------------------------------------------------------------
-// 5. INTERFAZ WEB RESPONSIVA (DASHBOARD SCADA TÁCTIL)
-// ------------------------------------------------------------------------------
+// ==============================================================================
+// 5. INTERFAZ GRÁFICA WEB RESPONSIVA (SCADA TÁCTIL)
+// ==============================================================================
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="es">
@@ -94,62 +95,62 @@ const char index_html[] PROGMEM = R"rawliteral(
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 16px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; width: 100%; max-width: 460px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; width: 100%; max-width: 440px; box-shadow: 0 12px 30px rgba(0,0,0,0.6); }
     h1 { font-size: 19px; color: var(--accent); text-align: center; margin-bottom: 2px; }
     p.sub { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 16px; }
     .display { background: #060911; border: 1px solid var(--border); border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 16px; }
-    .rpm-num { font-size: 46px; font-weight: 800; font-family: monospace; color: var(--accent); line-height: 1; margin: 4px 0; }
-    .metric-sub { font-size: 12px; color: var(--muted); }
-    .caudal-box { display: flex; justify-content: space-around; background: #0c1220; border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px solid #1a2742; }
-    .caudal-item span { font-size: 10px; color: var(--muted); display: block; }
-    .caudal-item strong { font-size: 15px; color: var(--success); font-family: monospace; }
-    .pill { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; margin-top: 8px; }
-    .pill-on { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
-    .pill-off { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
-    .slider-container { margin: 16px 0; }
-    .slider-header { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
-    input[type=range] { width: 100%; height: 8px; border-radius: 4px; background: #223150; accent-color: var(--accent); cursor: pointer; }
-    .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px; }
-    .btn-preset { background: #1a253c; border: 1px solid var(--border); color: var(--text); padding: 8px 0; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; }
-    .btn-preset:active { background: var(--accent); color: #000; }
-    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .btn { padding: 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: 0.15s; }
-    .btn:active { transform: scale(0.97); }
-    .btn-start { background: var(--accent); color: #060911; }
-    .btn-stop { background: var(--danger); color: #fff; }
-    .btn-dir { background: var(--warning); color: #060911; grid-column: span 2; }
-    .footer { font-size: 10px; color: #64748b; text-align: center; margin-top: 12px; line-height: 1.4; }
+    .rpm-val { font-size: 52px; font-weight: 800; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .rpm-unit { font-size: 14px; color: var(--muted); letter-spacing: 2px; }
+    .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .info-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; font-size: 11px; }
+    .info-lbl { color: var(--muted); display: block; margin-bottom: 2px; }
+    .info-num { font-size: 15px; font-weight: 700; color: #fff; }
+    .pill { display: inline-block; padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; margin-top: 10px; }
+    .pill-off { background: rgba(148,163,184,0.15); color: var(--muted); border: 1px solid rgba(148,163,184,0.3); }
+    .pill-on { background: rgba(16,185,129,0.2); color: var(--success); border: 1px solid var(--success); }
+    .ctrl-group { margin-bottom: 16px; }
+    .slider-lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input[type=range] { width: 100%; height: 6px; border-radius: 3px; background: #223150; accent-color: var(--accent); outline: none; }
+    .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px; }
+    .btn-preset { background: #1a243b; border: 1px solid var(--border); color: #e2e8f0; padding: 8px 4px; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; }
+    .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    .btn { padding: 12px; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .btn-start { background: var(--success); color: #052e16; }
+    .btn-stop { background: var(--danger); color: #450a0a; }
+    .btn-dir { grid-column: span 2; background: #1e293b; border: 1px solid var(--border); color: #cbd5e1; }
+    .footer { text-align: center; font-size: 10px; color: var(--muted); margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>BOMBA PERISTÁLTICA MBP-2000</h1>
-    <p class="sub">Planta Piloto UF FX100 • Control Wi-Fi ESP32</p>
-
+    <h1>PLANTA ULTRAFILTRACIÓN</h1>
+    <p class="sub">Hito 1: Control Bomba Peristáltica MBP-2000</p>
+    
     <div class="display">
-      <div class="rpm-num" id="disp_rpm">0.0</div>
-      <div class="metric-sub">RPM (Frecuencia: <span id="disp_freq">0</span> Hz)</div>
-      <div id="disp_pill" class="pill pill-off">MOTOR DETENIDO</div>
-      <div style="font-size: 11px; color: var(--muted); margin-top: 6px;" id="disp_dir">Giro: Horario (Filtración FX100)</div>
-
-      <div class="caudal-box">
-        <div class="caudal-item">
-          <span>CAUDAL TEÓRICO</span>
-          <strong id="disp_flow">0.00 L/min</strong>
+      <div class="rpm-val" id="disp_rpm">0.0</div>
+      <div class="rpm-unit">REVOLUCIONES POR MINUTO</div>
+      
+      <div class="grid-info">
+        <div class="info-box">
+          <span class="info-lbl">CAUDAL ACTUAL</span>
+          <span class="info-num" id="disp_flow">0.000 L/min</span>
         </div>
-        <div class="caudal-item">
-          <span>VOLUMEN BOMBEO</span>
-          <strong id="disp_vol" style="color: var(--accent);">0.00 L</strong>
+        <div class="info-box">
+          <span class="info-lbl">VOLUMEN TOTAL</span>
+          <span class="info-num" id="disp_vol">0.00 L</span>
         </div>
       </div>
+      
+      <div class="pill pill-off" id="disp_pill">MOTOR DETENIDO (REPOSO FRÍO)</div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 6px;" id="disp_dir">Giro: Horario (Filtración FX100)</div>
     </div>
 
-    <div class="slider-container">
-      <div class="slider-header">
-        <span>Fijar Velocidad:</span>
+    <div class="ctrl-group">
+      <div class="slider-lbl">
+        <span>Consigna de Velocidad:</span>
         <strong id="txt_slider" style="color: var(--accent);">30 RPM</strong>
       </div>
-      <input type="range" id="slider" min="0" max="120" value="30" oninput="ajustarSlider(this.value)">
+      <input type="range" id="slider" min="5" max="120" value="30" oninput="moverSlider(this.value)">
     </div>
 
     <div class="preset-grid">
@@ -166,13 +167,13 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
     <div class="footer">
-      ESP32 Bornera: D18 (PUL), D19 (DIR) • DM860 (1600 P/R)<br>
-      IP: <span id="disp_ip">Conectando...</span> • OTA Inalámbrico Activo
+      ESP32: P18 (PUL-), P19 (DIR-), VIN (5V) • DM860 (1600 P/R)<br>
+      IP Conexión: <span id="disp_ip">...</span>
     </div>
   </div>
 
   <script>
-    function ajustarSlider(v) {
+    function moverSlider(v) {
       document.getElementById('txt_slider').innerText = v + " RPM";
       fetch('/set?rpm=' + v);
     }
@@ -180,85 +181,90 @@ const char index_html[] PROGMEM = R"rawliteral(
       document.getElementById('slider').value = v;
       document.getElementById('txt_slider').innerText = v + " RPM";
       fetch('/set?rpm=' + v);
-      fetch('/cmd?act=START');
     }
     function enviarAccion(act) {
       fetch('/cmd?act=' + act);
     }
 
+    let solicitando = false;
     setInterval(() => {
-      fetch('/status').then(r => r.json()).then(d => {
-        document.getElementById('disp_rpm').innerText = d.rpm.toFixed(1);
-        document.getElementById('disp_freq').innerText = Math.round((d.rpm * 1600) / 60);
-        document.getElementById('disp_flow').innerText = d.flow.toFixed(3) + " L/min";
-        document.getElementById('disp_vol').innerText = d.vol.toFixed(2) + " L";
-        document.getElementById('disp_ip').innerText = d.ip;
-
-        let p = document.getElementById('disp_pill');
-        if (d.on) {
-          p.className = "pill pill-on";
-          p.innerText = "BOMBA EN MARCHA";
-        } else {
-          p.className = "pill pill-off";
-          p.innerText = "MOTOR DETENIDO (REPOSO FRÍO)";
-        }
-        document.getElementById('disp_dir').innerText = d.dir ? "Giro: Horario (Filtración FX100)" : "Giro: Antihorario (Retrolavado)";
-      }).catch(e => {});
-    }, 350);
+      if (solicitando) return;
+      solicitando = true;
+      fetch('/status')
+        .then(r => r.json())
+        .then(d => {
+          document.getElementById('disp_rpm').innerText = d.rpm.toFixed(1);
+          document.getElementById('disp_flow').innerText = d.flow.toFixed(3) + " L/min";
+          document.getElementById('disp_vol').innerText = d.vol.toFixed(2) + " L";
+          document.getElementById('disp_ip').innerText = d.ip;
+          
+          let p = document.getElementById('disp_pill');
+          if (d.on) {
+            p.className = "pill pill-on";
+            p.innerText = "BOMBA EN MARCHA";
+          } else {
+            p.className = "pill pill-off";
+            p.innerText = "MOTOR DETENIDO (REPOSO FRÍO)";
+          }
+          document.getElementById('disp_dir').innerText = d.dir ? "Giro: Horario (Filtración FX100)" : "Giro: Antihorario (Retrolavado)";
+        })
+        .catch(e => {})
+        .finally(() => { solicitando = false; });
+    }, 800);
   </script>
 </body>
 </html>
 )rawliteral";
 
-// ------------------------------------------------------------------------------
-// 6. SETUP: INICIALIZACIÓN
-// ------------------------------------------------------------------------------
+// ==============================================================================
+// 6. SETUP: INICIALIZACIÓN DE HARDWARE Y RED
+// ==============================================================================
 void setup() {
   Serial.begin(115200);
-
-  pinMode(PIN_DIR, OUTPUT);
-  digitalWrite(PIN_DIR, sentidoHorario ? HIGH : LOW);
-
-  // Inicializar temporizador LEDC por hardware en D18
-  ledcAttach(PIN_PUL, 1000, 8);
-  ledcWriteTone(PIN_PUL, 0);
+  delay(300);
 
   Serial.println("\n========================================================");
   Serial.println("  PLANTA PILOTO DE ULTRAFILTRACIÓN INDUSTRIAL FX100     ");
-  Serial.println("  HITO 1: ACCIONAMIENTO DE BOMBA CON BORNERA & WI-FI    ");
+  Serial.println("  HITO 1: CONTROL DEFINITIVO DE BOMBA PERISTÁLTICA      ");
   Serial.println("========================================================");
 
-  // Conexión Wi-Fi Modo Híbrido (Cliente + Punto de Acceso)
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.begin(ssid_red, password_red);
-  Serial.printf("Conectando a red Wi-Fi: '%s' ...", ssid_red);
+  // Configuración de pines de dirección
+  pinMode(PIN_DIR, OUTPUT);
+  digitalWrite(PIN_DIR, sentidoHorario ? LOW : HIGH); // En Ánodo Común: LOW activa el opto
 
-  int intentos = 0;
-  while (WiFi.status() != WL_CONNECTED && intentos < 18) {
+  // Inicialización de LEDC por hardware en P18 (10 bits de resolución)
+  ledcAttach(PIN_PUL, 800, 10);
+  ledcWrite(PIN_PUL, 1023); // Nivel ALTO -> Optoacoplador apagado en reposo
+  frecuencia_hz_actual = 0;
+
+  // Limpieza previa del stack Wi-Fi para evitar cuelgues de NVS
+  WiFi.persistent(false);
+  WiFi.disconnect(true, true);
+  delay(100);
+
+  // Conexión Wi-Fi limpia (Modo Cliente STA primero, fallback a AP Propio)
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid_router, pass_router);
+  Serial.printf("Intentando conectar a Wi-Fi: '%s' ...", ssid_router);
+
+  unsigned long t_inicio_wifi = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - t_inicio_wifi < 7000)) {
     delay(300);
     Serial.print(".");
-    intentos++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[OK] Conectado a Wi-Fi exitosamente.");
-    Serial.printf("Acceso Web por IP: http://%s\n", WiFi.localIP().toString().c_str());
-    if (MDNS.begin("bomba")) {
-      Serial.println("Acceso Web por Dominio: http://bomba.local");
-    }
+    Serial.println("\n[OK] Conectado exitosamente al router.");
+    Serial.printf("Panel Web disponible en: http://%s\n", WiFi.localIP().toString().c_str());
   } else {
-    Serial.println("\n[AVISO] No se encontró la red Box804. Creando Red Propia...");
-    WiFi.softAP(ap_ssid, ap_pass);
-    Serial.printf("Conéctate al Wi-Fi del ESP32: '%s' (Clave: '%s')\n", ap_ssid, ap_pass);
-    Serial.printf("Abre en tu navegador: http://%s\n", WiFi.softAPIP().toString().c_str());
+    Serial.println("\n[AVISO] No se encontró el router. Creando Red Wi-Fi Propia (AP)...");
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssid_ap, pass_ap);
+    Serial.printf("Conéctate al Wi-Fi: '%s' (Clave: '%s')\n", ssid_ap, pass_ap);
+    Serial.printf("Panel Web disponible en: http://%s\n", WiFi.softAPIP().toString().c_str());
   }
 
-  // Servicio de Actualización Inalámbrica (ArduinoOTA)
-  ArduinoOTA.setHostname("bomba-uf");
-  ArduinoOTA.setPassword("plantapiloto2");
-  ArduinoOTA.begin();
-
-  // Endpoints del Servidor Web
+  // Rutas del Servidor Web
   server.on("/", HTTP_GET, [](){
     server.send_P(200, "text/html", index_html);
   });
@@ -266,7 +272,7 @@ void setup() {
   server.on("/set", HTTP_GET, [](){
     if (server.hasArg("rpm")) {
       float r = server.arg("rpm").toFloat();
-      if (r >= 0.0f && r <= 130.0f) {
+      if (r >= 5.0f && r <= 130.0f) {
         rpm_objetivo = r;
       }
     }
@@ -277,53 +283,52 @@ void setup() {
     if (server.hasArg("act")) {
       String act = server.arg("act");
       if (act == "START") {
-        if (rpm_objetivo < 1.0f) rpm_objetivo = 30.0f;
+        if (rpm_objetivo < 5.0f) rpm_objetivo = 30.0f;
         bombaEnMarcha = true;
-        Serial.printf("[WEB] Bomba INICIADA a %.1f RPM.\n", rpm_objetivo);
+        Serial.printf("[WEB] Bomba INICIADA a consigna de %.1f RPM\n", rpm_objetivo);
       } else if (act == "STOP") {
         bombaEnMarcha = false;
-        Serial.println("[WEB] Bomba DETENIDA.");
+        Serial.println("[WEB] Bomba DETENIDA");
       } else if (act == "TOGGLE_DIR") {
         sentidoHorario = !sentidoHorario;
-        digitalWrite(PIN_DIR, sentidoHorario ? HIGH : LOW);
-        Serial.printf("[WEB] Sentido cambiado a: %s\n", sentidoHorario ? "Horario (Filtración)" : "Antihorario (Retrolavado)");
+        digitalWrite(PIN_DIR, sentidoHorario ? LOW : HIGH);
+        Serial.printf("[WEB] Sentido: %s\n", sentidoHorario ? "Horario (Filtración)" : "Antihorario (Retrolavado)");
       }
     }
     server.send(200, "text/plain", "OK");
   });
 
   server.on("/status", HTTP_GET, [](){
-    String ipActual = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+    String ipActual = (WiFi.getMode() == WIFI_STA) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
     String json = "{";
     json += "\"on\":" + String(bombaEnMarcha ? "true" : "false") + ",";
     json += "\"rpm\":" + String(rpm_actual, 1) + ",";
     json += "\"dir\":" + String(sentidoHorario ? "true" : "false") + ",";
-    json += "\"flow\":" + String(caudal_actual_Lmin, 3) + ",";
-    json += "\"vol\":" + String(volumen_total_L, 2) + ",";
+    json += "\"flow\":" + String(caudal_Lmin, 3) + ",";
+    json += "\"vol\":" + String(volumen_L, 2) + ",";
     json += "\"ip\":\"" + ipActual + "\"";
     json += "}";
     server.send(200, "application/json", json);
   });
 
   server.begin();
-  Serial.println("[OK] Servidor Web activo en el puerto 80.");
-  Serial.println("Comandos por Monitor Serie: 'R10', 'R30', 'R60', 'R100', 'DIR', 'STOP'");
+  Serial.println("[OK] Servidor Web listo.");
+  Serial.println("Comandos por Monitor Serie disponibles: 'START', 'STOP', 'DIR', 'R30', 'R60'");
 }
 
-// ------------------------------------------------------------------------------
-// 7. LOOP: RAMPA, TELEMETRÍA, WEB Y PARSER SERIE
-// ------------------------------------------------------------------------------
+// ==============================================================================
+// 7. LOOP PRINCIPAL (RAMPA SUAVE, INTEGRACIÓN DE VOLUMEN Y SERVIDOR WEB)
+// ==============================================================================
 void loop() {
   server.handleClient();
-  ArduinoOTA.handle();
 
-  unsigned long t_ahora = millis();
-  float dt = (t_ahora - t_ultimo_loop_ms) / 1000.0f;
+  unsigned long t_actual = millis();
+  float dt = (t_actual - t_ultimo_loop_ms) / 1000.0f;
 
-  if (dt >= 0.02f) { // Refresco cada 20 ms
-    t_ultimo_loop_ms = t_ahora;
+  if (dt >= 0.05f) { // Actualización cada 50 ms (20 Hz)
+    t_ultimo_loop_ms = t_actual;
 
-    // Aceleración y desaceleración suave
+    // Rampa suave de aceleración y desaceleración
     if (bombaEnMarcha) {
       if (rpm_actual < rpm_objetivo) {
         rpm_actual += ACELERACION_RPM_SEG * dt;
@@ -339,33 +344,36 @@ void loop() {
       }
     }
 
-    fijarFrecuenciaMotor(rpm_actual);
+    // Actualizar pulsos de silicio por hardware
+    actualizarPulsosMotor(rpm_actual, bombaEnMarcha);
 
     // Integración de Caudal y Volumen
-    caudal_actual_Lmin = (rpm_actual * ML_POR_REVOLUCION) / 1000.0f;
+    caudal_Lmin = (rpm_actual * ML_POR_VUELTA) / 1000.0f;
     if (bombaEnMarcha && rpm_actual > 0.1f) {
-      volumen_total_L += (caudal_actual_Lmin / 60.0f) * dt;
+      volumen_L += (caudal_Lmin / 60.0f) * dt;
     }
   }
 
-  // Parser por consola serie
+  // Parser por Monitor Serie (para control por cable si no hay Wi-Fi)
   if (Serial.available()) {
-    String c = Serial.readStringUntil('\n');
-    c.trim();
-    if (c.startsWith("R") || c.startsWith("r")) {
-      float r = c.substring(1).toFloat();
-      if (r >= 0.0f && r <= 130.0f) {
-        rpm_objetivo = r;
-        bombaEnMarcha = (r > 0.0f);
-        Serial.printf("[SERIAL] Setpoint: %.1f RPM\n", rpm_objetivo);
-      }
-    } else if (c.equalsIgnoreCase("DIR")) {
-      sentidoHorario = !sentidoHorario;
-      digitalWrite(PIN_DIR, sentidoHorario ? HIGH : LOW);
-      Serial.printf("[SERIAL] Sentido: %s\n", sentidoHorario ? "Horario" : "Antihorario");
-    } else if (c.equalsIgnoreCase("STOP")) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd.equalsIgnoreCase("START")) {
+      bombaEnMarcha = true;
+      Serial.println("[SERIE] Bomba Iniciada");
+    } else if (cmd.equalsIgnoreCase("STOP")) {
       bombaEnMarcha = false;
-      Serial.println("[SERIAL] Bomba Detenida");
+      Serial.println("[SERIE] Bomba Detenida");
+    } else if (cmd.equalsIgnoreCase("DIR")) {
+      sentidoHorario = !sentidoHorario;
+      digitalWrite(PIN_DIR, sentidoHorario ? LOW : HIGH);
+      Serial.printf("[SERIE] Sentido: %s\n", sentidoHorario ? "Horario" : "Antihorario");
+    } else if (cmd.startsWith("R") || cmd.startsWith("r")) {
+      float r = cmd.substring(1).toFloat();
+      if (r >= 5.0f && r <= 130.0f) {
+        rpm_objetivo = r;
+        Serial.printf("[SERIE] Consigna RPM: %.1f\n", rpm_objetivo);
+      }
     }
   }
 }
