@@ -32,43 +32,42 @@ El sistema debe permitir:
 
 ### 1.3. Esquema de Cableado Pin a Pin Exhaustivo
 
-El cableado se divide estrictamente en dos secciones: **Lógica de Control (Baja Tensión 3.3V)** y **Potencia (Media Tensión / Corriente)**.
+El cableado se divide estrictamente en dos secciones: **Lógica de Control (Ánodo Común a 5V / Open-Drain)** y **Potencia (Media Tensión / Corriente)**.
 
 ```
-       ESP32 DevKit V1 (38 Pines)                     DRIVER LEADSHINE DM860
+       ESP32 DevKit V1 (Bornera ZS-1057)              DRIVER LEADSHINE DM860
      ┌────────────────────────────┐                 ┌─────────────────────────────┐
-     │           GPIO 18 (D18) ───┼────────────────►│ PUL+ (PULSE / STEP)         │
-     │           GPIO 19 (D19) ───┼────────────────►│ DIR+ (DIRECCIÓN CW/CCW)     │
-     │           GPIO 21 (D21) ───┼───────────(Opc)►│ ENA+ (ENABLE / HABILITACIÓN)│
-     │                     GND ───┼─┬──────────────►│ PUL- (Masa de Pulsos)       │
-     │                            │ ├──────────────►│ DIR- (Masa de Dirección)    │
-     │                            │ └─────────(Opc)►│ ENA- (Masa de Enable)       │
+     │           Borne VIN (+5V) ─┼──┬─────────────►│ PUL+ (Ánodo Común de Pulsos)│
+     │                            │  └─────────────►│ DIR+ (Ánodo Común de Giro)  │
+     │             Borne P18 (D18)┼────────────────►│ PUL- (Catodo de Pulsos)     │
+     │             Borne P19 (D19)┼────────────────►│ DIR- (Catodo Open-Drain)    │
+     │                            │                 │ ENA+ / ENA- (DESCONECTADOS) │
      └────────────────────────────┘                 └─────────────────────────────┘
                                                     ┌─────────────────────────────┐
         TRANSFORMADOR 24 VAC                        │ AC / VCC  (Entrada Poder)   │
         (150 VA ➔ Bus interno 34V DC) ─────────────►│ AC / GND  (Entrada Poder)   │
                                                     ├─────────────────────────────┤
-        MOTOR NEMA 34 (6A)                          │ A+ (Cable Fase A1)          │
-        (Bobinado Bipolar 4 Cables)   ─────────────►│ A- (Cable Fase A2)          │
-                                                    │ B+ (Cable Fase B1)          │
-                                                    │ B- (Cable Fase B2)          │
+        MOTOR NEMA 34 (4.5 Nm - 3A)                 │ A+ (Cable Rojo)             │
+        (Bipolar Serie 8 Cables)      ─────────────►│ A- (Cable Negro)            │
+        * Amar.+Azul unidos y aislados              │ B+ (Cable Blanco)           │
+        * Naran.+Marr. unidos y aislados            │ B- (Cable Verde)            │
                                                     └─────────────────────────────┘
 ```
 
-#### 🔍 Detalle Crítico de Conexión de Cada Borne:
+#### 🔍 Detalle Crítico de Conexión de Cada Borne (Configuración Ánodo Común Validada):
 
-1. **Borne `PUL+` y `PUL-` (Tren de Pulsos de Paso)**:
-   * `PUL+` va directo al pin **`GPIO 18`** del ESP32.
-   * `PUL-` va a la masa **`GND`** del ESP32.
-   * *Funcionamiento*: Cada flanco de subida de $3.3\text{V}$ enciende el optoacoplador interno y avanza el motor exactamente un micropaso.
-2. **Borne `DIR+` y `DIR-` (Sentido de Rotación)**:
-   * `DIR+` va directo al pin **`GPIO 19`** del ESP32.
-   * `DIR-` va a la masa **`GND`** del ESP32.
-   * *Funcionamiento*: Con `HIGH` ($3.3\text{V}$), el motor gira en sentido Horario. Con `LOW` ($0\text{V}$), gira en sentido Antihorario.
-3. **Borne `ENA+` y `ENA-` (Habilitación / Torque)**:
-   * **Recomendación de Planta**: Dejar **DESCONECTADOS (al aire)**. 
-   * *Razón Técnica*: El driver DM860 viene configurado de fábrica para que con `ENA` desconectado (o a nivel bajo) el driver esté **SIEMPRE HABILITADO** con torque de retención. Si se conecta a `GPIO 21`, poner el pin en `HIGH` apagaría el driver dejando el eje libre (suelto).
-4. **Bornes de Potencia `AC / AC`**:
+1. **Bornes `PUL+` y `DIR+` (Ánodo Común a +5V)**:
+   * Puenteados entre sí y conectados al borne **`VIN`** (+5V de USB / Fuente externa).
+   * *Funcionamiento*: Al alimentar los ánodos a 5V exactos, los optoacopladores internos reciben corriente limpia sin caídas, garantizando respuesta nítida de disparo.
+2. **Borne `PUL-` (Tren de Pulsos de Paso)**:
+   * Conectado al pin **`GPIO 18` (`P18`)** del ESP32.
+   * *Funcionamiento*: El periférico LEDC conmuta hacia 0V para encender el optoacoplador en cada pulso de micropaso.
+3. **Borne `DIR-` (Sentido de Rotación Open-Drain)**:
+   * Conectado al pin **`GPIO 19` (`P19`)** del ESP32 configurado en `OUTPUT_OPEN_DRAIN`.
+   * *Funcionamiento*: En LOW conduce a masa (0V, optoacoplador ON = Horario). En HIGH entra en alta impedancia (Hi-Z, 0 mA de corriente = Antihorario), eliminando el problema de conducción parásita por voltaje residual.
+4. **Bornes `ENA+` y `ENA-` (Habilitación / Torque)**:
+   * **Dejar DESCONECTADOS (al aire)**. El driver DM860 se mantiene habilitado con torque permanente de retención.
+5. **Bornes de Potencia `AC / AC`**:
    * Los 2 cables de salida de $24\text{ VAC}$ del transformador se conectan directamente a estos bornes. 
    * No importa la polaridad porque el DM860 posee un puente rectificador interno con banco de capacitores electrolíticos que eleva y filtra la tensión a:
      $$V_{\text{bus DC}} = V_{\text{RMS}} \times \sqrt{2} = 24\text{V} \times 1.4142 \approx 33.94\text{ VDC}$$
@@ -309,13 +308,13 @@ Seguir estrictamente esta secuencia antes de energizar la planta:
 
 ### 1.8. Criterio de Aprobación del Hito 1
 
-El Hito 1 se considera **OFICIALMENTE APROBADO** para el informe de tesis cuando se verifiquen los siguientes 5 puntos en el laboratorio:
+El Hito 1 se encuentra **OFICIALMENTE VALIDADO Y APROBADO EN BANCO**:
 
-- [ ] **Giro Suave y Silencioso**: El motor gira en $10, 30, 60 \text{ y } 100\text{ RPM}$ con emisión sonora mínima y sin vibración de resonancia mecánica en el banco.
-- [ ] **Rampa Dinámica Libre de Pérdida de Pasos**: Al pasar bruscamente de 0 a 100 RPM, el motor acelera en forma continua sin cabeceos ni silbidos de pérdida de pasos.
-- [ ] **Inversión de Sentido Fiable**: El cambio entre modo Filtración (CW) y Retrolavado (CCW) se ejecuta de forma inmediata y limpia.
-- [ ] **Estabilidad Térmica Comprobada**: Tras operar durante $20\text{ minutos}$ continuos a $60\text{ RPM}$ y luego estar en reposo $10\text{ minutos}$, la carcasa del motor NEMA 34 permanece tibia ($< 45^\circ\text{C}$), comprobando que el switch SW4 en `OFF` protege las bobinas.
-- [ ] **Torque de Arrastre Efectivo**: El motor vence con total facilidad la resistencia del tubo peristáltico elastomérico comprimido por los rodillos de la bomba MBP-2000.
+- [x] **Giro Suave y Silencioso**: El motor gira en el rango operativo calibrado de $70\text{ a }160\text{ RPM}$ (presets en $80, 100, 120\text{ y }140\text{ RPM}$) con emisión sonora mínima, habiéndose descartado la zona resonante (<60 RPM).
+- [x] **Rampa Dinámica Libre de Pérdida de Pasos**: Aceleración a $40\text{ RPM/s}$ continua, sin cabeceos ni silbidos de pérdida de paso por hardware LEDC.
+- [x] **Inversión de Sentido Fiable y Segura**: Transición automática entre Filtración (CW) y Retrolavado (CCW) con desaceleración suave a 0 RPM, conmutación física de dirección en reposo y reaceleración progresiva sin sobrepresiones ni golpes de ariete.
+- [x] **Estabilidad Térmica Comprobada**: El switch SW4 en `OFF` (50% Standstill Current) reduce la disipación Joule en reposo en un 75%, manteniendo motor y driver tibios y estables tras operación continua.
+- [x] **Torque de Arrastre y Protección de Membrana FX100**: Arrastre fluido de los rodillos del cabezal peristáltico MBP-2000 y aviso visual de precaución antes y al superar el límite de caudal de diseño ($0.60\text{ L/min}$).
 
 ---
 

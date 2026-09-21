@@ -72,32 +72,37 @@ Si estás en una mesa sin router o fuera del laboratorio:
 
 En la pantalla verás un panel oscuro estilo SCADA industrial:
 
-1. **Slider de Velocidad**: Desliza el dedo para regular las RPM suavemente de $0\text{ a }120\text{ RPM}$.
+1. **Slider de Velocidad**: Desliza el dedo para regular las RPM suavemente en el rango seguro de **$70\text{ a }160\text{ RPM}$**.
 2. **Botones Rápidos de Preseteo**:
-   * `10 RPM` ➔ Flujo ultra-lento ($0.042\text{ L/min}$).
-   * `30 RPM` ➔ Flujo nominal suave ($0.126\text{ L/min}$).
-   * `60 RPM` ➔ Flujo estándar de operación ($0.252\text{ L/min}$).
-   * `100 RPM` ➔ Alto flujo ($0.420\text{ L/min}$).
-3. **Botón Invertir Sentido**:
+   * `80 RPM` ➔ Flujo nominal suave ($0.336\text{ L/min}$).
+   * `100 RPM` ➔ Flujo estándar de operación ($0.420\text{ L/min}$).
+   * `120 RPM` ➔ Operación sostenida ($0.504\text{ L/min}$).
+   * `140 RPM` ➔ Operación máxima con advertencia previa de caudal ($0.588\text{ L/min}$).
+3. **Alerta de Membrana FX100**:
+   * A partir de $0.55\text{ L/min}$ emite aviso preventivo en amarillo.
+   * Superando $0.60\text{ L/min}$ emite alarma crítica pulsante en rojo para proteger las fibras capilares de la membrana.
+4. **Botón Invertir Sentido con Rampa Automática**:
    * **Horario (CW)**: Modo Filtración impulsando agua hacia la membrana FX100.
    * **Antihorario (CCW)**: Modo Retrolavado (*Backwash*) para limpiar las fibras.
-4. **Cálculo en Tiempo Real**:
+   * *Maniobra*: Desacelera a 0 RPM a 40 RPM/s, conmuta la dirección con motor detenido y reaccelera sin tirones.
+5. **Cálculo en Tiempo Real**:
    * Muestra el **Caudal instantáneo en L/min** ($Q = \text{RPM} \times 4.2\text{ mL/rev}$).
    * Muestra el **Volumen total bombeado en Litros** acumulado durante la prueba.
 
 ---
 
 ## 🎯 Entregable Concreto de esta Guía
-* **Módulo de bombeo peristáltico inalámbrico operativo**: ESP32 montado en shield de borneras a tornillo, firmware `bomba.ino` cargado, y accionamiento de la bomba controlado en tiempo real vía Wi-Fi (Dashboard Web local en `http://bomba.local` o AP `192.168.4.1`) con rampas suaves de aceleración e inversión de giro.
+* **Módulo de bombeo peristáltico inalámbrico operativo**: ESP32 montado en shield de borneras a tornillo, firmware `bomba.ino` cargado, y accionamiento de la bomba controlado en tiempo real vía Wi-Fi (Dashboard Web local en `http://192.168.50.53` o AP `192.168.4.1`) con rampas suaves de aceleración e inversión de giro.
 
 ---
 
 ## 📋 Lista de Verificación (Checklist de Avance)
-- [ ] ESP32 calzado firmemente en el shield de borneras con conector USB-C hacia el exterior.
-- [ ] Conexión a tornillo firme de `D18` a `PUL+`, `D19` a `DIR+`, y `GND` a `PUL-` / `DIR-`.
-- [ ] Alimentación del ESP32 probada: $5.00\text{ VDC}$ desde el LM2596 al pin `VIN` y `GND`.
-- [ ] Firmware `bomba.ino` compilado y subido correctamente vía Arduino IDE.
-- [ ] Conexión Wi-Fi establecida: acceso al dashboard en `http://bomba.local` o mediante AP `Bomba_Peristaltica_UF`.
-- [ ] Respuesta de la bomba peristáltica verificada con los botones de preseteo (10, 30, 60 y 100 RPM).
-- [ ] Inversión de giro comprobada (Horario para filtración, Antihorario para retrolavado).
-- [ ] Acumulador de volumen de líquido bombeado funcionando en la interfaz web.
+- [x] ESP32 calzado firmemente en el shield de borneras ZS-1057 respetando la orientación correcta (`3V3` con `3V3`, `VIN` con `VIN`).
+- [x] Conexión a tornillo firme de `VIN` a `PUL+` y `DIR+` (Ánodo Común 5V), `P18` a `PUL-`, y `P19` a `DIR-` (Open-Drain).
+- [x] Alimentación del ESP32 probada: alimentación por USB / bornera 5V operativa.
+- [x] Firmware `bomba.ino` compilado y subido correctamente vía Arduino CLI / IDE.
+- [x] Conexión Wi-Fi establecida: acceso al dashboard en `http://192.168.50.53` y AP de contingencia `Bomba_Peristaltica_UF`.
+- [x] Respuesta de la bomba peristáltica verificada con los botones de preseteo (80, 100, 120 y 140 RPM).
+- [x] Inversión de giro comprobada con rampa de deceleración segura a 0 RPM (Horario para filtración, Antihorario para retrolavado).
+- [x] Acumulador de volumen de líquido bombeado y cálculo de caudal instantáneo funcionando en la interfaz web.
+
