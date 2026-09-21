@@ -173,13 +173,13 @@ const char index_html[] PROGMEM = R"rawliteral(
         <span>Consigna de Velocidad:</span>
         <strong id="txt_slider" style="color: var(--accent);">80 RPM</strong>
       </div>
-      <input type="range" id="slider" min="60" max="200" value="80" oninput="moverSlider(this.value)">
+      <input type="range" id="slider" min="70" max="160" value="80" oninput="moverSlider(this.value)">
     </div>
 
     <div class="preset-grid">
-      <button class="btn-preset" onclick="fijarRPM(60)">60 RPM</button>
       <button class="btn-preset" onclick="fijarRPM(80)">80 RPM</button>
       <button class="btn-preset" onclick="fijarRPM(100)">100 RPM</button>
+      <button class="btn-preset" onclick="fijarRPM(120)">120 RPM</button>
       <button class="btn-preset" onclick="fijarRPM(140)">140 RPM</button>
     </div>
 
@@ -312,7 +312,7 @@ void setup() {
   server.on("/set", HTTP_GET, [](){
     if (server.hasArg("rpm")) {
       float r = server.arg("rpm").toFloat();
-      if (r >= 50.0f && r <= 220.0f) {
+      if (r >= 70.0f && r <= 160.0f) {
         rpm_objetivo = r;
       }
     }
@@ -323,7 +323,8 @@ void setup() {
     if (server.hasArg("act")) {
       String act = server.arg("act");
       if (act == "START") {
-        if (rpm_objetivo < 60.0f) rpm_objetivo = 80.0f;
+        if (rpm_objetivo < 70.0f) rpm_objetivo = 80.0f;
+        if (rpm_objetivo > 160.0f) rpm_objetivo = 160.0f;
         bombaEnMarcha = true;
         Serial.printf("[WEB] Bomba INICIADA a consigna de %.1f RPM\n", rpm_objetivo);
       } else if (act == "STOP") {
@@ -434,7 +435,7 @@ void loop() {
       }
     } else if (cmd.startsWith("R") || cmd.startsWith("r")) {
       float r = cmd.substring(1).toFloat();
-      if (r >= 50.0f && r <= 220.0f) {
+      if (r >= 70.0f && r <= 160.0f) {
         rpm_objetivo = r;
         Serial.printf("[SERIE] Consigna RPM: %.1f\n", rpm_objetivo);
       }
