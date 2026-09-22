@@ -26,6 +26,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 
 // ==============================================================================
 // 1. CONFIGURACIÓN DE PINES Y PARÁMETROS MECÁNICOS
@@ -417,14 +418,19 @@ void setup() {
   frecuencia_hz_actual = 0;
   Serial.println("[OK] Driver DM860 inicializado por hardware en P18 y P19.");
 
-  // Inicialización de Pila Wi-Fi
+  // Inicialización de Pila Wi-Fi DUAL (AP y STA simultáneos)
   WiFi.persistent(false);
   WiFi.disconnect(true, true);
   delay(100);
 
-  WiFi.mode(WIFI_STA);
+  // Modo Dual: Red Propia AP + Cliente de Router STA
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(ssid_ap, pass_ap);
+  Serial.printf("\n[OK] Red Wi-Fi Propia activada: '%s' (Clave: '%s')\n", ssid_ap, pass_ap);
+  Serial.printf(">>> Acceso Directo por AP: http://%s\n", WiFi.softAPIP().toString().c_str());
+
   WiFi.begin(ssid_router, pass_router);
-  Serial.printf("Intentando conectar a Wi-Fi: '%s' ...", ssid_router);
+  Serial.printf("Conectando también a router: '%s' ...", ssid_router);
 
   unsigned long t_inicio_wifi = millis();
   while (WiFi.status() != WL_CONNECTED && (millis() - t_inicio_wifi < 6000)) {
@@ -433,14 +439,15 @@ void setup() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[OK] Conectado exitosamente al router.");
-    Serial.printf(">>> Panel Web en: http://%s\n", WiFi.localIP().toString().c_str());
+    Serial.println("\n[OK] Conectado exitosamente al router!");
+    Serial.printf(">>> Acceso por Router: http://%s\n", WiFi.localIP().toString().c_str());
   } else {
-    Serial.println("\n[AVISO] Router no disponible. Creando Red Wi-Fi Propia (AP)...");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid_ap, pass_ap);
-    Serial.printf(">>> Conéctate al Wi-Fi: '%s' (Clave: '%s')\n", ssid_ap, pass_ap);
-    Serial.printf(">>> Panel Web en: http://%s\n", WiFi.softAPIP().toString().c_str());
+    Serial.println("\n[AVISO] No se pudo enlazar al router Box804. El AP 'Bomba_Peristaltica_UF' sigue 100% activo.");
+  }
+
+  // Servicio mDNS (permite ingresar como http://bomba.local)
+  if (MDNS.begin("bomba")) {
+    Serial.println("[OK] Servicio mDNS activo: http://bomba.local");
   }
 
   // Rutas del Servidor Web
@@ -492,7 +499,8 @@ void setup() {
   });
 
   server.on("/status", HTTP_GET, [](){
-    String ipActual = (WiFi.getMode() == WIFI_STA) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+    String ipRouter = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : "Buscando...";
+    String ipAP = WiFi.softAPIP().toString();
     String json = "{";
     json += "\"on\":" + String(bombaEnMarcha ? "true" : "false") + ",";
     json += "\"inv\":" + String(invirtiendoSentido ? "true" : "false") + ",";
@@ -511,7 +519,8 @@ void setup() {
     json += "\"q_ret_ml\":" + String(qRet_calc_mLmin, 1) + ",";
     json += "\"recov\":" + String(recuperacion_porc, 1) + ",";
     json += "\"delta_bomba\":" + String(discrepanciaBomba_porc, 1) + ",";
-    json += "\"ip\":\"" + ipActual + "\"";
+    json += "\"ip\":\"" + ipRouter + "\",";
+    json += "\"ip_ap\":\"" + ipAP + "\"";
     json += "}";
     server.send(200, "application/json", json);
   });
