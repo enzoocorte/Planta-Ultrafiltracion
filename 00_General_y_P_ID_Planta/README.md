@@ -209,21 +209,22 @@ Al analizar tu boceto manuscrito con criterios estrictos de ingeniería de proce
 * La **Válvula de Purga de Fondo** se abre periódicamente para evacuar la torta de lodos decantados.
 * La **Válvula de Salida a la Bomba** se coloca unos $3\text{ a }5\text{ cm}$ por encima de la cota máxima del lodo compactado. Así, la bomba peristáltica aspira únicamente líquido sobrenadante clarificado, maximizando la vida útil del filtro FX100.
 
-### 5.4. Motor de 12V de la Paleta y Driver Puente H L298N
-* **¿Se pueden controlar el Motor de la Bomba (NEMA 34) y el de la Paleta (12V) con el MISMO ESP32?**:
-  * **¡SÍ, TOTALMENTE!** El ESP32 es Dual-Core a 240 MHz:
-    * La **Bomba NEMA 34** utiliza el canal LEDC 0 por hardware en `GPIO 18` (PUL) y `GPIO 19` (DIR) a través del driver DM860.
-    * La **Paleta Agitadora** utiliza el canal LEDC 1 (PWM) en `GPIO 4` (D4) y dos pines lógicos `GPIO 16` (D16) y `GPIO 17` (D17) para el sentido de giro a través del driver L298N.
-    * Ambos accionamientos operan de manera simultánea, síncrona y sin conflicto de recursos.
-* **Esquema de Conexionado de Taller del Agitador**:
-  1. Comprar un **motorreductor DC de 12V** (200 a 300 RPM nominales con reducción metálica).
-  2. Los 2 cables del motor van a los bornes a tornillo **`OUT1` y `OUT2`** del L298N.
-  3. La fuente de **12V DC** se conecta a los bornes **`+12V`** y **`GND`** del L298N.
-  4. Quitar el jumper negro de habilitación `ENA` del L298N y cablear:
-     * `ENA` ──► `GPIO 4` (D4) del ESP32.
-     * `IN1` ──► `GPIO 16` (D16) del ESP32.
-     * `IN2` ──► `GPIO 17` (D17) del ESP32.
-     * `GND` del L298N ──► `GND` del ESP32 (¡Masa de referencia común obligatoria!).
+### 5.4. Motor de la Paleta y Driver Puente H L298N: Tensión y Acople Mecánico
+* **¿Por qué 12V y no un motor de menor voltaje (5V o 6V)?**:
+  1. **Caída de tensión interna del driver L298N**: El chip L298N está construido con transistores bipolares (BJT) que introducen una caída de tensión de saturación de **$V_{CE(sat)} \approx 2.0\text{V} \text{ a } 2.5\text{V}$**. Si se alimenta con **5V**, al motor solo le llegan entre **$2.5\text{V} \text{ y } 3.0\text{V}$**, haciendo que gire casi sin torque y se clave al entrar en contacto con el agua espesa. Con **12V**, al motor le llegan aproximadamente **$9.5\text{V} \text{ a } 10.0\text{V}$**, entregando par suficiente en todo momento.
+  2. **Resistencia viscosa de la mezcla**: El agua sintética de bentonita ($\approx 500\text{ NTU}$) y el extracto de *Opuntia ficus-indica* (mucílago biopolimérico viscoso) oponen una resistencia hidrodinámica considerable ($F_D$). Un motorreductor de 12V con caja reductora metálica entrega entre $2\text{ y }5\text{ kg}\cdot\text{cm}$ de torque sostenido sin recalentarse.
+  3. **Disponibilidad universal**: Cualquier fuente switching común de $12\text{V DC}$ (1A o 2A, como las de módem/cámaras) o un convertidor Step-Down LM2596 conectado al transformador de la planta alimenta el sistema con total facilidad.
+* **¿Cómo se conecta mecánicamente la paleta al motor?**:
+  1. **El Motorreductor**: Se utiliza un motorreductor DC de 12V (200 a 300 RPM nominales con eje metálico de $4\text{ mm}$, $6\text{ mm}$ u $8\text{ mm}$ con chaflán plano tipo "D").
+  2. **El Acople de Eje**: Se monta un **Acople Rígido de Aluminio para CNC / Impresora 3D** (cilindro de aluminio con prisioneros Allen M3/M4, con orificio de $4\text{ mm} \to 6\text{ mm}$ o $6\text{ mm} \to 8\text{ mm}$).
+  3. **El Eje del Agitador**: Una varilla de acero inoxidable AISI 304 de $6\text{ mm}$ u $8\text{ mm}$ (de unos $25\text{ a }35\text{ cm}$ de longitud) se introduce en el otro extremo del acople de aluminio y se aprieta con llave Allen.
+  4. **Guía en la Tapa (Evita bamboleo)**: En el centro de la tapa del reactor se encastra un **buje de teflón o un rodamiento 608** (de patín/roller). El eje pasa por el rodamiento, que absorbe las fuerzas radiales y mantiene la varilla perfectamente vertical sin forzar el reductor del motor.
+  5. **Fijación de la Paleta**: La paleta (rectángulo de acrílico cortado a láser, chapa fina de acero inoxidable 304 o impresión 3D en PETG de aprox. $7\text{ cm} \times 2.5\text{ cm}$) tiene una perforación central y se fija en el extremo inferior de la varilla mediante **arandela + tuerca + contratuerca inox (o tuerca autofrenante con teflón)**, asegurando que no se afloje jamás durante la rotación.
+* **Control Dual en el mismo ESP32**:
+  * La **Bomba NEMA 34** utiliza el canal LEDC 0 por hardware en `GPIO 18` (PUL) y `GPIO 19` (DIR) a través del driver DM860.
+  * La **Paleta Agitadora** utiliza el canal LEDC 1 (PWM) en `GPIO 4` (D4) y dos pines lógicos `GPIO 16` (D16) y `GPIO 17` (D17) para el sentido de giro a través del driver L298N.
+  * Ambos accionamientos operan de manera simultánea, síncrona y sin conflicto de recursos gracias a la arquitectura Dual-Core a 240 MHz del ESP32.
+
 
 ### 5.5. Sensor de Nivel (Boya Inox): ¿Cómo fijar la cota y cómo cablear?
 * **¿Cómo colocarlo a la altura deseada?**:

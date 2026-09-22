@@ -418,18 +418,23 @@
               "<b>3. Tapa Superior:</b> Permite incorporar el agua turbia y dosificar la solución de <i>Opuntia</i>."
       },
       l298n: {
-        titulo: "⚡ Driver Puente H L298N & Motor de 12V (Paleta Agitadora)",
-        tipo: "Etapa de Potencia para el Agitador",
-        desc: "<b>¿Cómo se conecta?:</b><br>" +
-              "1. Compras un <b>motorreductor DC de 12V</b> (200-300 RPM con engranajes metálicos).<br>" +
-              "2. Los 2 cables del motor van a los bornes a tornillo <b>OUT1 y OUT2</b> del L298N.<br>" +
-              "3. Alimentación: Conectas <b>+12V</b> y <b>GND</b> de la fuente de 12V al L298N.<br>" +
-              "4. <b>Conexión al ESP32:</b><br>" +
-              "   • <b>Masa Común (GND):</b> Un cable une GND del L298N con GND del ESP32.<br>" +
-              "   • <b>Velocidad (PWM):</b> Quitas el jumper negro de <code>ENA</code> y conectas a <b>GPIO 4 (D4)</b>.<br>" +
-              "   • <b>Sentido de Giro:</b> Pines <code>IN1</code> y <code>IN2</code> a <b>GPIO 16 (D16)</b> y <b>GPIO 17 (D17)</b>.<br><br>" +
-              "⭐ <b>¿El mismo ESP32 puede controlar la Bomba y la Paleta?:</b><br>" +
-              "<b>¡SÍ, TOTALMENTE!</b> El ESP32 es Dual-Core a 240 MHz. La bomba usa el periférico LEDC en P18 (hardware independiente) y la paleta usa PWM en D4. Ambos motores funcionan al mismo tiempo sin interferirse."
+        titulo: "⚡ Driver Puente H L298N & Motor Agitador (Paleta)",
+        tipo: "Etapa de Potencia y Mecánica de Agitación",
+        desc: "⭐ <b>¿Por qué 12V y no menos (5V o 6V)?:</b><br>" +
+              "1. <i>Caída de tensión del L298N:</i> El chip pierde internamente entre <b>2.0V y 2.5V</b> en sus transistores. Si lo alimentas con 5V, al motor le llegan solo 2.5V (gira sin fuerza y se clava en el agua). Con 12V le llegan ~10V limpios con torque potente.<br>" +
+              "2. <i>Viscosidad:</i> El agua con bentonita (~500 NTU) y <i>Opuntia</i> (mucílago viscoso) exige un torque de 2 a 5 kg·cm que un motor de 12V entrega sin sobrecalentarse.<br><br>" +
+              "⭐ <b>¿Cómo se conecta mecánicamente la paleta al motor?:</b><br>" +
+              "• <i>El Motor:</i> Motorreductor DC de 12V (200-300 RPM nominales con eje metálico de 4 o 6 mm).<br>" +
+              "• <i>El Acople:</i> Se compra un <b>Acople Rígido de Aluminio para CNC</b> (ej. 4mm a 6mm o 6mm a 8mm) con 4 prisioneros Allen.<br>" +
+              "• <i>El Eje:</i> Una varilla de acero inoxidable AISI 304 de 6 u 8 mm que pasa por un <b>buje de teflón o rodamiento 608 en la tapa</b> (para evitar bamboleo).<br>" +
+              "• <i>La Paleta:</i> Rectángulo de acrílico, acero inox o 3D (PETG) fijado al final de la varilla con <b>arandela + tuerca + contratuerca inox</b>.<br><br>" +
+              "⭐ <b>Conexión Eléctrica al ESP32:</b><br>" +
+              "• Motor a OUT1 y OUT2. Fuente 12V a +12V y GND.<br>" +
+              "• Masa Común: GND del L298N a GND del ESP32.<br>" +
+              "• PWM Velocidad: Sin jumper en ENA ➔ <b>GPIO 4 (D4)</b>.<br>" +
+              "• Sentido de Giro: IN1 e IN2 ➔ <b>GPIO 16 (D16)</b> y <b>GPIO 17 (D17)</b>.<br><br>" +
+              "⭐ <b>¿El mismo ESP32 maneja la Bomba y la Paleta?:</b><br>" +
+              "<b>¡SÍ!</b> El ESP32 es Dual-Core a 240 MHz. Ambos motores funcionan al mismo tiempo sin interferirse."
       },
       prefiltro: {
         titulo: "🛡️ Prefiltro Y-Strainer (Malla Inoxidable 120 Mesh / 125 µm)",
