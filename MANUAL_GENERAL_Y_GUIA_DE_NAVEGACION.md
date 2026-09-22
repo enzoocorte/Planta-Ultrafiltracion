@@ -35,6 +35,7 @@ flowchart TD
 * **Objetivo General**: Mantener la visión global e integral de todo el banco de pruebas hidráulico y electrónico de la planta.
 * **Qué encontrarán aquí**:
   * [`README.md`](./00_General_y_P_ID_Planta/README.md): Plano maestro P&ID según norma ISA 5.1 con diferenciación estricta de mangueras de proceso (línea llena) y señales de control al ESP32 (línea punteada), justificación de la válvula reguladora de aguja $V_{\text{reg}}$, especificación del prefiltro de succión y matriz de conexionado (directo vs indirecto).
+  * [`Guia_Construccion_y_Montaje_Tanques.md`](./00_General_y_P_ID_Planta/Guia_Construccion_y_Montaje_Tanques.md): Guía de diseño, perforación, estanqueidad e instalación de sensores (boya inox, DS18B20, TDS) y prefiltro de succión en los tanques T-01 y T-02.
   * [`diagrama_pid_interactivo.html`](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html): Diagrama interactivo ejecutable en navegador con selector de capas (mangueras/cables), flujo animado y simulador de Presión Transmembrana (TMP).
   * [`boceto_original_enzo_pid.jpg`](./00_General_y_P_ID_Planta/boceto_original_enzo_pid.jpg): Fotografía en alta resolución del boceto original de banco de Enzo.
 
@@ -49,6 +50,7 @@ flowchart TD
   * Control determinístico por hardware LEDC del ESP32 a 0% de uso de CPU.
 * **Archivos Clave**:
   * [`03_Firmware_Control_Bomba/bomba/bomba.ino`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/bomba/bomba.ino): Firmware oficial con **Control Wi-Fi**, Dashboard Web táctil, cálculo de caudal en L/min, litros totales y ArduinoOTA.
+  * [`03_Firmware_Control_Bomba/bomba/EXPLICACION_DETALLADA_CODIGO_BOMBA.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/bomba/EXPLICACION_DETALLADA_CODIGO_BOMBA.md): Explicación exhaustiva línea por línea de la arquitectura de software.
   * [`03_Firmware_Control_Bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/Guia_Montaje_Bomba_y_Bornera_ESP32.md): Manual ilustrado de conexionado de la bornera.
   * [`02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md): Puesta a punto según hoja oficial de CNC Insumos S.R.L.
   * [`01_Hardware_y_Cableado/Guia_Conexionado_Fisico_DM860.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/01_Hardware_y_Cableado/Guia_Conexionado_Fisico_DM860.md): Conexión de potencia y señales lógicas en cátodo común.
@@ -58,17 +60,19 @@ flowchart TD
 ---
 
 ### 📁 [`02_Hito2_Instrumentacion_Sensores/`](./02_Hito2_Instrumentacion_Sensores/)
-* **Objetivo de los Alumnos**: Conectar y calibrar los sensores físicos disponibles en el laboratorio para monitorear el proceso en tiempo real.
+* **Objetivo de los Alumnos**: Conectar y calibrar los sensores físicos disponibles en el laboratorio paso a paso por subhitos para monitorear el proceso en tiempo real.
 * **Qué aprenderán aquí**:
-  * Lectura de pulsos de microflujo con los caudalímetros de efecto Hall YF-S401 ($98\text{ pulsos/seg} = 1\text{ L/min}$).
-  * Protocolo OneWire digital para la sonda sumergible de temperatura DS18B20.
-  * Medición de calidad de agua en partes por millón ($\text{ppm}$) con la sonda analógica de TDS.
-  * Manejo del bus I2C y conversión analógica-digital de alta precisión con el chip **ADS1115 de 16 bits**.
+  * **Subhito 2.1**: Lectura de pulsos de microflujo con caudalímetros de efecto Hall YF-S401 ($98\text{ pulsos/seg} = 1\text{ L/min}$), interrupciones IRAM y contraste dinámico con la bomba MBP-2000.
+  * **Subhito 2.2**: Protocolo OneWire digital para la sonda sumergible de temperatura DS18B20 y cálculo de TCF Darcy.
+  * **Subhito 2.3**: Bus I2C y conversión analógica-digital con ADS1115 de 16 bits para sonda de calidad de agua (TDS en ppm).
+  * **Subhito 2.4**: Transductores de presión hidráulica (P1, P2, P3) y enclavamiento de TMP.
 * **Archivos Clave**:
-  * [`README.md`](./02_Hito2_Instrumentacion_Sensores/README.md): Ecuaciones de calibración, tabla de sensores y teoría de señales.
+  * [`README.md`](./02_Hito2_Instrumentacion_Sensores/README.md): Hoja de ruta modular en 4 subhitos, ecuaciones de calibración y checklist.
+  * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md): Guía de conexionado, factor K, prueba serie y calibración de microflujo YF-S401.
+  * [`02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino): Firmware modular para probar el caudalímetro con menú serie interactivo para la bomba peristáltica.
   * [`01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md): Dónde y cómo intercalar cada sensor en la cañería.
   * [`01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md): Fórmulas de conversión analógica, ganancia y compensación térmica.
-  * [`02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino): Firmware de prueba integral que imprime telemetría en formato CSV por puerto serie.
+  * [`02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino): Firmware de prueba integral multivariable en formato CSV.
 
 ---
 

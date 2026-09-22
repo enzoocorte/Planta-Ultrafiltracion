@@ -9,9 +9,10 @@
 
 Este documento establece la **visión sistémica e integral** de toda la planta piloto. Mientras que los **Hitos 1 al 5** se enfocan en la validación modular y experimental de cada subsistema, este diagrama P&ID (*Piping and Instrumentation Diagram*) representa el **plano maestro permanente** que conecta hidráulica, mecánica y electrónicamente todos los componentes del banco de ensayos.
 
-### 🖼️ Boceto Original de Banco vs Diagrama Formalizado
+### 🖼️ Boceto Original de Banco vs Diagrama Formalizado y Guías
 * **Boceto Original manuscrito en taller**: [`boceto_original_enzo_pid.jpg`](./boceto_original_enzo_pid.jpg)
 * **Diagrama Formal ISA 5.1 e Interactivo**: Este documento y el simulador visual complementario [`diagrama_pid_interactivo.html`](./diagrama_pid_interactivo.html).
+* **Guía de Construcción y Montaje de Tanques y Sondas**: [`Guia_Construccion_y_Montaje_Tanques.md`](./Guia_Construccion_y_Montaje_Tanques.md) (perforaciones, boya inox, sellado, prefiltro y posicionamiento de electrodos).
 
 ---
 
