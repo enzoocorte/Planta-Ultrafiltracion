@@ -190,18 +190,13 @@ Al analizar tu boceto manuscrito con criterios estrictos de ingeniería de proce
 
 ## 🚰 5. Los Tres Puntos Clave de Hidráulica Aplicada
 
-### 5.1. ¿Por qué es obligatoria la Válvula de Regulación de Aguja ($V_{\text{reg}}$)?
-En el módulo de ultrafiltración capilar Fresenius FX100, la ecuación que gobierna el paso de agua a través de las paredes de las fibras es la **Ley de Darcy**:
-
-$$J = \frac{\text{TMP}}{\mu \cdot (R_m + R_c)}$$
-
-Donde la **Presión Transmembrana ($\text{TMP}$)** se define como:
-
-$$\text{TMP} = \frac{P_1 + P_2}{2} - P_3$$
-
-* Si la línea de retorno no tuviera una válvula de aguja que estrangule la salida, la resistencia al flujo dentro del hueco de los capilares es casi cero ($P_1 \approx P_2 \approx 0\text{ bar}$).
-* Al no haber presión hidrostática dentro de las fibras, la $\text{TMP} \approx 0$, por lo que **el caudal de permeado ($Q_p$) sería prácticamente nulo**.
-* Incorporando la válvula $V_{\text{reg}}$ en la salida del retentado, el operador puede cerrarla suavemente hasta fijar una $\text{TMP}$ controlada (ejemplo: $0.30\text{ bar}$ o $0.40\text{ bar}$), permitiendo estudiar rigurosamente la cinética de colmatación (*fouling*).
+### 5.1. ¿Por qué la Válvula de Regulación ($V_{\text{reg}}$) es Manual de Aguja y NO Automática?
+* **Decisión de Ingeniería de Membranas**: Se utiliza una **Válvula Manual de Aguja de $1/4''$ en acero inoxidable** con volante micrométrico.
+* **¿Por qué manual y no una servoválvula electrónica?**:
+  1. **Metodología de Ensayo Científico**: La caracterización hidrodinámica y la determinación de las resistencias de Darcy ($R_m$ y $R_c$) exigen operar a **Presión Transmembrana constante ($\text{TMP}$)** (ej. $0.20, 0.30\text{ ó }0.40\text{ bar}$) para registrar cómo decae el flujo en función del tiempo.
+  2. **Estabilidad absoluta sin oscilaciones**: Una válvula automática con lazo PID tiende a oscilar ante pequeñas fluctuaciones de caudal pulsátil de la bomba peristáltica, generando picos de presión que fatigan los capilares. La válvula manual de aguja fija una restricción física milimétrica constante y libre de fallas electrónicas.
+  3. **Costo y practicidad**: Una servoválvula industrial para microflujos de líquidos agresivos/coloidales es sumamente costosa. Con la válvula manual, el tesista observa el display web del SCADA y en 3 segundos gira la perilla hasta la TMP deseada.
+* **¿Qué sucede si no estuviera?**: El agua tomaría el camino de menor resistencia (el conducto axial interno de los capilares) y retornaría toda al sedimentador, dando un caudal de permeado casi nulo ($Q_p \approx 0$).
 
 ### 5.2. El Prefiltro: ¿Por qué tipo "Y" de 120 mesh ($125\,\mu\text{m}$)?
 * Los capilares de la membrana FX100 tienen un diámetro interno de **$200\,\mu\text{m}$**.
@@ -213,6 +208,46 @@ $$\text{TMP} = \frac{P_1 + P_2}{2} - P_3$$
 * El tanque sedimentador debe tener una geometría cónica o inclinada en la base.
 * La **Válvula de Purga de Fondo** se abre periódicamente para evacuar la torta de lodos decantados.
 * La **Válvula de Salida a la Bomba** se coloca unos $3\text{ a }5\text{ cm}$ por encima de la cota máxima del lodo compactado. Así, la bomba peristáltica aspira únicamente líquido sobrenadante clarificado, maximizando la vida útil del filtro FX100.
+
+### 5.4. Motor de 12V de la Paleta y Driver Puente H L298N
+* **¿Se pueden controlar el Motor de la Bomba (NEMA 34) y el de la Paleta (12V) con el MISMO ESP32?**:
+  * **¡SÍ, TOTALMENTE!** El ESP32 es Dual-Core a 240 MHz:
+    * La **Bomba NEMA 34** utiliza el canal LEDC 0 por hardware en `GPIO 18` (PUL) y `GPIO 19` (DIR) a través del driver DM860.
+    * La **Paleta Agitadora** utiliza el canal LEDC 1 (PWM) en `GPIO 4` (D4) y dos pines lógicos `GPIO 16` (D16) y `GPIO 17` (D17) para el sentido de giro a través del driver L298N.
+    * Ambos accionamientos operan de manera simultánea, síncrona y sin conflicto de recursos.
+* **Esquema de Conexionado de Taller del Agitador**:
+  1. Comprar un **motorreductor DC de 12V** (200 a 300 RPM nominales con reducción metálica).
+  2. Los 2 cables del motor van a los bornes a tornillo **`OUT1` y `OUT2`** del L298N.
+  3. La fuente de **12V DC** se conecta a los bornes **`+12V`** y **`GND`** del L298N.
+  4. Quitar el jumper negro de habilitación `ENA` del L298N y cablear:
+     * `ENA` ──► `GPIO 4` (D4) del ESP32.
+     * `IN1` ──► `GPIO 16` (D16) del ESP32.
+     * `IN2` ──► `GPIO 17` (D17) del ESP32.
+     * `GND` del L298N ──► `GND` del ESP32 (¡Masa de referencia común obligatoria!).
+
+### 5.5. Sensor de Nivel (Boya Inox): ¿Cómo fijar la cota y cómo cablear?
+* **¿Cómo colocarlo a la altura deseada?**:
+  * **Montaje Lateral (Recomendado)**: Se taladra la pared del reactor a la altura mínima admisible (unos 4 cm sobre el vértice del cono, inmediatamente encima de la válvula de sobrenadante). Se inserta la rosca macho con su junta tórica de silicona (O-ring) y se aprieta la tuerca exterior.
+  * **Montaje Suspendido**: Se cuelga una varilla rígida desde la tapa hermética que desciende la boya hasta dicha altura crítica.
+* **Principio y Conexión**:
+  * La boya tiene **solo 2 cables** y no tiene polaridad.
+  * **Cable 1** ──► Borne **`GPIO 32` (D32)** del ESP32.
+  * **Cable 2** ──► Borne **`GND`** del ESP32.
+  * En el firmware se activa la resistencia pull-up interna (`pinMode(32, INPUT_PULLUP)`). Cuando hay agua, el flotador sube y cierra el circuito a masa (`LOW`). Si el nivel desciende por debajo de la boya, cae por gravedad, el circuito se abre (`HIGH`), y el ESP32 **apaga en el acto la bomba peristáltica y el agitador** (evitando la marcha en seco y la entrada de aire a la membrana).
+
+### 5.6. Conversor ADS1115: ¿Se necesitan varios o alcanza con uno solo?
+* **¡CON UN SOLO ADS1115 ALCANZA PARA TODA LA PLANTA!**
+* El módulo ADS1115 cuenta con **4 canales analógicos independientes (A0 a A3)** con resolución de 16 bits:
+  * **Canal `A0`**: Sonda de Calidad de Agua (**TDS**, salida $0\text{ a }2.3\text{V}$).
+  * **Canal `A1`**: Transductor de Presión **$P_1$** (Alimentación / Feed, $0.5\text{ a }4.5\text{V}$).
+  * **Canal `A2`**: Transductor de Presión **$P_2$** (Retentado / Salida axial, $0.5\text{ a }4.5\text{V}$).
+  * **Canal `A3`**: Transductor de Presión **$P_3$** (Permeado / Salida radial, $0.5\text{ a }4.5\text{V}$).
+* **Conexión al ESP32**:
+  * Solo requiere 2 cables de datos por el bus I2C:
+    * Borne `SDA` del ADS1115 ──► Borne **`GPIO 21` (D21)** del ESP32.
+    * Borne `SCL` del ADS1115 ──► Borne **`GPIO 22` (D22)** del ESP32.
+    * Borne `VDD` a `5V` (o `3V3`), `GND` a `GND` común, y `ADDR` a `GND` (dirección fija `0x48`).
+
 
 ---
 
