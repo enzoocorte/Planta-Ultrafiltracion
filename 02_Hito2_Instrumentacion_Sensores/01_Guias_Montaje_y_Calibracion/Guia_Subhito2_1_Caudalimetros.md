@@ -19,12 +19,14 @@ El caudalímetro YF-S401 posee 3 cables. Se conectan directamente a la bornera d
 ┌─────────────────────────────────────────────────────────────────────────────────────────┐
 │                           CONEXIONADO DEL CAUDALÍMETRO YF-S401                          │
 ├─────────────────────────┬───────────────────────────────┬───────────────────────────────┤
-│ Cable del Sensor        │ Función                       │ Borne en Shield ESP32         │
+│ Cable del Sensor        │ Función y Ubicación           │ Borne en Shield ESP32         │
 ├─────────────────────────┼───────────────────────────────┼───────────────────────────────┤
 │ 🔴 ROJO                 │ Alimentación VCC (5V)         │ Borne [ 5V ] o [ VIN ]        │
 │ ⚫ NEGRO                │ Masa de Referencia (GND)      │ Borne [ GND ]                 │
-│ 🟡 AMARILLO (Sensor 1)  │ Señal Digital Pulsos Hall     │ Borne [ P14 ] (GPIO 14)       │
-│ 🟡 AMARILLO (Sensor 2)  │ Señal Digital Pulsos Hall     │ Borne [ P27 ] (GPIO 27)       │
+│ 🟡 AMARILLO (Sensor 1)  │ Señal FEED (Bomba a Filtro)   │ Borne [ P14 ] (GPIO 14)       │
+│                         │ *Montaje Vertical Ascendente* │                               │
+│ 🟡 AMARILLO (Sensor 2)  │ Señal PERMEADO (Filtrado)     │ Borne [ P27 ] (GPIO 27)       │
+│                         │ *Montaje Horizontal*          │                               │
 └─────────────────────────┴───────────────────────────────┴───────────────────────────────┘
 ```
 
@@ -48,6 +50,13 @@ El sensor YF-S401 aloja una turbina plástica interna con imanes permanentes en 
   $$K = 98 \times 60 = 5880\text{ pulsos/Litro}$$
 * **Volumen Total Acumulado ($V$)**:
   $$V (\text{Litros}) = \frac{\text{Pulsos Totales}}{5880.0}$$
+
+### Balance de Masa en la Membrana FX100:
+Con $Q_{\text{feed}}$ (Sensor 1) y $Q_{\text{permeado}}$ (Sensor 2), el retentado y la tasa de recuperación se calculan directamente por software:
+* **Caudal de Retentado Calculado**:
+  $$Q_{\text{retentado}} = Q_{\text{feed}} - Q_{\text{permeado}}$$
+* **Tasa de Recuperación de Membrana ($Y$)**:
+  $$Y (\%) = \left(\frac{Q_{\text{permeado}}}{Q_{\text{feed}}}\right) \times 100\%$$
 
 ---
 

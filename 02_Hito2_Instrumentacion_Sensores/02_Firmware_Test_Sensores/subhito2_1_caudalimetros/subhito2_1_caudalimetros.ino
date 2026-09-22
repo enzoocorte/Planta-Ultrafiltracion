@@ -13,13 +13,13 @@
  * ┌────────────────────────┬────────────────────────────────┬──────────────────────────┐
  * │ SENSOR / ACTUADOR      │ CABLE / BORNE DISPOSITIVO      │ BORNE SHIELD ESP32       │
  * ├────────────────────────┼────────────────────────────────┼──────────────────────────┤
- * │ Caudalímetro 1 (Q1)    │ Cable Rojo (VCC)               │ Borne [ 5V ] / [ VIN ]   │
- * │ (Retentado o Principal)│ Cable Negro (GND)              │ Borne [ GND ]            │
- * │                        │ Cable Amarillo (Señal Pulsos)  │ Borne [ P14 ] (GPIO 14)  │
+ * │ Caudalímetro 1 (Q_feed)│ Cable Rojo (VCC)               │ Borne [ 5V ] / [ VIN ]   │
+ * │ (Feed: Bomba a Filtro) │ Cable Negro (GND)              │ Borne [ GND ]            │
+ * │ (Montaje Vertical Asc.)│ Cable Amarillo (Señal Pulsos)  │ Borne [ P14 ] (GPIO 14)  │
  * ├────────────────────────┼────────────────────────────────┼──────────────────────────┤
- * │ Caudalímetro 2 (Q2)    │ Cable Rojo (VCC)               │ Borne [ 5V ] / [ VIN ]   │
- * │ (Permeado - si se usa) │ Cable Negro (GND)              │ Borne [ GND ]            │
- * │                        │ Cable Amarillo (Señal Pulsos)  │ Borne [ P27 ] (GPIO 27)  │
+ * │ Caudalímetro 2 (Q_perm)│ Cable Rojo (VCC)               │ Borne [ 5V ] / [ VIN ]   │
+ * │ (Permeado / Filtrado)  │ Cable Negro (GND)              │ Borne [ GND ]            │
+ * │ (Montaje Horizontal)   │ Cable Amarillo (Señal Pulsos)  │ Borne [ P27 ] (GPIO 27)  │
  * ├────────────────────────┼────────────────────────────────┼──────────────────────────┤
  * │ Driver DM860 (Bomba)   │ PUL+ y DIR+ (Puenteados)       │ Borne [ VIN ] (5V Ánodo) │
  * │                        │ PUL- (Señal Paso)              │ Borne [ P18 ] (GPIO 18)  │
@@ -234,14 +234,17 @@ void loop() {
     // Presentación clara en el Monitor Serie
     Serial.printf("[t: %4lus] ", t_ahora / 1000);
 
-    // Reporte Sensor 1 (GPIO 14)
-    Serial.printf("| Q1 (P14): %5.1f Hz -> %5.1f mL/min (%5.3f L/min) | Vol1: %5.3f L ",
+    // Reporte Caudalímetro 1 (Feed / Alimentación - GPIO 14)
+    Serial.printf("| FEED (P14): %5.1f Hz -> %5.1f mL/min (%5.3f L/min) | Vol_F: %5.3f L ",
                   f1_Hz, q1_mLmin, q1_Lmin, volumenTotal1_L);
 
-    // Si Sensor 2 tiene pulsos o actividad, reportarlo
+    // Si Caudalímetro 2 (Permeado - GPIO 27) tiene pulsos o actividad
     if (f2_Hz > 0.0f || volumenTotal2_L > 0.0f) {
-      Serial.printf("| Q2 (P27): %5.1f Hz -> %5.1f mL/min (%5.3f L/min) | Vol2: %5.3f L ",
-                    f2_Hz, q2_mLmin, q2_Lmin, volumenTotal2_L);
+      float qRet_calc_Lmin = (q1_Lmin >= q2_Lmin) ? (q1_Lmin - q2_Lmin) : 0.0f;
+      float rec_porc = (q1_Lmin > 0.02f) ? ((q2_Lmin / q1_Lmin) * 100.0f) : 0.0f;
+
+      Serial.printf("| PERM (P27): %5.1f mL/min | RET(calc): %5.1f mL/min | Recov: %4.1f%% ",
+                    q2_mLmin, qRet_calc_Lmin * 1000.0f, rec_porc);
     }
 
     // Contraste con Bomba si está encendida
