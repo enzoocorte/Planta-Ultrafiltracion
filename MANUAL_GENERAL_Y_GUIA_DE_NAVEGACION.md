@@ -20,6 +20,7 @@ Cada hito cuenta con su propia carpeta autocontenida con documentación técnica
 
 ```mermaid
 flowchart TD
+    P_ID["📐 GENERAL: Arquitectura P&ID Maestro e Interactivo (ISA 5.1)<br>• Diagrama global de mangueras, conexiones ESP32, cálculo de TMP y prefiltro"] -. Marco de Integración .-> H1
     H1["⚡ HITO 1: Bomba Peristáltica MBP-2000 & Accionamiento NEMA 34<br>• Montaje 8 cables Serie 3A, DM860, bornera ESP32, simulador y Web Wi-Fi"] --> H2["📊 HITO 2: Instrumentación y Sensores Disponibles<br>• Caudalímetros YF-S401, Sonda TDS, Temp DS18B20 y Conversor ADS1115"]
     H2 --> H3["🌪️ HITO 3: Reactor de Coagulación-Sedimentador Cónico<br>• Driver L298N, paleta PWM, gradiente Camp-Stein, boya inox y Jar Test"]
     H3 --> H4["🌐 HITO 4: Integración Global, Automatización Total & SCADA<br>• Sincronización FSM, enclavamientos TMP ≤ 0.50 atm y telemetría completa"]
@@ -29,6 +30,15 @@ flowchart TD
 ---
 
 ## 🧭 ¿Qué se busca y qué encontrarán en cada carpeta?
+
+### 📁 [`00_General_y_P_ID_Planta/`](./00_General_y_P_ID_Planta/)
+* **Objetivo General**: Mantener la visión global e integral de todo el banco de pruebas hidráulico y electrónico de la planta.
+* **Qué encontrarán aquí**:
+  * [`README.md`](./00_General_y_P_ID_Planta/README.md): Plano maestro P&ID según norma ISA 5.1 con diferenciación estricta de mangueras de proceso (línea llena) y señales de control al ESP32 (línea punteada), justificación de la válvula reguladora de aguja $V_{\text{reg}}$, especificación del prefiltro de succión y matriz de conexionado (directo vs indirecto).
+  * [`diagrama_pid_interactivo.html`](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html): Diagrama interactivo ejecutable en navegador con selector de capas (mangueras/cables), flujo animado y simulador de Presión Transmembrana (TMP).
+  * [`boceto_original_enzo_pid.jpg`](./00_General_y_P_ID_Planta/boceto_original_enzo_pid.jpg): Fotografía en alta resolución del boceto original de banco de Enzo.
+
+---
 
 ### 📁 [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/)
 * **Objetivo de los Alumnos**: Dejar la bomba peristáltica MBP-2000 funcionando a la perfección con el motor NEMA 34 ($4.5\text{ Nm}$, 8 cables) y el driver DM860, tanto por consola serie como por Wi-Fi desde el celular con el shield de borneras.
