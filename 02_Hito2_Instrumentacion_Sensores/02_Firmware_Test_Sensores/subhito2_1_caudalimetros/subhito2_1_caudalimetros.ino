@@ -80,17 +80,32 @@ uint32_t frecuencia_hz_actual = 0;
 unsigned long t_ultimo_loop_ms = 0;
 
 // ==============================================================================
-// 4. VARIABLES DE CAUDALÍMETROS E INTERRUPCIONES DE HARDWARE
+// 4. VARIABLES DE CAUDALÍMETROS E INTERRUPCIONES CON FILTRO ANTI-RUIDO
 // ==============================================================================
+// A caudal máximo admisible de la planta (0.60 L/min), la frecuencia real es de ~59 Hz (periodo de ~17 ms).
+// Cualquier pulso que ocurra con un intervalo menor a 2000 microsegundos (equivale a >500 Hz o >5.1 L/min)
+// es 100% ruido eléctrico inducido por el motor NEMA 34 o el driver DM860.
+const unsigned long FILTRO_RUIDO_MIN_US = 2000; // 2 milisegundos de tiempo muerto mínimo
+
 volatile unsigned long conteoPulsosFeed = 0;
 volatile unsigned long conteoPulsosPerm = 0;
+volatile unsigned long t_ultimo_pulso_feed_us = 0;
+volatile unsigned long t_ultimo_pulso_perm_us = 0;
 
 void IRAM_ATTR isrCaudalFeed() {
-  conteoPulsosFeed++;
+  unsigned long t_ahora_us = micros();
+  if (t_ahora_us - t_ultimo_pulso_feed_us >= FILTRO_RUIDO_MIN_US) {
+    conteoPulsosFeed++;
+    t_ultimo_pulso_feed_us = t_ahora_us;
+  }
 }
 
 void IRAM_ATTR isrCaudalPerm() {
-  conteoPulsosPerm++;
+  unsigned long t_ahora_us = micros();
+  if (t_ahora_us - t_ultimo_pulso_perm_us >= FILTRO_RUIDO_MIN_US) {
+    conteoPulsosPerm++;
+    t_ultimo_pulso_perm_us = t_ahora_us;
+  }
 }
 
 // Variables calculadas periódicamente (cada 1 segundo)
@@ -405,9 +420,9 @@ void setup() {
   // Configuración de Pines de los Caudalímetros con PULLUP interno
   pinMode(PIN_CAUDAL_FEED, INPUT_PULLUP);
   pinMode(PIN_CAUDAL_PERM, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(PIN_CAUDAL_FEED), isrCaudalFeed, RISING);
-  attachInterrupt(digitalPinToInterrupt(PIN_CAUDAL_PERM), isrCaudalPerm, RISING);
-  Serial.println("[OK] Interrupciones asignadas: FEED en P14 y PERMEADO en P27.");
+  attachInterrupt(digitalPinToInterrupt(PIN_CAUDAL_FEED), isrCaudalFeed, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_CAUDAL_PERM), isrCaudalPerm, FALLING);
+  Serial.println("[OK] Interrupciones asignadas (flanco de bajada FALLING): FEED en P14 y PERMEADO en P27.");
 
   // Configuración de pines del driver DM860 (Bomba NEMA 34)
   pinMode(PIN_DIR, OUTPUT_OPEN_DRAIN);
