@@ -12,7 +12,7 @@ Este directorio contiene la arquitectura modular en C++ orientada a objetos para
 | **`Bomba.h`** | Clase `Bomba`: encapsula el accionamiento de la bomba peristáltica con driver DM860 en **Cátodo Común** mediante hardware LEDC de 10 bits. Implementa arranque suave, inversión de sentido segura y cálculo de caudal teórico por geometría del cabezal ($4.2\text{ mL/rev}$). |
 | **`caudalimetro.h`** / **`caudalimetro.cpp`** | Clase `Caudalimetro`: maneja los microcaudalímetros YF-S401 con triple defensa anti-ruido (interrupción atómica con mutex FreeRTOS, bloqueo temporal de 3 ms por ISR, descarte de caudales físicamente imposibles $>700\text{ mL/min}$ y filtro exponencial EMA 30/70 para el display). Detecta pérdida de señal/burbuja de aire tras 5 s de bombeo sin pulsos. |
 | **`index_html.h`** | Interfaz Web SCADA responsive (HTML5 + CSS + JavaScript) embebida en memoria Flash (`PROGMEM`). Incluye monitoreo en vivo de FEED, PERMEADO, balance de masa, barra de capacidad de membrana y panel de mando de la bomba. |
-| **`planta_uf.ino.ino`** | Punto de entrada principal (`setup` y `loop`). Inicia el Wi-Fi en modo dual (`WIFI_AP_STA`), servidor Web Asíncrono (`ESPAsyncWebServer`), mDNS (`http://bomba.local`) y refresca la instrumentación cada 1 segundo. |
+| **`subhito2_2_v2.ino`** | Punto de entrada principal (`setup` y `loop`). Inicia el Wi-Fi en modo dual (`WIFI_AP_STA`), servidor Web Asíncrono (`ESPAsyncWebServer`), mDNS (`http://bomba.local`) y refresca la instrumentación cada 1 segundo. |
 
 ---
 
@@ -57,7 +57,7 @@ Los caudalímetros alimentados a 5V elevan su cable amarillo a **4.2 V - 5.0 V**
 Cuando conectes el cable micro-USB con líneas de datos al puerto de la PC (`COM5`), ejecuta:
 
 ```powershell
-& "C:\Users\enzoo\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" upload -p COM5 --fqbn "esp32:esp32:esp32:FlashMode=dio,FlashFreq=40,UploadSpeed=115200" "c:\Users\enzoo\OneDrive\Documentos\ENZO\Domotica\SistemaUF\planta_uf.ino\planta_uf.ino.ino"
+& "C:\Users\enzoo\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" upload -p COM5 --fqbn "esp32:esp32:esp32:FlashMode=dio,FlashFreq=40,UploadSpeed=115200" "c:\Users\enzoo\OneDrive\Documentos\ENZO\Domotica\SistemaUF\02_Hito2_Instrumentacion_Sensores\02_Firmware_Test_Sensores\subhito2_2_v2\subhito2_2_v2.ino"
 ```
 
 > **IMPORTANTE:** El parámetro `FlashMode=dio` y `FlashFreq=40` es mandatorio en esta placa NodeMCU ESP32 para evitar el error de suma de verificación (`csum err`) en el arranque.

@@ -69,6 +69,8 @@ Para avanzar con método científico y validación segura paso a paso en el banc
   * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
   * 🌊 **[`subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino)**: Firmware modular de prueba para Subhito 2.1 con interrupciones por hardware y comandos interactivos de bomba MBP-2000.
+  * 🚀 **[`subhito2_2_v2/subhito2_2_v2.ino`](./02_Firmware_Test_Sensores/subhito2_2_v2/subhito2_2_v2.ino)**: **Firmware Modular V2 (Cátodo Común + Web SCADA)**: Arquitectura orientada a objetos (Bomba y Caudalímetro) con triple filtro anti-ruido, Wi-Fi dual (AP + STA) y servidor HTTP asíncrono.
   * 💻 **[`firmware_sensores_test/firmware_sensores_test.ino`](./02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino)**: Sketch integral multivariable de adquisición de datos en tiempo real y transmisión serie en formato CSV.
+
 
 
