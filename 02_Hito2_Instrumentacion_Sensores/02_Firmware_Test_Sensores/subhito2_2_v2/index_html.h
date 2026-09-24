@@ -57,10 +57,10 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 <button style="font-size:10px;padding:4px 8px" onclick="cmd('RESET_VOL')">Reset L</button></div>
 <div class="sens">
 <div class="s"><h3 style="color:#0ea5e9">FEED <span class="badge" id="bf">SIN SEÑAL</span></h3>
-<div class="v" id="vf" style="color:#0ea5e9">0.0</div>
+<div class="v"><span id="vf" style="color:#0ea5e9">0.0</span> <small style="font-size:11px;font-weight:600;color:#8296b3">mL/min</small></div>
 <div class="d" id="ff">0.0 Hz</div><div class="d" id="lf">0.000 L</div></div>
 <div class="s"><h3 style="color:#a855f7">PERMEADO <span class="badge" id="bp">SIN SEÑAL</span></h3>
-<div class="v" id="vp" style="color:#a855f7">0.0</div>
+<div class="v"><span id="vp" style="color:#a855f7">0.0</span> <small style="font-size:11px;font-weight:600;color:#8296b3">mL/min</small></div>
 <div class="d" id="fp">0.0 Hz</div><div class="d" id="lp">0.000 L</div></div>
 </div>
 <div class="bal">
