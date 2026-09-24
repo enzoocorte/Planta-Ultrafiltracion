@@ -24,7 +24,7 @@ constexpr float K_FEED = 98.0f;
 constexpr float K_PERM = 98.0f;
 
 constexpr uint32_t FILTRO_RUIDO_US = 3000;      // pulso real más rápido ≈17 ms
-constexpr float Q_MAX_FISICO_MLMIN = 700.0f;    // imposible con esta bomba → ruido
+constexpr float Q_MAX_FISICO_MLMIN = 6000.0f;   // Límite físico YF-S401 (0.3 a 6 L/min). Permite prueba de soplido
 
 // ---- WI-FI ----
 constexpr const char* SSID_AP  = "Bomba_Peristaltica_UF";

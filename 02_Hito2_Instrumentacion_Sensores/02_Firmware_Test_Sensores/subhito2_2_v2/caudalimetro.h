@@ -25,13 +25,14 @@ public:
     _pulsos = 0;
     portEXIT_CRITICAL(&_mux);
 
-    float q = (n * 1000.0f) / (_k * 60.0f * dt_s);   // mL/min instantáneo
-    if (q > Q_MAX_FISICO_MLMIN) {                     // defensa anti-ruido:
-      q = 0.0f;                                       // lo que la bomba no puede
-      Serial.printf("[%s] %lu pulsos falsos descartados\n", _nombre, (unsigned long)n);
+    _f = (dt_s > 0.0f) ? ((float)n / dt_s) : 0.0f;     // Frecuencia física real en Hz (pulsos/seg)
+    float q = (_f * 1000.0f) / _k;                      // mL/min instantáneo real: Q (L/min) = F/K -> mL/min = (F*1000)/K
+    if (q > Q_MAX_FISICO_MLMIN) {                       // defensa anti-ruido por encima de 6 L/min
+      q = 0.0f;
+      Serial.printf("[%s] %lu pulsos falsos descartados (f=%.1f Hz)\n", _nombre, (unsigned long)n, _f);
     }
-    _q  = 0.3f * q + 0.7f * _q;              // suavizado (estabiliza el display)
-    _vol += (float)n / (_k * 60.0f);         // volumen EXACTO por conteo de pulsos
+    _q  = (n > 0) ? (0.3f * q + 0.7f * _q) : 0.0f;      // suavizado (estabiliza display, cae a 0 si se detiene)
+    _vol += (float)n / (_k * 60.0f);                    // volumen EXACTO por conteo de pulsos: K*60 = 5880 pulsos/L
 
     // Bomba empujando + 5 s sin NI UN pulso → burbuja de aire o cable suelto
     _fallo = bombaEmpuja && (micros() - _t_ultimo > 5000000UL);
@@ -39,7 +40,7 @@ public:
 
   float caudal_mLmin()  const { return _q; }
   float caudal_Lmin()   const { return _q / 1000.0f; }
-  float frecuencia_Hz() const { return _q * _k / 1000.0f; }
+  float frecuencia_Hz() const { return _f; }
   float volumen_L()     const { return _vol; }
   bool  sinSenal()      const { return _fallo; }
   void  resetVolumen()        { _vol = 0.0f; }
@@ -52,7 +53,7 @@ private:
   const float   _k;
   const char*   _nombre;
   volatile uint32_t _pulsos = 0, _t_ultimo = 0;
-  float _q = 0.0f, _vol = 0.0f;
+  float _f = 0.0f, _q = 0.0f, _vol = 0.0f;
   bool  _fallo = false;
   static portMUX_TYPE _mux;                 // mutex compartido entre instancias
 };
