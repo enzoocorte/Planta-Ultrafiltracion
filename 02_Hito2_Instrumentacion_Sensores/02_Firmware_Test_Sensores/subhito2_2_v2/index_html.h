@@ -17,7 +17,7 @@ u{display:block;font-size:10px;color:#8296b3;letter-spacing:2px;text-decoration:
 .vis{display:block}
 .row{display:flex;justify-content:space-between;font-size:11px;color:#8296b3;margin-bottom:4px}
 input[type=range]{width:100%;accent-color:#38bdf8}
-.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:10px 0}
 button{border:none;border-radius:8px;padding:8px 4px;font-weight:700;font-size:11px;cursor:pointer;background:#22304e;color:#e2e8f0}
 .btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .go{background:#10b981;color:#04301c}.no{background:#ef4444;color:#3d0808}
@@ -37,14 +37,14 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 
 <div class="card">
 <h1>BOMBA PERISTÁLTICA MBP-2000</h1>
-<p class="sub">Rango 80–140 RPM • Membrana FX100 ≤ 0.60 L/min</p>
+<p class="sub">Rango 72–140 RPM • Membrana FX100 ≤ 0.60 L/min</p>
 <div class="disp"><div class="rpm" id="rpm">0.0</div><u>RPM INSTANTÁNEA</u>
 <div class="pill off" id="pil">DETENIDA</div></div>
 <div class="al" id="al">⚠ Caudal cercano al límite de membrana (0.60 L/min)</div>
-<div class="row"><span>Consigna: <b id="lc" style="color:#38bdf8">80</b> RPM</span></div>
-<input type="range" id="sl" min="80" max="140" step="1" value="80">
+<div class="row"><span>Consigna: <b id="lc" style="color:#38bdf8">72</b> RPM</span></div>
+<input type="range" id="sl" min="72" max="140" step="1" value="72">
 <div class="grid">
-<button onclick="setR(80)">80</button><button onclick="setR(100)">100</button>
+<button onclick="setR(72)">72</button><button onclick="setR(80)">80</button><button onclick="setR(100)">100</button>
 <button onclick="setR(120)">120</button><button onclick="setR(140)">140</button></div>
 <div class="btns">
 <button class="go" onclick="cmd('START')">▶ ARRANCAR</button>

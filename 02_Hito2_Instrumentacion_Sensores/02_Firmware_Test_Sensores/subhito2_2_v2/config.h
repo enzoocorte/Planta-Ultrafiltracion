@@ -13,9 +13,9 @@ constexpr uint8_t PIN_SENSOR_PERM = 27;  // Caudalímetro PERMEADO
 // ---- BOMBA PERISTÁLTICA ----
 constexpr uint16_t PULSOS_POR_REV = 1600;      // DM860: 8 micropasos (SW5-8)
 constexpr float ML_POR_VUELTA     = 4.2f;      // mL por giro del cabezal
-constexpr float RPM_MIN           = 80.0f;     // 336 mL/min (mín. sensor: 300)
+constexpr float RPM_MIN           = 72.0f;     // 302 mL/min (mín. sensor: 300)
 constexpr float RPM_MAX           = 140.0f;    // 588 mL/min (límite membrana: 600)
-constexpr float RPM_INICIO        = 80.0f;
+constexpr float RPM_INICIO        = 72.0f;
 constexpr float ACEL_RPM_S        = 40.0f;     // rampa
 
 // ---- CAUDALÍMETROS YF-S401 ----

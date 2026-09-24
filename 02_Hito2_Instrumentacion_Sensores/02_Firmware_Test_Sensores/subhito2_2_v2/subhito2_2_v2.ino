@@ -57,10 +57,19 @@ void setup() {
   bomba.begin();
   Serial.println("\n=== PLANTA UF | Hito 2.1 (v2.2 cátodo común) ===");
 
+  // 1. Conectar a Router primero (15s timeout) para fijar el canal Wi-Fi
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(SSID_AP, PASS_AP);
+  Serial.printf("Conectando a '%s' ", SSID_STA);
   WiFi.begin(SSID_STA, PASS_STA);
-  for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) delay(300);
+  uint32_t t0 = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - t0 < 15000) {
+    delay(300);
+    Serial.print(".");
+  }
+  Serial.println(WiFi.status() == WL_CONNECTED ? " -> OK" : " -> TIMEOUT (queda AP activo)");
+
+  // 2. Levantar el SoftAP (hereda el canal RF del router si conectó)
+  WiFi.softAP(SSID_AP, PASS_AP);
   MDNS.begin("bomba");
 
   server.on("/", HTTP_GET, manejarRaiz);
@@ -69,9 +78,11 @@ void setup() {
   server.on("/status", HTTP_GET, manejarStatus);
   server.begin();
 
-  Serial.printf("AP: http://%s | Router: http://%s | http://bomba.local\n",
-                WiFi.softAPIP().toString().c_str(),
-                WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "n/d");
+  Serial.printf("AP:     http://%s  (siempre disponible)\n", WiFi.softAPIP().toString().c_str());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("Router: http://%s  <<< USA ESTA URL en Box804\n", WiFi.localIP().toString().c_str());
+    Serial.println("mDNS:   http://bomba.local");
+  }
   Serial.println("Sensores: FEED=G14, PERM=G27 | Bomba: PUL+=G18, DIR+=G19 (PUL-/DIR- a GND)");
   tLoop = tCaudal = millis();
 }
@@ -79,6 +90,14 @@ void setup() {
 void loop() {
   server.handleClient();
   uint32_t t = millis();
+
+  // --- WiFi: si se cayó o nunca conectó, reintenta cada 30 s en segundo plano ---
+  static uint32_t tWiFi = 0;
+  if (t - tWiFi >= 30000 && WiFi.status() != WL_CONNECTED) {
+    tWiFi = t;
+    Serial.println("[WIFI] Reintentando conexión con router...");
+    WiFi.begin(SSID_STA, PASS_STA);
+  }
 
   // --- Bomba: rampa cada 50 ms ---
   float dt = (t - tLoop) / 1000.0f;
