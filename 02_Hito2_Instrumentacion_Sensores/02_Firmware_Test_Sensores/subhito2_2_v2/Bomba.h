@@ -61,9 +61,9 @@ public:
 private:
   void fijarSentido(bool horario) {
     _horario = horario;
-    // CÁTODO COMÚN: HIGH conduce el opto. Si al probar, "FILTRACIÓN" resulta
-    // ser retrolavado, intercambia HIGH y LOW en esta línea.
-    digitalWrite(PIN_DIR, horario ? HIGH : LOW);
+    // CÁTODO COMÚN: LOW = opto OFF (sentido horario / filtración)
+    //                HIGH = opto ON (sentido antihorario / retrolavado)
+    digitalWrite(PIN_DIR, horario ? LOW : HIGH);
   }
 
   bool _enMarcha = false, _horario = true, _invirtiendo = false;
