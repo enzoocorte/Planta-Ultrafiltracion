@@ -34,8 +34,17 @@ public:
     _q  = (n > 0) ? (0.3f * q + 0.7f * _q) : 0.0f;      // suavizado (estabiliza display, cae a 0 si se detiene)
     _vol += (float)n / (_k * 60.0f);                    // volumen EXACTO por conteo de pulsos: K*60 = 5880 pulsos/L
 
-    // Bomba empujando + 5 s sin NI UN pulso → burbuja de aire o cable suelto
-    _fallo = bombaEmpuja && (micros() - _t_ultimo > 5000000UL);
+    // Detección de pérdida de flujo / cable suelto:
+    // Si la bomba empuja pero transcurren 5 segundos continuos sin pulsos -> alerta
+    if (n > 0) {
+      _segSinPulso = 0;
+      _fallo = false;
+    } else if (bombaEmpuja) {
+      if (++_segSinPulso >= 5) _fallo = true;
+    } else {
+      _segSinPulso = 0;
+      _fallo = false;
+    }
   }
 
   float caudal_mLmin()  const { return _q; }
@@ -54,6 +63,7 @@ private:
   const char*   _nombre;
   volatile uint32_t _pulsos = 0, _t_ultimo = 0;
   float _f = 0.0f, _q = 0.0f, _vol = 0.0f;
+  uint8_t _segSinPulso = 0;
   bool  _fallo = false;
   static portMUX_TYPE _mux;                 // mutex compartido entre instancias
 };
