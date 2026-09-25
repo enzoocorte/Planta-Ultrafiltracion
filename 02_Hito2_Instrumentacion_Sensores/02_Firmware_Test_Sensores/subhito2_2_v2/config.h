@@ -11,12 +11,13 @@ constexpr uint8_t PIN_SENSOR_FEED = 14;  // Caudalímetro FEED
 constexpr uint8_t PIN_SENSOR_PERM = 27;  // Caudalímetro PERMEADO
 
 // ---- BOMBA PERISTÁLTICA ----
-constexpr uint16_t PULSOS_POR_REV = 1600;      // DM860: 8 micropasos (SW5-8)
-constexpr float ML_POR_VUELTA     = 4.2f;      // mL por giro del cabezal
-constexpr float RPM_MIN           = 72.0f;     // 302 mL/min (mín. sensor: 300)
-constexpr float RPM_MAX           = 140.0f;    // 588 mL/min (límite membrana: 600)
-constexpr float RPM_INICIO        = 72.0f;
-constexpr float ACEL_RPM_S        = 40.0f;     // rampa
+// Desplazamiento manguera silicona ØInt 12mm (MBP-2000): ~15.4 mL/rev
+constexpr uint16_t PULSOS_POR_REV = 1600;      // DM860: 8 micropasos (pasar a 3200 si se activa 16 micropasos)
+constexpr float ML_POR_VUELTA     = 15.4f;     // mL por giro del cabezal (manguera 12mm)
+constexpr float RPM_MIN           = 20.0f;     // 308 mL/min (mín. sensor: 300)
+constexpr float RPM_MAX           = 42.0f;     // 646 mL/min (límite membrana: 600-650)
+constexpr float RPM_INICIO        = 25.0f;     // 385 mL/min (punto óptimo inicial)
+constexpr float ACEL_RPM_S        = 20.0f;     // rampa suave para bajo régimen
 
 // ---- CAUDALÍMETROS YF-S401 ----
 // F (Hz) = K × Q (L/min).  >>> Calibrar cada sensor por gravimetría <<<

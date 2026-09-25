@@ -37,15 +37,15 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 
 <div class="card">
 <h1>BOMBA PERISTÁLTICA MBP-2000</h1>
-<p class="sub">Rango 72–140 RPM • Membrana FX100 ≤ 0.60 L/min</p>
+<p class="sub">Rango 20–42 RPM • Manguera 12mm • Membrana FX100 ≤ 0.60 L/min</p>
 <div class="disp"><div class="rpm" id="rpm">0.0</div><u>RPM INSTANTÁNEA</u>
 <div class="pill off" id="pil">DETENIDA</div></div>
 <div class="al" id="al">⚠ Caudal cercano al límite de membrana (0.60 L/min)</div>
-<div class="row"><span>Consigna: <b id="lc" style="color:#38bdf8">72</b> RPM</span></div>
-<input type="range" id="sl" min="72" max="140" step="1" value="72">
+<div class="row"><span>Consigna: <b id="lc" style="color:#38bdf8">25</b> RPM</span></div>
+<input type="range" id="sl" min="20" max="42" step="1" value="25">
 <div class="grid">
-<button onclick="setR(72)">72</button><button onclick="setR(80)">80</button><button onclick="setR(100)">100</button>
-<button onclick="setR(120)">120</button><button onclick="setR(140)">140</button></div>
+<button onclick="setR(20)">20</button><button onclick="setR(25)">25</button><button onclick="setR(30)">30</button>
+<button onclick="setR(35)">35</button><button onclick="setR(40)">40</button></div>
 <div class="btns">
 <button class="go" onclick="cmd('START')">▶ ARRANCAR</button>
 <button class="no" onclick="cmd('STOP')">⏹ PARAR</button>
@@ -54,7 +54,10 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 
 <div class="card">
 <div class="row"><b style="font-size:12px">🌊 CAUDALÍMETROS</b>
-<button style="font-size:10px;padding:4px 8px" onclick="cmd('RESET_VOL')">Reset L</button></div>
+<div>
+<button style="font-size:10px;padding:4px 8px" onclick="cmd('RESET_VOL')">Reset L</button>
+<button style="font-size:10px;padding:4px 8px;background:#0284c7;color:#fff" onclick="exportarCSV()">📥 CSV</button>
+</div></div>
 <div class="sens">
 <div class="s"><h3 style="color:#0ea5e9">FEED <span class="badge" id="bf">SIN SEÑAL</span></h3>
 <div class="v"><span id="vf" style="color:#0ea5e9">0.0</span> <small style="font-size:11px;font-weight:600;color:#8296b3">mL/min</small></div>
@@ -75,10 +78,18 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 </div>
 <script>
 const $=id=>document.getElementById(id);
+let log=[];
 function cmd(a){fetch('/cmd?act='+a)}
 function setR(v){$('sl').value=v;$('lc').innerText=v;fetch('/set?rpm='+v)}
  $('sl').oninput=e=>$('lc').innerText=e.target.value;
  $('sl').onchange=e=>setR(e.target.value);
+function exportarCSV(){
+  if(!log.length){alert('No hay datos registrados aun. Arranca la bomba para registrar.');return;}
+  let c="Hora;Sentido;RPM;Q_Teorico_mLmin;Q_Feed_mLmin;Q_Perm_mLmin;Q_Ret_mLmin;Vol_Feed_L;Vol_Perm_L;Recov_Y_porc\n"+log.join('\n');
+  let a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(c);
+  a.download='datos_planta_uf_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+let tLastLog=0;
 setInterval(()=>fetch('/status').then(r=>r.json()).then(d=>{
  $('rpm').innerText=d.rpm.toFixed(1);$('ip').innerText=d.ip;
  $('pil').className='pill '+(d.inv?'inv':d.on?'on':'off');
@@ -94,5 +105,12 @@ setInterval(()=>fetch('/status').then(r=>r.json()).then(d=>{
  $('qr').innerText=d.q_ret.toFixed(1)+' mL/min';$('rv').innerText=d.recov.toFixed(1)+' %';
  $('qb').innerText=d.pump_ml.toFixed(1)+' mL/min';
  $('db').innerText=(d.delta>0?'+':'')+d.delta.toFixed(1)+' %';
+
+ let now=Date.now();
+ if(d.on && now - tLastLog >= 2000 && log.length < 5000){
+   tLastLog = now;
+   let t = new Date().toLocaleTimeString();
+   log.push([t, d.dir?'FILTRACION':'RETROLAVADO', d.rpm.toFixed(1), d.pump_ml.toFixed(1), d.q_feed.toFixed(1), d.q_perm.toFixed(1), d.q_ret.toFixed(1), d.vol_feed.toFixed(3), d.vol_perm.toFixed(3), d.recov.toFixed(1)].join(';'));
+ }
 }).catch(()=>{}),500);
 </script></body></html>)html";
