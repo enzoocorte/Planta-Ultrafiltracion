@@ -28,9 +28,10 @@ constexpr float RPM_ALARMA_MEMBRANA = 36.0f;
 constexpr float K_FEED = 98.0f;
 constexpr float K_PERM = 98.0f;
 
-// Filtro digital: 12000 µs (12 ms) -> bloquea ruidos de 100-120 Hz del motor
-// y deja pasar la turbina completa (< 60 Hz = 600 mL/min con período > 16.6 ms)
-constexpr uint32_t FILTRO_RUIDO_US = 12000;
+// Filtro digital: 3000 µs (3 ms) -> f_max = 333 Hz (~3400 mL/min)
+// Sincronizado exactamente con el filtro pasabajos RC de Placa 2 (fc ≈ 338 Hz).
+// Permite medir el caudal real de la manguera de 12mm a 72-100 RPM (1200-1540 mL/min) sin recortar pulsos.
+constexpr uint32_t FILTRO_RUIDO_US = 3000;
 constexpr float Q_MAX_FISICO_MLMIN = 6000.0f;   // Límite físico YF-S401 (0.3 a 6 L/min). Permite prueba de soplido
 
 // ---- WI-FI ----
