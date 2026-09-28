@@ -13,7 +13,7 @@ public:
     : _pin(pin), _k(k), _nombre(nombre) {}
 
   void begin() {
-    pinMode(_pin, INPUT_PULLUP);
+    pinMode(_pin, INPUT);     // Pull-up externo de 4.7k a 3.3V en el front-end (Placa 2)
     // attachInterruptArg pasa 'this' a la ISR → cada sensor se auto-registra
     attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, FALLING);
   }

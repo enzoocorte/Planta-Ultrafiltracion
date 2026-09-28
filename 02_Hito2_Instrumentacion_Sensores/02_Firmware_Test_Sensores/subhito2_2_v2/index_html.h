@@ -14,6 +14,7 @@ u{display:block;font-size:10px;color:#8296b3;letter-spacing:2px;text-decoration:
 .pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:10px;font-weight:700;margin-top:6px}
 .off{background:#2a3448;color:#aab7cc}.on{background:rgba(16,185,129,.25);color:#34d399}.inv{background:rgba(245,158,11,.25);color:#fbbf24}
 .al{display:none;background:rgba(239,68,68,.15);border:1px solid #ef4444;color:#fca5a5;border-radius:8px;padding:7px;font-size:11px;text-align:center;margin-bottom:10px}
+.al2{display:none;background:rgba(245,158,11,.15);border:1px solid #f59e0b;color:#fcd34d;border-radius:8px;padding:7px;font-size:11px;text-align:center;margin-bottom:10px}
 .vis{display:block}
 .row{display:flex;justify-content:space-between;font-size:11px;color:#8296b3;margin-bottom:4px}
 input[type=range]{width:100%;accent-color:#38bdf8}
@@ -37,15 +38,16 @@ footer{text-align:center;font-size:10px;color:#8296b3;padding:6px}
 
 <div class="card">
 <h1>BOMBA PERISTÁLTICA MBP-2000</h1>
-<p class="sub">Rango 20–42 RPM • Manguera 12mm • Membrana FX100 ≤ 0.60 L/min</p>
+<p class="sub">Rango 20–100 RPM • Manguera 12mm • Alerta FX100 a ≥ 36 RPM</p>
 <div class="disp"><div class="rpm" id="rpm">0.0</div><u>RPM INSTANTÁNEA</u>
 <div class="pill off" id="pil">DETENIDA</div></div>
-<div class="al" id="al">⚠ Caudal cercano al límite de membrana (0.60 L/min)</div>
+<div class="al2" id="al2">⚠️ Advertencia: Consigna ≥ 36 RPM (~600 mL/min). Límite seguro FX100. Solo para caracterización con agua y retentado abierto.</div>
+<div class="al" id="al">🚨 Peligro: Caudal medido supera 600 mL/min (límite de membrana FX100)</div>
 <div class="row"><span>Consigna: <b id="lc" style="color:#38bdf8">25</b> RPM</span></div>
-<input type="range" id="sl" min="20" max="42" step="1" value="25">
+<input type="range" id="sl" min="20" max="100" step="1" value="25">
 <div class="grid">
-<button onclick="setR(20)">20</button><button onclick="setR(25)">25</button><button onclick="setR(30)">30</button>
-<button onclick="setR(35)">35</button><button onclick="setR(40)">40</button></div>
+<button onclick="setR(20)">20</button><button onclick="setR(25)">25</button><button onclick="setR(36)">36</button>
+<button onclick="setR(50)">50</button><button onclick="setR(80)">80</button></div>
 <div class="btns">
 <button class="go" onclick="cmd('START')">▶ ARRANCAR</button>
 <button class="no" onclick="cmd('STOP')">⏹ PARAR</button>
@@ -96,6 +98,7 @@ setInterval(()=>fetch('/status').then(r=>r.json()).then(d=>{
  $('pil').innerText=d.inv?'INVIRTIENDO':d.on?'EN MARCHA':'DETENIDA';
  $('bd').innerText=d.dir?'🔄 HORARIO (FILTRACIÓN)':'🔄 ANTIHORARIO (RETROLAVADO)';
  $('al').classList.toggle('vis',d.q_feed>600);
+ $('al2').classList.toggle('vis',d.rpm >= (d.rpm_al || 36));
  $('bf').classList.toggle('vis',!d.feed_ok);
  $('bp').classList.toggle('vis',!d.perm_ok);
  $('vf').innerText=d.q_feed.toFixed(1);$('ff').innerText=d.f_feed.toFixed(1)+' Hz';

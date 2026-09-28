@@ -35,14 +35,14 @@ void manejarStatus() {
   char ip[24];
   if (WiFi.status() == WL_CONNECTED) WiFi.localIP().toString().toCharArray(ip, 24);
   else strcpy(ip, "solo AP");
-  char j[420];
+  char j[460];
   snprintf(j, sizeof(j),
-    "{\"on\":%d,\"inv\":%d,\"dir\":%d,\"rpm\":%.1f,\"pump_ml\":%.1f,"
+    "{\"on\":%d,\"inv\":%d,\"dir\":%d,\"rpm\":%.1f,\"rpm_al\":%.1f,\"pump_ml\":%.1f,"
     "\"f_feed\":%.1f,\"q_feed\":%.1f,\"vol_feed\":%.3f,\"feed_ok\":%d,"
     "\"f_perm\":%.1f,\"q_perm\":%.1f,\"vol_perm\":%.3f,\"perm_ok\":%d,"
     "\"q_ret\":%.1f,\"recov\":%.1f,\"delta\":%.1f,\"ip\":\"%s\"}",
     bomba.enMarcha(), bomba.invirtiendo(), bomba.sentidoHorario(),
-    bomba.rpmActual(), bomba.caudalTeorico_mLmin(),
+    bomba.rpmActual(), RPM_ALARMA_MEMBRANA, bomba.caudalTeorico_mLmin(),
     sensorFeed.frecuencia_Hz(), sensorFeed.caudal_mLmin(), sensorFeed.volumen_L(), !sensorFeed.sinSenal(),
     sensorPerm.frecuencia_Hz(), sensorPerm.caudal_mLmin(), sensorPerm.volumen_L(), !sensorPerm.sinSenal(),
     qRet_mLmin, recuperacion, deltaBomba, ip);
