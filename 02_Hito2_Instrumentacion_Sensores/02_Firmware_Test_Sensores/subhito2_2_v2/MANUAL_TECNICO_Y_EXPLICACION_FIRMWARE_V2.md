@@ -477,7 +477,7 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 ```cpp
 19:   void arrancar() {
 20:     _enMarcha = true;
-21:     if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;  // restaura consigna huérfana tras STOP durante inversión
+21:     if (_objetivo < RPM_MIN) _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
 22:   }
 23:   void detener()         { _enMarcha = false; _invirtiendo = false; }
 24:   void setRPM(float rpm) {
@@ -488,20 +488,20 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 ```
 * **Líneas 19-28**: Comandos de control.  
   🐛 **Solución del Bug 1 (Estado en Inversión)**: Si el usuario mueve el slider de RPM mientras la bomba frena para invertir (`_invirtiendo == true`), la consigna se guarda en `_rpmGuardada` en lugar de pisar `_objetivo`.  
-  🐛 **Solución del Bug Hermano (Consigna Huérfana)**: Si se pulsa `STOP` durante una inversión en curso, `_objetivo` queda en 0. Al pulsar `START` posteriormente, `arrancar()` detecta que `_objetivo < RPM_MIN` y restaura automáticamente el valor de `_rpmGuardada`. La bomba acelera fielmente a su velocidad de trabajo sin quedar "encendida y muerta".
+  🐛 **Solución del Bug Hermano y Edge Case (Consigna Huérfana)**: Si se pulsa `STOP` durante una inversión en curso, `_objetivo` queda en 0. Al pulsar `START` posteriormente, `arrancar()` detecta que `_objetivo < RPM_MIN` y restaura automáticamente `_rpmGuardada`, o cae al fallback seguro `RPM_INICIO` ($25\text{ RPM}$) si la propia `_rpmGuardada` también fue afectada. La máquina de estados queda cerrada en el 100% de los caminos posibles.
 
 ```cpp
-23:   void toggleSentido() {
-24:     if (_invirtiendo) return;                        // inversión ya en curso: ignorar
-25:     if (_actual < 5.0f) fijarSentido(!_horario);     // parado → giro directo
-26:     else {                                           // en marcha → frenar, invertir, acelerar
-27:       _invirtiendo = true;
-28:       _rpmGuardada = _objetivo;
-29:       _objetivo = 0.0f;
-30:     }
-31:   }
+30:   void toggleSentido() {
+31:     if (_invirtiendo) return;                        // inversión ya en curso: ignorar
+32:     if (_actual < 5.0f) fijarSentido(!_horario);     // parado → giro directo
+33:     else {                                           // en marcha → frenar, invertir, acelerar
+34:       _invirtiendo = true;
+35:       if (_objetivo >= RPM_MIN) _rpmGuardada = _objetivo; // previene contagio de 0 si venía de STOP
+36:       _objetivo = 0.0f;
+37:     }
+38:   }
 ```
-* **Líneas 23-31**: Maniobra de inversión protegida. Si el motor está en movimiento, memoriza la velocidad de consigna, frena la bomba a $0\text{ RPM}$ siguiendo la rampa de deceleración y recién allí invierte el sentido de giro. Esto previene roturas mecánicas por inercia en el cabezal peristáltico.
+* **Líneas 30-38**: Maniobra de inversión protegida. Si el motor está en movimiento, memoriza la consigna válida (sin contagiarse de cero si venía de una detención), frena la bomba a $0\text{ RPM}$ siguiendo la rampa de deceleración y recién allí invierte el sentido de giro. Esto previene roturas mecánicas por inercia en el cabezal peristáltico.
 
 ```cpp
 33:   float rpmActual() const           { return _actual; }
@@ -746,14 +746,12 @@ Durante el análisis exhaustivo línea por línea, se auditaron y corrigieron cu
 
 | Aspecto Auditado | Estado Anterior ("Cosa Rara") | Corrección Implementada | Justificación de Ingeniería |
 | :--- | :--- | :--- | :--- |
-| Aspecto Auditado | Estado Anterior ("Cosa Rara") | Corrección Implementada | Justificación de Ingeniería |
-| :--- | :--- | :--- | :--- |
 | **1. Bug de Inversión de Giro (`bomba.h`)** | `setRPM()` pisaba `_objetivo` durante el frenado de inversión | **`if (_invirtiendo) _rpmGuardada = r; else _objetivo = r;`** | Si el usuario cambiaba la consigna mientras desaceleraba para invertir, `_actual` nunca bajaba de 0.1 RPM, bloqueando el estado `_invirtiendo = true` permanentemente. Resuelto guardando la consigna en `_rpmGuardada`. |
 | **2. Compromiso Filtro Digital (`config.h`)** | Techo fijo o corte arbitrario | **`12000 µs` en Fase 1 (banco), opción `4500 µs` post-P5** | `12000 µs` otorga máxima inmunidad contra el hum de 108 Hz en ensayos nominales ($\le 36\text{ RPM}$). `4500 µs` habilita medir hasta $100\text{ RPM}$ ($1540\text{ mL/min}$) una vez validado el hardware limpio. |
 | **3. Integrador de Volumen (`caudalimetro.h`)** | `_vol += n/(K*60)` sumaba incluso pulsos falsos descartados | **Movido dentro del bloque `else` de `Q_MAX_FISICO_MLMIN`** | Si una ráfaga supera los $6000\text{ mL/min}$ y es descartada como ruido eléctrico, esos pulsos falsos no contaminan el totalizador acumulado de volumen en Litros. |
 | **4. Buffer de Telemetría JSON (`subhito2_2_v2.ino`)** | `char j[420]` en `manejarStatus()` | **`char j[460]`** | Al agregar el campo `"rpm_al": 36.0` para la alarma en la web, la cadena JSON superaba los 410 bytes, quedando peligrosamente al borde del desbordamiento de buffer (*buffer overflow*). |
 | **5. Configuración del Modo GPIO (`caudalimetro.h`)** | `pinMode(_pin, INPUT_PULLUP)` | **`pinMode(_pin, INPUT)`** | Como el front-end de la Placa 2 ya provee una resistencia externa de $4.7\text{ k}\Omega$ a $3.3\text{V}$, desactivar el pull-up interno garantiza una conmutación a $0.0\text{ V}$ nítida sin corrientes parásitas. |
-| **6. Bug Hermano de Consigna Huérfana (`bomba.h`)** | Al pulsar `START` tras un `STOP` durante inversión, la bomba quedaba en $0\text{ RPM}$ | **`if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;` en `arrancar()`** | Cierra completamente la máquina de estados. Si se interrumpió una inversión con STOP, el próximo START restaura la consigna real de trabajo en lugar de quedar "encendida y muerta". |
+| **6. Bug Hermano y Edge Case de Inversión (`bomba.h`)** | Al pulsar `START` tras un `STOP` durante inversión, la bomba quedaba en $0\text{ RPM}$ | **Fallback a `RPM_INICIO` en `arrancar()` + guarda en `toggleSentido()`** | Cierra completamente la máquina de estados. Si se canceló una inversión con STOP, el próximo START restaura la consigna real (o RPM_INICIO como salvaguarda) sin quedar "encendida y muerta". |
 
 ---
 
@@ -762,9 +760,9 @@ Durante el análisis exhaustivo línea por línea, se auditaron y corrigieron cu
 Sigan estrictamente esta secuencia en el laboratorio:
 
 ```
-[Paso 1: Medición Multímetro] ──► [Paso 2: Prueba de Soplido] ──► [Paso 3: Motor en Seco 20/50/80 RPM] ──► [Paso 4: Bombeo con Probeta]
-Continuidad Masas (GND=0Ω)       Giro de turbina con aire        Criterio P5 (Ver Tabla de Hum)             Validación volumétrica
-Bornes amarillos P14/P27 = 3.3V   Display marca Hz y mL/min       Badges "SIN SEÑAL" a los 5s                y descarga CSV para Excel
+[Paso 1: Medición Multímetro] ──► [Paso 2: Prueba de Soplido] ──► [Paso 3: Motor en Seco 20/50/80 RPM] ──► [Paso 4: Bombeo con Probeta] ──► [Paso 5: Sub-tests P8a/P8b]
+Continuidad Masas (GND=0Ω)       Giro de turbina con aire        Criterio P5 (Ver Tabla de Hum)             Validación volumétrica            Validación Máquina Estados
+Bornes amarillos P14/P27 = 3.3V   Display marca Hz y mL/min       Badges "SIN SEÑAL" a los 5s                y descarga CSV para Excel         Blindaje de Inversión
 ```
 
 ### Paso 1: Verificación Eléctrica en Frío (Multímetro)
@@ -794,3 +792,16 @@ Con las mangueras vacías (sin agua), operar la bomba en tres regímenes sucesiv
 2. Presionar **"Reset L"** en la web.
 3. Operar la bomba a **$36\text{ RPM}$** durante exactamente **$60\text{ segundos}$**.
 4. Comparar el volumen de la probeta frente al volumen registrado en la web y hacer clic en **"📥 CSV"** para exportar la planilla oficial de calibración para la tesis.
+
+### Paso 5: Prueba P8 — Validación Dinámica de la Máquina de Estados (Sub-tests P8a y P8b)
+Para certificar que la lógica de inversión y detención no posee estados huérfanos:
+1. **Sub-test P8a (Cambio de consigna durante frenado)**:
+   * Arrancar la bomba a $50\text{ RPM}$.
+   * Presionar `DIR` $\rightarrow$ la bomba inicia el frenado.
+   * Mientras frena, mover el slider a $30\text{ RPM}$.
+   * **Resultado esperado**: La bomba desacelera hasta $0\text{ RPM}$, invierte el sentido de giro físico y acelera suavemente hasta alcanzar exactamente las nuevas $30\text{ RPM}$ (sin trabarse ni ignorar la consigna).
+2. **Sub-test P8b (Cancelación y rearme de inversión)**:
+   * Con la bomba en marcha a $50\text{ RPM}$, presionar `DIR`.
+   * Mientras frena, presionar inmediatamente `STOP` $\rightarrow$ la bomba se detiene por completo.
+   * Presionar nuevamente `DIR` y luego `START`.
+   * **Resultado esperado**: La bomba arranca y acelera limpiamente a su consigna de trabajo (sin quedarse parada en $0\text{ RPM}$ con el cartel "EN MARCHA").

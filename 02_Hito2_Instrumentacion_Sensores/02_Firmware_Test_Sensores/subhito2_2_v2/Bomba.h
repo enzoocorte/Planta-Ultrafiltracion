@@ -18,7 +18,7 @@ public:
 
   void arrancar() {
     _enMarcha = true;
-    if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;  // restaura consigna huérfana tras STOP durante inversión
+    if (_objetivo < RPM_MIN) _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
   }
   void detener()         { _enMarcha = false; _invirtiendo = false; }
   void setRPM(float rpm) {
@@ -32,7 +32,7 @@ public:
     if (_actual < 5.0f) fijarSentido(!_horario);     // parado → giro directo
     else {                                           // en marcha → frenar, invertir, acelerar
       _invirtiendo = true;
-      _rpmGuardada = _objetivo;
+      if (_objetivo >= RPM_MIN) _rpmGuardada = _objetivo; // previene contagio de 0 si venía de STOP
       _objetivo = 0.0f;
     }
   }
