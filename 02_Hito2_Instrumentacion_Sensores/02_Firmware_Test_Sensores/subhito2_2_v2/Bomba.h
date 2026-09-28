@@ -16,7 +16,10 @@ public:
     ledcWrite(PIN_PUL, 0);                 // reposo: LOW → opto OFF (motor libre de pulsos)
   }
 
-  void arrancar()        { _enMarcha = true; }
+  void arrancar() {
+    _enMarcha = true;
+    if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;  // restaura consigna huérfana tras STOP durante inversión
+  }
   void detener()         { _enMarcha = false; _invirtiendo = false; }
   void setRPM(float rpm) {
     float r = constrain(rpm, RPM_MIN, RPM_MAX);

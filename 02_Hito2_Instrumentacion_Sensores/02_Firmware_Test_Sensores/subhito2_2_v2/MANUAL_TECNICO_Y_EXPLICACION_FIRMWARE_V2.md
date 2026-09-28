@@ -475,16 +475,20 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 * **Líneas 12-17**: Inicializa el pin de dirección como salida y vincula el pin de pulsos (`PIN_PUL = 18`) al generador de hardware LEDC con resolución de 10 bits ($0-1023$). En reposo escribe ciclo de trabajo 0, asegurando que el optoacoplador del driver permanezca apagado.
 
 ```cpp
-19:   void arrancar()        { _enMarcha = true; }
-20:   void detener()         { _enMarcha = false; _invirtiendo = false; }
-21:   void setRPM(float rpm) {
-22:     float r = constrain(rpm, RPM_MIN, RPM_MAX);
-23:     if (_invirtiendo) _rpmGuardada = r;   // consigna post-inversión si cambia durante frenado
-24:     else              _objetivo = r;
-25:   }
+19:   void arrancar() {
+20:     _enMarcha = true;
+21:     if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;  // restaura consigna huérfana tras STOP durante inversión
+22:   }
+23:   void detener()         { _enMarcha = false; _invirtiendo = false; }
+24:   void setRPM(float rpm) {
+25:     float r = constrain(rpm, RPM_MIN, RPM_MAX);
+26:     if (_invirtiendo) _rpmGuardada = r;   // consigna post-inversión si cambia durante frenado
+27:     else              _objetivo = r;
+28:   }
 ```
-* **Líneas 19-25**: Comandos de control. `setRPM` restringe la consigna dentro del rango seguro ($20.0$ a $100.0\text{ RPM}$).  
-  🐛 **Solución del Bug de Estado en Inversión**: Si el usuario mueve el slider de RPM mientras la bomba está desacelerando para invertir (`_invirtiendo == true`), la nueva consigna se guarda en `_rpmGuardada` en lugar de pisar `_objetivo`. De este modo, la rampa de frenado a cero no se interrumpe y la inversión física se completa limpiamente sin bloquear el sistema.
+* **Líneas 19-28**: Comandos de control.  
+  🐛 **Solución del Bug 1 (Estado en Inversión)**: Si el usuario mueve el slider de RPM mientras la bomba frena para invertir (`_invirtiendo == true`), la consigna se guarda en `_rpmGuardada` en lugar de pisar `_objetivo`.  
+  🐛 **Solución del Bug Hermano (Consigna Huérfana)**: Si se pulsa `STOP` durante una inversión en curso, `_objetivo` queda en 0. Al pulsar `START` posteriormente, `arrancar()` detecta que `_objetivo < RPM_MIN` y restaura automáticamente el valor de `_rpmGuardada`. La bomba acelera fielmente a su velocidad de trabajo sin quedar "encendida y muerta".
 
 ```cpp
 23:   void toggleSentido() {
@@ -749,6 +753,7 @@ Durante el análisis exhaustivo línea por línea, se auditaron y corrigieron cu
 | **3. Integrador de Volumen (`caudalimetro.h`)** | `_vol += n/(K*60)` sumaba incluso pulsos falsos descartados | **Movido dentro del bloque `else` de `Q_MAX_FISICO_MLMIN`** | Si una ráfaga supera los $6000\text{ mL/min}$ y es descartada como ruido eléctrico, esos pulsos falsos no contaminan el totalizador acumulado de volumen en Litros. |
 | **4. Buffer de Telemetría JSON (`subhito2_2_v2.ino`)** | `char j[420]` en `manejarStatus()` | **`char j[460]`** | Al agregar el campo `"rpm_al": 36.0` para la alarma en la web, la cadena JSON superaba los 410 bytes, quedando peligrosamente al borde del desbordamiento de buffer (*buffer overflow*). |
 | **5. Configuración del Modo GPIO (`caudalimetro.h`)** | `pinMode(_pin, INPUT_PULLUP)` | **`pinMode(_pin, INPUT)`** | Como el front-end de la Placa 2 ya provee una resistencia externa de $4.7\text{ k}\Omega$ a $3.3\text{V}$, desactivar el pull-up interno garantiza una conmutación a $0.0\text{ V}$ nítida sin corrientes parásitas. |
+| **6. Bug Hermano de Consigna Huérfana (`bomba.h`)** | Al pulsar `START` tras un `STOP` durante inversión, la bomba quedaba en $0\text{ RPM}$ | **`if (_objetivo < RPM_MIN) _objetivo = _rpmGuardada;` en `arrancar()`** | Cierra completamente la máquina de estados. Si se interrumpió una inversión con STOP, el próximo START restaura la consigna real de trabajo en lugar de quedar "encendida y muerta". |
 
 ---
 
@@ -757,26 +762,35 @@ Durante el análisis exhaustivo línea por línea, se auditaron y corrigieron cu
 Sigan estrictamente esta secuencia en el laboratorio:
 
 ```
-[Paso 1: Medición Multímetro] ──► [Paso 2: Prueba de Soplido] ──► [Paso 3: Motor en Seco 80 RPM] ──► [Paso 4: Bombeo con Probeta]
-Continuidad Masas (GND=0Ω)       Giro de turbina con aire        Caudalímetros DEBEN            Validación de volumen
-Bornes amarillos P14/P27 = 3.3V   Display marca Hz y mL/min       marcar 0.0 Hz CLAVADOS         y descarga CSV
+[Paso 1: Medición Multímetro] ──► [Paso 2: Prueba de Soplido] ──► [Paso 3: Motor en Seco 20/50/80 RPM] ──► [Paso 4: Bombeo con Probeta]
+Continuidad Masas (GND=0Ω)       Giro de turbina con aire        Criterio P5 (Ver Tabla de Hum)             Validación volumétrica
+Bornes amarillos P14/P27 = 3.3V   Display marca Hz y mL/min       Badges "SIN SEÑAL" a los 5s                y descarga CSV para Excel
 ```
 
 ### Paso 1: Verificación Eléctrica en Frío (Multímetro)
 1. **Continuidad de Masas**: Con el multímetro en modo "Beep", tocar un borne GND de Placa 1 y un borne GND de Placa 2 $\rightarrow$ Debe pitar con resistencia $0\,\Omega$.
-2. **Voltaje en Reposo**: Energizar el ESP32 por USB. Con voltímetro en DC, medir entre GND y los cables amarillos P14 y P27 $\rightarrow$ Debe medir exactamente **$3.3\text{ V}$** (confirma que el pull-up a 3.3V está funcionando).
+2. **Voltaje en Reposo**: Energizar el ESP32 por USB. Con voltímetro en DC, medir entre GND y los cables amarillos P14 y P27 $\rightarrow$ Debe medir exactamente **$3.3\text{ V}$** (confirma que el pull-up externo a 3.3V está funcionando y no hay sobretensión).
 
 ### Paso 2: Prueba de Soplido (Motor Apagado)
 1. Abrir el dashboard en el celular o PC (`http://bomba.local`).
 2. Soplar suavemente por el caudalímetro FEED y luego por PERMEADO.
-3. **Resultado esperado**: La frecuencia en Hz y el caudal en mL/min deben subir fluidamente y volver a cero al detenerse el soplido. Esto valida que la turbina ahora sí conmuta a $0\text{ V}$ y que el filtro digital de $3000\,\mu\text{s}$ no bloquea el flujo.
+3. **Resultado esperado**: La frecuencia en Hz y el caudal en mL/min deben subir fluidamente y volver a cero al detenerse el soplido. Esto valida que la turbina conmuta sólidamente a $0.0\text{ V}$.
 
-### Paso 3: Prueba de Oro Antirruido (Motor en Seco a 36, 50 y 80 RPM)
-1. Sin conectar mangueras o con mangueras secas, arrancar la bomba desde la web a **$36\text{ RPM}$**, luego a **$50\text{ RPM}$** y finalmente a **$80\text{ RPM}$**.
-2. **Resultado esperado**: Los valores de frecuencia de FEED y PERMEADO deben permanecer **estrictamente clavados en $0.0\text{ Hz}$**, sin registrar un solo pulso fantasma mientras el motor NEMA 34 conmute a plena potencia. Esto demostrará el éxito absoluto del filtro RC ($4.7\text{ k}\Omega + 100\text{ nF}$).
+### Paso 3: Prueba P5 — Ensayo de Oro Antirruido en Seco (20, 50 y 80 RPM)
+Con las mangueras vacías (sin agua), operar la bomba en tres regímenes sucesivos para mapear el comportamiento frente a EMI:
+
+#### Criterio de Diagnóstico para la Prueba P5:
+
+| Resultado en Seco (80 RPM) | Diagnóstico Físico | Causa Raíz | Acción Inmediata |
+| :---: | :---: | :---: | :---: |
+| **$0.0\text{ Hz}$ clavado en ambos** | **¡ÉXITO TOTAL!** El hum electromagnético quedó por debajo del umbral lógico gracias al filtro RC. | Front-End Placa 2 ($4.7\text{ k}\Omega + 100\text{ nF}$) funcionando a la perfección. | ✅ Cambiar `FILTRO_RUIDO_US` a `4500` en `config.h` y desbloquear todo el rango hasta 100 RPM. |
+| **$\sim 270\text{ a }550\text{ mL/min}$ estables** | El hum de $108\text{ Hz}$ sigue vivo. El filtro de $12\text{ ms}$ deja pasar 1 de cada 2 pulsos ($54\text{ Hz}$). | Ruido físico en la bornera: revisar contacto de resistencias $4.7\text{ k}\Omega$ o capacitor $100\text{ nF}$. | El arreglo es de hardware: revisar cableado en Placa 2, polaridad del capacitor electrolítico de filtro y masa común. |
+| **Valores erráticos saltando** | Transitorios sueltos de conmutación inductiva. | Picos de acoplamiento capacitivo entre cables de motor y sensores. | Separar físicamente los cables del motor de los cables amarillos de señal. |
+
+> 💡 **Verificación adicional gratuita en P5**: Como la bomba empuja más de $150\text{ mL/min}$ teóricos sin recibir pulsos reales, **a los 5 segundos exactos deben encenderse los carteles rojos `SIN SEÑAL` en ambos sensores**. Que se enciendan confirma que el algoritmo de supervisión y diagnóstico de fallas opera a la perfección.
 
 ### Paso 4: Caracterización con Agua y Descarga Libre (Probeta Graduada)
 1. Colocar agua en el recipiente de alimentación y la descarga libre a la probeta de $1000\text{ mL}$.
 2. Presionar **"Reset L"** en la web.
-3. Operar la bomba a **$36\text{ RPM}$** durante $60\text{ segundos}$.
-4. Comparar el volumen de la probeta frente al volumen registrado en la web y hacer clic en **"📥 CSV"** para descargar la planilla oficial de ensayo para la tesis.
+3. Operar la bomba a **$36\text{ RPM}$** durante exactamente **$60\text{ segundos}$**.
+4. Comparar el volumen de la probeta frente al volumen registrado en la web y hacer clic en **"📥 CSV"** para exportar la planilla oficial de calibración para la tesis.
