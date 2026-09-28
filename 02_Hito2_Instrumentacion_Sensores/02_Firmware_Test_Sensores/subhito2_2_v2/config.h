@@ -28,10 +28,12 @@ constexpr float RPM_ALARMA_MEMBRANA = 36.0f;
 constexpr float K_FEED = 98.0f;
 constexpr float K_PERM = 98.0f;
 
-// Filtro digital: 3000 µs (3 ms) -> f_max = 333 Hz (~3400 mL/min)
-// Sincronizado exactamente con el filtro pasabajos RC de Placa 2 (fc ≈ 338 Hz).
-// Permite medir el caudal real de la manguera de 12mm a 72-100 RPM (1200-1540 mL/min) sin recortar pulsos.
-constexpr uint32_t FILTRO_RUIDO_US = 3000;
+// Filtro digital por software (ISR):
+// • 12000 µs (12 ms): Máxima inmunidad contra el hum de 108 Hz durante validación inicial (P1 a P10).
+//   Techo de medición: ~850 mL/min (~55 RPM). Para el rango nominal (≤ 36 RPM = ~554 mL/min) es perfecto.
+// • 4500 µs (4.5 ms): Techo 222 Hz (~2260 mL/min / >100 RPM). Descomentar tras validar P5 limpia (PERM = 0.0 Hz).
+constexpr uint32_t FILTRO_RUIDO_US = 12000;
+// constexpr uint32_t FILTRO_RUIDO_US = 4500;  // Activar tras pasar P5
 constexpr float Q_MAX_FISICO_MLMIN = 6000.0f;   // Límite físico YF-S401 (0.3 a 6 L/min). Permite prueba de soplido
 
 // ---- WI-FI ----

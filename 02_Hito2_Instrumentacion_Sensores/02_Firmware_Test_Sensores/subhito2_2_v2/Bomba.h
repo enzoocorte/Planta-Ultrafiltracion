@@ -18,7 +18,11 @@ public:
 
   void arrancar()        { _enMarcha = true; }
   void detener()         { _enMarcha = false; _invirtiendo = false; }
-  void setRPM(float rpm) { _objetivo = constrain(rpm, RPM_MIN, RPM_MAX); }
+  void setRPM(float rpm) {
+    float r = constrain(rpm, RPM_MIN, RPM_MAX);
+    if (_invirtiendo) _rpmGuardada = r;   // cambio de consigna durante frenado: post-inversión
+    else              _objetivo = r;
+  }
 
   void toggleSentido() {
     if (_invirtiendo) return;                        // inversión ya en curso: ignorar

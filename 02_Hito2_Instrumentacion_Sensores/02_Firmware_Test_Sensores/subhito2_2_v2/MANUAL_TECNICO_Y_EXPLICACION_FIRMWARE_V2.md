@@ -152,39 +152,31 @@ $$Q\text{ (L/min)} = \frac{F}{K} \implies Q\text{ (mL/min)} = \frac{F \times 100
 
 ---
 
-## 2.4. Hallazgo Crítico del Filtro de Software: 12000 µs vs 3000 µs
+## 2.4. El Dilema del Filtro de Software: Ancho de Banda vs Inmunidad al Ruido
 
-> [!CAUTION]
-> **AUDITORÍA DE PRECISIÓN**: En conversaciones previas se sugirió configurar `FILTRO_RUIDO_US = 12000` ($12\text{ ms}$).  
-> ¡Esa configuración causaría un error grave al medir caudales reales con la manguera de 12 mm!
+El ajuste de `FILTRO_RUIDO_US` es un caso clásico de ingeniería de control y procesamiento de señales: el **compromiso (*trade-off*) entre inmunidad al ruido electromagnético y ancho de banda útil de medición**.
 
-### Demostración Matemática:
-Si fijamos una ventana de rechazo de $12000\,\mu\text{s}$ ($12\text{ ms}$) en la rutina de interrupción:
-* La frecuencia máxima que el microcontrolador puede registrar es:
-  $$F_{\text{corte}} = \frac{1}{0.012\text{ s}} \approx \mathbf{83.33\text{ Hz}}$$
-* El caudal máximo correspondiente es:
-  $$Q_{\text{máx}} = \frac{83.33\text{ Hz} \times 1000}{98.0} \approx \mathbf{850.3\text{ mL/min}}$$
+### Tabla de Análisis del Compromiso (Trade-Off):
 
-¿Qué ocurriría cuando Enzo pruebe a $72\text{ RPM}$ con descarga libre ($1200\text{ mL/min}$)?
-* A $1200\text{ mL/min}$, la frecuencia física de la turbina es:
-  $$F = 98 \times 1.20 = \mathbf{117.6\text{ Hz}}$$
-* El período entre pulsos físicos reales es:
-  $$T = \frac{1}{117.6\text{ Hz}} = 0.008503\text{ s} = \mathbf{8503\,\mu\text{s}} \quad (8.5\text{ ms})$$
-* **Como $8.5\text{ ms} < 12\text{ ms}$, ¡el microcontrolador descartaría el pulso considerándolo ruido!**
-* El sensor solo registraría uno de cada dos pulsos ($17\text{ ms}$), reportando exactamente la mitad: **$\approx 600\text{ mL/min}$ en lugar de los $1200\text{ mL/min}$ reales**.
+| Consigna RPM | Caudal Real ($15.4\text{ mL/rev}$) | Frecuencia Turbina YF-S401 | Período entre Pulsos | ¿Pasa el Filtro de 12 ms (12000 µs)? | ¿Pasa el Filtro de 4.5 ms (4500 µs)? |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **20 RPM** | $308\text{ mL/min}$ | $30.2\text{ Hz}$ | $33.1\text{ ms}$ | ✅ Pasa perfecto ($> 12\text{ ms}$) | ✅ Pasa holgado |
+| **36 RPM** (límite FX100) | $554\text{ mL/min}$ | $54.3\text{ Hz}$ | $18.4\text{ ms}$ | ✅ Pasa perfecto ($> 12\text{ ms}$) | ✅ Pasa holgado |
+| **50 RPM** | $770\text{ mL/min}$ | $75.5\text{ Hz}$ | $13.2\text{ ms}$ | ✅ Pasa justo ($> 12\text{ ms}$) | ✅ Pasa holgado |
+| **55+ RPM** | $> 850\text{ mL/min}$ | $> 83.3\text{ Hz}$ | $< 12.0\text{ ms}$ | ❌ **Recorta pulsos** (techo ~850 mL/min) | ✅ Pasa holgado |
+| **72 RPM** (ensayo libre) | $1108\text{ a }1200\text{ mL/min}$ | $108.6\text{ a }117.6\text{ Hz}$ | $8.5\text{ a }9.2\text{ ms}$ | ❌ Sub-cuenta a ~850 mL/min | ✅ Pasa perfecto ($> 4.5\text{ ms}$) |
+| **100 RPM** (máx. exploratorio) | $1540\text{ mL/min}$ | $150.9\text{ Hz}$ | $6.6\text{ ms}$ | ❌ Sub-cuenta a ~850 mL/min | ✅ Pasa holgado ($> 4.5\text{ ms}$) |
 
-### Sincronización Armónica: ¿Por qué 3000 µs es el valor perfecto?
-1. En la Placa 2 ya instalamos el filtro pasabajos RC físico por hardware ($4.7\text{ k}\Omega + 100\text{ nF}$):
-   $$f_{c,\text{hardware}} \approx \mathbf{338.6\text{ Hz}}$$
-2. Configurando en software:
-   $$\mathbf{FILTRO\_RUIDO\_US = 3000\,\mu\text{s}} \quad (3.0\text{ ms})$$
-   La frecuencia de corte del filtro digital es:
-   $$F_{\text{corte}} = \frac{1}{0.003\text{ s}} = \mathbf{333.3\text{ Hz}} \implies Q_{\text{máx}} \approx \mathbf{3400\text{ mL/min}}$$
-
-**Conclusión**:
-* El filtro de hardware ($338\text{ Hz}$) y el de software ($333\text{ Hz}$) quedan perfectamente hermanados.
-* Permite medir holgadamente el rango completo de $20$ a $100\text{ RPM}$ ($300$ a $1600\text{ mL/min}$) y la prueba de soplido sin recortar pulsos reales.
-* Todo transitorio o espiga parásita por encima de $333\text{ Hz}$ es eliminado.
+### Estrategia Operativa Homologada:
+1. **Fase 1 (Validación Inicial en Banco — Pruebas P1 a P10)**:  
+   Se mantiene configurado **`FILTRO_RUIDO_US = 12000` ($12\text{ ms}$)**.  
+   * **Justificación**: Para el rango de operación nominal de la planta de ultrafiltración ($\le 36\text{ RPM} = 554\text{ mL/min} = 54.3\text{ Hz}$), el período entre pulsos físicos ($18.4\text{ ms}$) es mayor a $12\text{ ms}$, por lo que los pulsos pasan sin atenuación. A su vez, bloquea al 100% cualquier acoplamiento parásito de $108\text{ Hz}$ del motor NEMA 34.
+   * **Nota**: Por encima de $\sim 55\text{ RPM}$, el caudalímetro alcanzará su techo de $\sim 850\text{ mL/min}$. En esa zona de ensayo exploratorio, la referencia es el caudal teórico de bomba + medición por probeta.
+2. **Fase 2 (Tras validar que la Prueba P5 dé PERMEADO = 0.0 Hz con motor girando en seco)**:  
+   Una vez confirmado en mesa de trabajo que el hardware de la Placa 2 (filtro RC $4.7\text{ k}\Omega + 100\text{ nF}$) extinguió completamente las espigas del motor, se cambia en `config.h` a:
+   ```cpp
+   constexpr uint32_t FILTRO_RUIDO_US = 4500;  // Techo 222 Hz (~2260 mL/min) -> Cubre 100 RPM con margen
+   ```
 
 ---
 
@@ -332,15 +324,17 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 28: constexpr float K_FEED = 98.0f;
 29: constexpr float K_PERM = 98.0f;
 30: 
-31: // Filtro digital: 3000 µs (3 ms) -> f_max = 333 Hz (~3400 mL/min)
-32: // Sincronizado exactamente con el filtro pasabajos RC de Placa 2 (fc ≈ 338 Hz).
-33: // Permite medir el caudal real de la manguera de 12mm a 72-100 RPM (1200-1540 mL/min) sin recortar pulsos.
-34: constexpr uint32_t FILTRO_RUIDO_US = 3000;
-35: constexpr float Q_MAX_FISICO_MLMIN = 6000.0f;   // Límite físico YF-S401 (0.3 a 6 L/min). Permite prueba de soplido
+31: // Filtro digital por software (ISR):
+32: // • 12000 µs (12 ms): Máxima inmunidad contra el hum de 108 Hz durante validación inicial (P1 a P10).
+33: //   Techo de medición: ~850 mL/min (~55 RPM). Para el rango nominal (≤ 36 RPM = ~554 mL/min) es perfecto.
+34: // • 4500 µs (4.5 ms): Techo 222 Hz (~2260 mL/min / >100 RPM). Descomentar tras validar P5 limpia (PERM = 0.0 Hz).
+35: constexpr uint32_t FILTRO_RUIDO_US = 12000;
+36: // constexpr uint32_t FILTRO_RUIDO_US = 4500;  // Activar tras pasar P5
+37: constexpr float Q_MAX_FISICO_MLMIN = 6000.0f;   // Límite físico YF-S401 (0.3 a 6 L/min). Permite prueba de soplido
 ```
 * **Líneas 28-29**: Factores de calibración de turbina ($K$).
-* **Línea 34**: Tiempo de guarda mínimo entre pulsos consecutivos dentro de la interrupción ISR. Al fijar $3000\,\mu\text{s}$, admite hasta $333\text{ Hz}$ ($3400\text{ mL/min}$), descartando rebotes y acoplamientos parásitos.
-* **Línea 35**: Límite superior de seguridad física ($6000\text{ mL/min}$). Si una ráfaga supera este valor, el firmware la clasifica como ruido y la descarta.
+* **Líneas 31-36**: Tiempo de guarda mínimo entre pulsos consecutivos dentro de la interrupción ISR. Al fijar $12000\,\mu\text{s}$, protege al sistema de cualquier falso pulso a $108\text{ Hz}$ mientras se valida el banco en frío y a velocidades nominales ($\le 36\text{ RPM}$). Se deja lista la opción a $4500\,\mu\text{s}$ para cuando la prueba P5 confirme ruido cero.
+* **Línea 37**: Límite superior de seguridad física ($6000\text{ mL/min}$). Si una ráfaga supera este valor, el firmware la clasifica como ruido y la descarta.
 
 ```cpp
 37: // ---- WI-FI ----
@@ -390,18 +384,15 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 30:     if (q > Q_MAX_FISICO_MLMIN) {                       // defensa anti-ruido por encima de 6 L/min
 31:       q = 0.0f;
 32:       Serial.printf("[%s] %lu pulsos falsos descartados (f=%.1f Hz)\n", _nombre, (unsigned long)n, _f);
-33:     }
+33:     } else {
+34:       _vol += (float)n / (_k * 60.0f);                  // volumen EXACTO por conteo de pulsos válidos
+35:     }
+36:     _q  = (n > 0) ? (0.3f * q + 0.7f * _q) : 0.0f;      // suavizado (estabiliza display, cae a 0 si se detiene)
 ```
 * **Línea 28**: Calcula la frecuencia física instantánea $F = n / \Delta t$.
 * **Línea 29**: Convierte la frecuencia a caudal volumétrico en $\text{mL/min}$ ($Q = \frac{F \times 1000}{K}$).
-* **Líneas 30-33**: Filtro de sanidad física: si el cálculo supera los $6000\text{ mL/min}$, anula el valor espurio y emite una advertencia por el puerto serie.
-
-```cpp
-34:     _q  = (n > 0) ? (0.3f * q + 0.7f * _q) : 0.0f;      // suavizado (estabiliza display, cae a 0 si se detiene)
-35:     _vol += (float)n / (_k * 60.0f);                    // volumen EXACTO por conteo de pulsos: K*60 = 5880 pulsos/L
-```
-* **Línea 34**: Filtro digital paso bajo recursivo (IIR de primer orden): $y[k] = 0.3 x[k] + 0.7 y[k-1]$. Suaviza el parpadeo en pantalla ante pulsaciones peristálticas normales. Si no hay pulsos ($n = 0$), cae a cero de inmediato.
-* **Línea 35**: Totalizador volumétrico absoluto en Litros. Integra el volumen real contabilizando pulso por pulso: $\sum \frac{n}{5880}$.
+* **Líneas 30-35**: Filtro de sanidad física y totalización protegida: si el cálculo supera los $6000\text{ mL/min}$, anula el caudal espurio y **evita sumar esos pulsos falsos al acumulador de volumen** (`else`). Si los pulsos son válidos, acumula el volumen exacto en Litros ($\sum \frac{n}{5880}$).
+* **Línea 36**: Filtro digital paso bajo recursivo (IIR de primer orden): $y[k] = 0.3 x[k] + 0.7 y[k-1]$. Suaviza el parpadeo en pantalla ante pulsaciones peristálticas normales. Si no hay pulsos ($n = 0$), cae a cero de inmediato.
 
 ```cpp
 37:     // Detección de pérdida de flujo / cable suelto:
@@ -486,9 +477,14 @@ La arquitectura de dos placas shield ZS-1057 resuelve todos estos problemas sin 
 ```cpp
 19:   void arrancar()        { _enMarcha = true; }
 20:   void detener()         { _enMarcha = false; _invirtiendo = false; }
-21:   void setRPM(float rpm) { _objetivo = constrain(rpm, RPM_MIN, RPM_MAX); }
+21:   void setRPM(float rpm) {
+22:     float r = constrain(rpm, RPM_MIN, RPM_MAX);
+23:     if (_invirtiendo) _rpmGuardada = r;   // consigna post-inversión si cambia durante frenado
+24:     else              _objetivo = r;
+25:   }
 ```
-* **Líneas 19-21**: Comandos de control. `setRPM` utiliza `constrain()` para restringir rígidamente cualquier consigna dentro del rango seguro programado ($20.0$ a $100.0\text{ RPM}$).
+* **Líneas 19-25**: Comandos de control. `setRPM` restringe la consigna dentro del rango seguro ($20.0$ a $100.0\text{ RPM}$).  
+  🐛 **Solución del Bug de Estado en Inversión**: Si el usuario mueve el slider de RPM mientras la bomba está desacelerando para invertir (`_invirtiendo == true`), la nueva consigna se guarda en `_rpmGuardada` en lugar de pisar `_objetivo`. De este modo, la rampa de frenado a cero no se interrumpe y la inversión física se completa limpiamente sin bloquear el sistema.
 
 ```cpp
 23:   void toggleSentido() {
@@ -746,10 +742,13 @@ Durante el análisis exhaustivo línea por línea, se auditaron y corrigieron cu
 
 | Aspecto Auditado | Estado Anterior ("Cosa Rara") | Corrección Implementada | Justificación de Ingeniería |
 | :--- | :--- | :--- | :--- |
-| **1. Ventana del Filtro de Software** | `FILTRO_RUIDO_US = 12000` ($12\text{ ms}$) | **`FILTRO_RUIDO_US = 3000` ($3\text{ ms}$)** | A $12\text{ ms}$, cualquier caudal real $> 850\text{ mL/min}$ era recortado a la mitad. Con $3\text{ ms}$, se mide hasta $3400\text{ mL/min}$, sincronizándose con el filtro RC de hardware ($338\text{ Hz}$). |
-| **2. Buffer de Telemetría JSON** | `char j[420]` en `manejarStatus()` | **`char j[460]`** | Al agregar el campo `"rpm_al": 36.0` para la alarma en la web, la cadena JSON superaba los 410 bytes, quedando peligrosamente al borde del desbordamiento de buffer (*buffer overflow*). |
-| **3. Configuración del Modo GPIO** | `pinMode(_pin, INPUT_PULLUP)` | **`pinMode(_pin, INPUT)`** | Como el front-end de la Placa 2 ya provee una resistencia externa de $4.7\text{ k}\Omega$ a $3.3\text{V}$, desactivar el pull-up interno garantiza una caída nítida a $0.0\text{ V}$ sin corrientes residuales. |
-| **4. Rango de Consignas del Dashboard** | Limitado rígidamente a $42\text{ RPM}$ | **Rango ampliado de $20$ a $100\text{ RPM}$ con alerta ámbar a $\ge 36\text{ RPM}$** | Permite caracterizar libremente la curva de la bomba peristáltica MBP-2000 con agua sin bloquear la pantalla, manteniendo la seguridad mediante advertencias claras. |
+| Aspecto Auditado | Estado Anterior ("Cosa Rara") | Corrección Implementada | Justificación de Ingeniería |
+| :--- | :--- | :--- | :--- |
+| **1. Bug de Inversión de Giro (`bomba.h`)** | `setRPM()` pisaba `_objetivo` durante el frenado de inversión | **`if (_invirtiendo) _rpmGuardada = r; else _objetivo = r;`** | Si el usuario cambiaba la consigna mientras desaceleraba para invertir, `_actual` nunca bajaba de 0.1 RPM, bloqueando el estado `_invirtiendo = true` permanentemente. Resuelto guardando la consigna en `_rpmGuardada`. |
+| **2. Compromiso Filtro Digital (`config.h`)** | Techo fijo o corte arbitrario | **`12000 µs` en Fase 1 (banco), opción `4500 µs` post-P5** | `12000 µs` otorga máxima inmunidad contra el hum de 108 Hz en ensayos nominales ($\le 36\text{ RPM}$). `4500 µs` habilita medir hasta $100\text{ RPM}$ ($1540\text{ mL/min}$) una vez validado el hardware limpio. |
+| **3. Integrador de Volumen (`caudalimetro.h`)** | `_vol += n/(K*60)` sumaba incluso pulsos falsos descartados | **Movido dentro del bloque `else` de `Q_MAX_FISICO_MLMIN`** | Si una ráfaga supera los $6000\text{ mL/min}$ y es descartada como ruido eléctrico, esos pulsos falsos no contaminan el totalizador acumulado de volumen en Litros. |
+| **4. Buffer de Telemetría JSON (`subhito2_2_v2.ino`)** | `char j[420]` en `manejarStatus()` | **`char j[460]`** | Al agregar el campo `"rpm_al": 36.0` para la alarma en la web, la cadena JSON superaba los 410 bytes, quedando peligrosamente al borde del desbordamiento de buffer (*buffer overflow*). |
+| **5. Configuración del Modo GPIO (`caudalimetro.h`)** | `pinMode(_pin, INPUT_PULLUP)` | **`pinMode(_pin, INPUT)`** | Como el front-end de la Placa 2 ya provee una resistencia externa de $4.7\text{ k}\Omega$ a $3.3\text{V}$, desactivar el pull-up interno garantiza una conmutación a $0.0\text{ V}$ nítida sin corrientes parásitas. |
 
 ---
 

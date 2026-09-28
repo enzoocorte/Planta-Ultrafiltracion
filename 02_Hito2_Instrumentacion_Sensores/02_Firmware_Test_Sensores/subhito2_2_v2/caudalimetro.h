@@ -30,9 +30,10 @@ public:
     if (q > Q_MAX_FISICO_MLMIN) {                       // defensa anti-ruido por encima de 6 L/min
       q = 0.0f;
       Serial.printf("[%s] %lu pulsos falsos descartados (f=%.1f Hz)\n", _nombre, (unsigned long)n, _f);
+    } else {
+      _vol += (float)n / (_k * 60.0f);                  // volumen EXACTO por conteo de pulsos válidos
     }
     _q  = (n > 0) ? (0.3f * q + 0.7f * _q) : 0.0f;      // suavizado (estabiliza display, cae a 0 si se detiene)
-    _vol += (float)n / (_k * 60.0f);                    // volumen EXACTO por conteo de pulsos: K*60 = 5880 pulsos/L
 
     // Detección de pérdida de flujo / cable suelto:
     // Si la bomba empuja pero transcurren 5 segundos continuos sin pulsos -> alerta
