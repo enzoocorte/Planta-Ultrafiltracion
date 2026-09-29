@@ -97,3 +97,5 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
   * 💻 **[`firmware_sedimentador/firmware_sedimentador.ino`](./02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino)**: Sketch de Arduino para ESP32 con Máquina de Estados Finitos (FSM) no bloqueante.
 * 📁 **[`03_Compras_y_Ferreteria_Hidraulica/`](./03_Compras_y_Ferreteria_Hidraulica/)**:
   * 🚰 **[`Guia_Compras_Hidraulicas_y_Locales_Salta.md`](./03_Compras_y_Ferreteria_Hidraulica/Guia_Compras_Hidraulicas_y_Locales_Salta.md)**: Guía de adaptación de 1/2" a 1/4", ensamble con bujes de bronce, lista para mostrador y locales en Salta Capital.
+* 🌐 **[`guia_conexion_sedimentador.html`](./guia_conexion_sedimentador.html)**: Guía visual interactiva con fotos reales, esquemáticos del Driver L298N, acople de tornillo sinfín, pines ESP32 y checklist de armado.
+
