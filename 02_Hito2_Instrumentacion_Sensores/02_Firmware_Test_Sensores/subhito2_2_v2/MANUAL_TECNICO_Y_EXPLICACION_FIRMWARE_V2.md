@@ -59,10 +59,19 @@ En sistemas de grado industrial y proyectos de tesis de ingeniería, el software
 ```
 
 ### Principios Fundamentales del Sistema:
-1. **Ejecución No Bloqueante (`Non-blocking design`)**: Prohibición de la función `delay()` en el lazo continuo. Las tareas se calendarizan con marcas de tiempo diferenciales ($\Delta t = t_{\text{actual}} - t_{\text{anterior}}$) utilizando `millis()` y `micros()`.
+1. **Ejecución No Bloqueante (`Non-blocking design`)**: Prohibición terminante de la función `delay()` en el lazo continuo. Las tareas se calendarizan con marcas de tiempo diferenciales ($\Delta t = t_{\text{actual}} - t_{\text{anterior}}$) utilizando `millis()` y `micros()`.
 2. **Generación de Pasos por Hardware (`LEDC`)**: El ESP32 no conmuta pines de pulsos por software. Delega la onda cuadrada al temporizador de silicio periférico `LEDC`, liberando ambos núcleos Tensilica LX6 de jitter temporal.
 3. **Secciones Críticas Atómicas (`FreeRTOS Spinlocks`)**: Dado que el ESP32 es dual-core y los pulsos ingresan por interrupciones de hardware asíncronas (`ISR`), la lectura y reinicio de contadores se protege con cerrojos de giro atómicos (`portENTER_CRITICAL` / `portEXIT_CRITICAL`).
 4. **Cero Consumo de Memoria SRAM para la Web (`PROGMEM`)**: Toda la interfaz HTML5, estilos CSS3, motor JavaScript de telemetría y exportador CSV residen en la memoria Flash ($4\text{ MB}$), dejando intactos los $320\text{ KB}$ de SRAM para buffers de red y variables de control.
+
+### 💡 ¿Por qué esta arquitectura es infinitamente superior al código Arduino tradicional? (Comparativa Técnica)
+
+| Enfoque Tradicional / Principiante | Arquitectura Industrial `subhito2_2_v2` | ¿Por qué es mejor? (Beneficio Crítico en la Planta) |
+| :--- | :--- | :--- |
+| **`delay(1000)` para temporizar** | **`millis()` no bloqueante por deltas ($\Delta t$)** | `delay(1000)` congela la CPU durante 160 millones de ciclos. El ESP32 no puede atender peticiones Wi-Fi, la página web no responde, no lee comandos de parada y las rampas de aceleración se clavan. Con `millis()`, el procesador ejecuta miles de iteraciones por segundo atendiendo la web en tiempo real mientras evalúa cada lazo solo cuando corresponde. |
+| **`digitalWrite()` con retardos en microsegundos** | **Generador PWM por Hardware de Silicio (`LEDC`)** | Conmutar pines por software genera *jitter* (fluctuación de fase): cada vez que el ESP32 atiende una trama Wi-Fi, el pulso se estira, el motor NEMA 34 pierde pasos, vibra violentamente y genera ruido acústico. El módulo `LEDC` genera la onda cuadrada por hardware puro de silicio, con precisión de cuarzo y sin gastar un solo ciclo de CPU. |
+| **Variables globales compartidas sin protección** | **Secciones Críticas Atómicas (`FreeRTOS Spinlocks`)** | El ESP32 tiene **dos núcleos físicos** (Core 0 y Core 1). Si el Core 0 (servidor web) intenta leer una variable de 32 bits (`_pulsos`) justo en el microsegundo en que la interrupción en Core 1 la está incrementando, se produce una lectura corrupta (*race condition*). `portENTER_CRITICAL` congela temporalmente las interrupciones para copiar el dato de forma 100% segura. |
+| **HTML/CSS/JS como objetos `String` en RAM** | **Almacenamiento en Memoria Flash (`PROGMEM`)** | La memoria RAM del ESP32 es de solo $320\text{ KB}$. Si guardamos las páginas web en RAM, la memoria se fragmenta rápidamente con cada petición de cliente, provocando cuelgues espontáneos (*panics* o reinicios inesperados) a los pocos minutos. En Flash (`PROGMEM`) disponemos de $4\text{ MB}$, dejando la RAM al $85\%$ libre para la red. |
 
 ---
 
@@ -90,24 +99,28 @@ $$A_{\text{tubo}} = \frac{\pi \times d_i^2}{4}$$
 
 * **Caso Anterior (Manguera Fina de Laboratorio Clínico, $d_i = 4.8\text{ mm}$)**:
   $$A_{\text{tubo}} = \frac{\pi \times (0.48\text{ cm})^2}{4} = 0.181\text{ cm}^2 = 0.181\text{ mL/cm}$$
-  Para una pista perimetral de $23\text{ cm}$ y 2 rodillos:
-  $$V_{\text{rev}} \approx 23\text{ cm} \times 0.181\text{ mL/cm} \approx \mathbf{4.16 \approx 4.2\text{ mL/vuelta}}$$
-  *(Este valor correspondía al prototipo teórico con manguera delgada de 4.8 mm)*.
+  Para una pista perimetral de $23\text{ cm}$ y rotor de 3 rodillos:
+  $$V_{\text{rev}} \approx \mathbf{4.2\text{ mL/vuelta}}$$
+  *(Este valor correspondía a una bomba pequeña con manguera delgada de 4.8 mm)*.
 
 * **Caso Real Actual (Manguera MBP-2000, $d_i = 12.0\text{ mm}$)**:
   $$A_{\text{tubo}} = \frac{\pi \times (1.20\text{ cm})^2}{4} = \mathbf{1.131\text{ cm}^2} = \mathbf{1.131\text{ mL/cm}}$$
   ¡El área interna es **6.25 veces mayor** que la de 4.8 mm!
-  El volumen teórico geométrico desplazado por vuelta resulta:
+  El cabezal **MBP-2000 cuenta con un rotor de 3 rodillos**:
+  * Tener 3 rodillos confina el fluido en 3 cámaras peristálticas por vuelta ($120^\circ$ entre rodillos).
+  * Reduce sustancialmente la amplitud de pulsación hidráulica en comparación con un cabezal de 2 rodillos, logrando un flujo más estable y homogéneo hacia la membrana.
+  * El volumen teórico geométrico desplazado por vuelta resulta:
   $$V_{\text{geom}} = L_{\text{efectiva}} \times A_{\text{tubo}} \approx 15\text{ a }18\text{ mL/vuelta}$$
 
 ### Demostración con la Prueba Experimental Real de Enzo:
 En el ensayo de probeta a descarga libre realizado por Enzo:
 * Velocidad: $72\text{ RPM}$
 * Tiempo: $1\text{ minuto}$ ($60\text{ segundos}$)
-* Volumen recolectado en probeta: **$1200\text{ mL}$**
+* Volumen recolectado en probeta: $\approx \mathbf{1200\text{ mL}}$  
+  *(Nota de campo: La probeta graduada del laboratorio tenía capacidad de hasta $1000\text{ mL}$, por lo que este valor de $1200\text{ mL}$ fue una estimación visual por desborde/tiempo. Es un excelente indicador del orden de magnitud, y el valor exacto se calibrará rigurosamente con pesada o tara en el ensayo P6 del protocolo).*
 
-Calculando el desplazamiento real directo:
-$$\text{Desplazamiento Real} = \frac{1200\text{ mL}}{72\text{ vueltas}} = \mathbf{16.66\text{ mL/vuelta}}$$
+Calculando el desplazamiento real aproximado:
+$$\text{Desplazamiento Real} \approx \frac{1200\text{ mL}}{72\text{ vueltas}} \approx \mathbf{16.66\text{ mL/vuelta}}$$
 
 Considerando una ligera deformación por aplastamiento elástico de la silicona y pérdidas dinámicas, fijamos inicialmente en el código:
 $$\mathbf{ML\_POR\_VUELTA = 15.4\text{ mL/vuelta}}$$
@@ -115,18 +128,21 @@ $$\mathbf{ML\_POR\_VUELTA = 15.4\text{ mL/vuelta}}$$
 
 ---
 
-## 2.2. La Paradoja de Contrapresión: Descarga Libre (1200 mL/min) vs Membrana (150 mL/min)
+## 2.2. La Paradoja de Contrapresión y la Nueva Válvula Reguladora de Retentado
 
 En las pruebas preliminares surgió una discrepancia desconcertante:
-1. Con la manguera libre (sin conectar al filtro), a $72\text{ RPM}$ se recolectaron **$1200\text{ mL/min}$**.
+1. Con la manguera libre (sin conectar al filtro), a $72\text{ RPM}$ se recolectaron $\approx \mathbf{1200\text{ mL/min}}$.
 2. Con la membrana conectada y la bomba a $72\text{ RPM}$, la probeta sólo capturó **$150\text{ mL/min}$**.
 
 ### Explicación Hidráulica:
 El cartucho **Fresenius FX100** contiene miles de microfibras capilares de polisulfona *Helixone* con poros de ultrafiltración ($< 0.01\,\mu\text{m}$).  
-* Si la válvula de la línea de **retentado** está cerrada o muy estrangulada, el fluido no puede salir libremente por el extremo axial de las fibras.
-* El agua se ve forzada a atravesar la pared porosa de las fibras hacia la carcasa de permeado, lo cual ofrece una **altísima resistencia hidráulica (pérdida de carga)**.
-* Aunque las bombas peristálticas son de desplazamiento positivo, las mangueras de silicona son elásticas. Ante presiones elevadas, la manguera se expande antes del rodillo y el rodillo no logra un sellado hermético al 100% (*slip* o retroflujo interno por contrapresión).
-* **Solución operativa**: Para la calibración inicial con agua, la válvula de retentado debe permanecer **completamente abierta**, permitiendo el flujo cruzado sin generar contrapresiones excesivas.
+* En la primera prueba, la línea de salida de **retentado** no tenía regulación y quedó prácticamente cerrada/estrangulada. Al no poder escapar el líquido por el extremo axial de las fibras, se generó una contrapresión masiva.
+* El agua se vio forzada a intentar salir exclusivamente atravesando la pared porosa de las fibras hacia el permeado, lo cual ofrece una resistencia hidráulica extrema.
+* Las mangueras de silicona son elásticas: ante contrapresiones elevadas, el tubo se "infla" antes del rodillo y el rodillo no logra un sellado hermético perfecto contra la pista (*slip* o retroflujo interno en el cabezal).
+
+### Incorporación de la Válvula de Retentado:
+* **Mejora de Hardware Implementada**: Ya se incorporó la **válvula reguladora en la línea de retentado**.
+* Con esta válvula, la línea ya **no quedará estrangulada al 100%**. Se ajusta para permitir una circulación fluida en flujo cruzado (*cross-flow*) a lo largo del interior de los capilares, manteniendo la presión transmembrana dentro de límites seguros ($< 0.5\text{ bar}$) y permitiendo que la bomba trabaje a su caudal nominal real sin sobrepresión destructiva.
 
 ---
 
@@ -178,6 +194,11 @@ El ajuste de `FILTRO_RUIDO_US` es un caso clásico de ingeniería de control y p
    constexpr uint32_t FILTRO_RUIDO_US = 4500;  // Techo 222 Hz (~2260 mL/min) -> Cubre 100 RPM con margen
    ```
 
+### ❓ Pregunta Frecuente: ¿Por qué no configurar 4500 µs (o 6.6 ms) directamente ahora? ¿Perdemos algo?
+* **¿Se pierde algo de caudal real?** No, al contrario: con $4500\,\mu\text{s}$ el sensor mide perfecto hasta $2260\text{ mL/min}$, cubriendo los $1540\text{ mL/min}$ a $100\text{ RPM}$ con total holgura.
+* **¿Por qué empezamos el lunes con 12 ms entonces?** Como precaución de diagnóstico de laboratorio. Si en la mesa de trabajo hay un cable mal apretado en la bornera de la Placa 2 o masa flotante, el hum de $108\text{ Hz}$ ($9.3\text{ ms}$) podría colarse. El filtro de $12\text{ ms}$ garantiza que para las pruebas iniciales P1 a P4 no haya interferencia alguna.
+* **El momento exacto del cambio**: Apenas ejecuten la **Prueba P5** (bomba girando en seco a 80 RPM sin agua) y vean que la pantalla marca **$0.0\text{ Hz}$ clavados**, ¡felicitaciones! El hardware ya ganó la batalla contra el ruido. En ese mismo instante descomentan `FILTRO_RUIDO_US = 4500;`, flashean, y ya tienen desbloqueada la medición exacta hasta $100\text{ RPM}$.
+
 ---
 
 ## 2.5. Cinemática del Accionamiento DM860 (1600 vs 3200 micropasos)
@@ -199,6 +220,21 @@ $$\text{Frecuencia de Pulsos } f_{\text{LEDC}} (\text{Hz}) = \frac{\text{RPM} \t
 | **72 RPM** (ensayo anterior) | $1108.8\text{ mL/min}$ | $1920.0\text{ Hz}$ | $3840.0\text{ Hz}$ |
 | **80 RPM** | $1232\text{ mL/min}$ | $2133.3\text{ Hz}$ | $4266.7\text{ Hz}$ |
 | **100 RPM** (máx. exploratorio) | $1540\text{ mL/min}$ | $2666.7\text{ Hz}$ | $5333.3\text{ Hz}$ |
+
+### ⚙️ ¿En qué incide duplicar los micropasos de 1600 a 3200 (aumentar la frecuencia)?
+
+Al pasar de 8 a 16 micropasos en el DM860 (llave SW5:OFF, SW6:OFF, SW7:ON, SW8:ON) y configurar `PULSOS_POR_REV = 3200`, la frecuencia generada se duplica. Esto tiene **4 impactos directos en la planta**:
+
+1. **Giro Ultra-Suave y Cero Resonancia Mecánica**:
+   * A paso completo ($1.8^\circ$) o micropasos bajos, el motor NEMA 34 avanza a "pequeños martillazos", produciendo un traqueteo audible y vibración mecánica que sacude la bomba.
+   * Con 16 micropasos, cada impulso angular es de apenas $0.1125^\circ$. La corriente en las bobinas se modula de forma casi perfectamente sinusoidal, haciendo que el rotor gire con suavidad continua, eliminando la vibración sobre el soporte metálico.
+2. **Protección y Mayor Vida Útil de la Manguera de Silicona**:
+   * Los 3 rodillos del cabezal MBP-2000 avanzan sin micro-impactos sobre la pared del tubo. El aplastamiento es homogéneo y continuo, reduciendo el desgaste prematuro por fatiga mecánica de la silicona.
+3. **Cero Penalización para el ESP32 (gracias a LEDC)**:
+   * Como la frecuencia no se genera por software sino por el periférico de silicio `LEDC`, generar $1066\text{ Hz}$ o $5333\text{ Hz}$ consume exactamente **cero ciclos de CPU**. El temporizador interno del ESP32 puede generar frecuencias superiores a $100\text{ kHz}$ sin inmutarse.
+4. **Margen Holgado en el Driver Leadshine DM860**:
+   * Los optoacopladores de entrada del driver DM860 admiten una frecuencia máxima de conmutación de **$200\text{ kHz}$ ($200\,000\text{ pulsos/seg}$)**.
+   * A la velocidad máxima de $100\text{ RPM}$ con 3200 pulsos/rev, la frecuencia es de apenas $5.33\text{ kHz}$, lo que representa **solo el $2.6\%$ de la capacidad del driver**. El sistema opera en una zona de confort absoluta.
 
 ---
 
