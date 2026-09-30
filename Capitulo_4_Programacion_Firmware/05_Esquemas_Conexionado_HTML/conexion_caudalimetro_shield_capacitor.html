@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Montaje Vertical: Sensor 1 (5V con R 4.7k) y Sensor 2 (3.3V Directo)</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-inner: #1f2937;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border: #374151;
+      --primary: #38bdf8;
+      --vcc-5v: #ef4444;
+      --vcc-3v3: #38bdf8;
+      --gnd-black: #6b7280;
+      --s1-yellow: #facc15;
+      --s2-cyan: #06b6d4;
+      --cap-orange: #fb923c;
+      --res-violet: #a855f7;
+      --accent-green: #22c55e;
+      --accent-aux: #8b5cf6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1280px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header */
+    header {
+      background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .badge-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--primary);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    .badge.red {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .badge.green {
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--accent-green);
+      border-color: rgba(34, 197, 94, 0.25);
+    }
+
+    .badge.purple {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--accent-aux);
+      border-color: rgba(139, 92, 246, 0.3);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Controles interactivos */
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      background: var(--card-bg);
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      align-items: center;
+    }
+
+    .btn-filter {
+      background: #1f2937;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-filter:hover {
+      background: #374151;
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-filter.active {
+      background: var(--primary);
+      color: #0f172a;
+      border-color: var(--primary);
+      font-weight: 700;
+      box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Tarjeta del Diagrama */
+    .diagram-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .diagram-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .diagram-header h2 {
+      font-size: 1.15rem;
+      color: #ffffff;
+    }
+
+    .svg-container {
+      width: 100%;
+      background: #070a12;
+      border-radius: 12px;
+      border: 1px solid #1f2937;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* Animaciones y resaltado SVG */
+    .wire {
+      transition: opacity 0.3s, stroke-width 0.3s, filter 0.3s;
+    }
+
+    .wire-highlight {
+      stroke-width: 5 !important;
+      opacity: 1 !important;
+      filter: drop-shadow(0 0 8px currentColor);
+    }
+
+    .wire-dimmed {
+      opacity: 0.15 !important;
+    }
+
+    /* Grilla de info inferior */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    /* Tablas */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--card-inner);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag-color {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    }
+
+    .alert-box {
+      background: rgba(56, 189, 248, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      color: #bae6fd;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .alert-box.green {
+      background: rgba(34, 197, 94, 0.1);
+      border-left-color: #22c55e;
+      color: #bbf7d0;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- HEADER -->
+    <header>
+      <div class="badge-bar">
+        <span class="badge red">Sensor 1: 5V (Con R 4.7 kΩ Protección)</span>
+        <span class="badge">Sensor 2: 3.3V (Directo sin Resistencia)</span>
+        <span class="badge purple">2 Terminal Adapters Apilados en Vertical</span>
+      </div>
+      <h1>Montaje Vertical: Sensor 1 (5V con R 4.7k) y Sensor 2 (3.3V Directo)</h1>
+      <p class="subtitle">Exactamente por eso se necesita la resistencia: <strong>el Sensor 1 alimentado a 5V requiere la R de 4.7 kΩ para proteger el pin P27 del ESP32</strong>, mientras que el <strong>Sensor 2 alimentado a 3.3V entra directo a P14 sin resistencia</strong>.</p>
+    </header>
+
+    <!-- BARRA DE FILTROS INTERACTIVOS -->
+    <div class="controls-bar">
+      <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);">Ver circuito:</span>
+      <button class="btn-filter active" onclick="setHighlight('all')">🌐 Todo el Ruteo</button>
+      <button class="btn-filter" onclick="setHighlight('s1_5v')">🔴 Sensor 1: Rama 5V con R 4.7k (P27)</button>
+      <button class="btn-filter" onclick="setHighlight('s2_3v3')">🔵 Sensor 2: Rama 3.3V Directo (P14)</button>
+      <button class="btn-filter" onclick="setHighlight('power')">⚡ Alimentaciones (5V y 3V3)</button>
+      <button class="btn-filter" onclick="setHighlight('caps')">🛡️ Capacitores 104 (Ambos a Masa)</button>
+    </div>
+
+    <!-- TARJETA DEL DIAGRAMA SVG VERTICAL -->
+    <div class="diagram-card">
+      <div class="diagram-header">
+        <h2>Plano de Montaje Vertical Dual: Línea 5V y Línea 3.3V</h2>
+        <span style="font-size: 0.82rem; color: var(--text-muted);">Ruteo vertical pin a pin entre ambas placas Terminal Adapter</span>
+      </div>
+
+      <div class="svg-container">
+        <svg id="schematic_stacked_voltages" viewBox="0 0 1200 980" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1e222d" />
+              <stop offset="100%" stop-color="#0a0c12" />
+            </linearGradient>
+
+            <linearGradient id="metalShield" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#94a3b8" />
+              <stop offset="40%" stop-color="#e2e8f0" />
+              <stop offset="70%" stop-color="#cbd5e1" />
+              <stop offset="100%" stop-color="#64748b" />
+            </linearGradient>
+
+            <linearGradient id="terminalGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#22c55e" />
+              <stop offset="40%" stop-color="#16a34a" />
+              <stop offset="100%" stop-color="#14532d" />
+            </linearGradient>
+
+            <linearGradient id="capGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#fdba74" />
+              <stop offset="50%" stop-color="#ea580c" />
+              <stop offset="100%" stop-color="#9a3412" />
+            </linearGradient>
+
+            <filter id="shadowBox" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity="0.5"/>
+            </filter>
+          </defs>
+
+          <!-- ============================================================== -->
+          <!-- 1. SENSORES DE CAUDAL A LOS COSTADOS                           -->
+          <!-- ============================================================== -->
+          
+          <!-- SENSOR 1: ALIMENTADO A 5V (IZQUIERDA) -->
+          <g id="s1_unit" filter="url(#shadowBox)">
+            <rect x="40" y="80" width="220" height="240" rx="12" fill="#111827" stroke="#ef4444" stroke-width="2" />
+            <text x="150" y="108" fill="#ef4444" font-size="13" font-weight="900" text-anchor="middle">CAUDALÍMETRO 1</text>
+            <rect x="75" y="118" width="150" height="20" rx="4" fill="#7f1d1d" />
+            <text x="150" y="132" fill="#fca5a5" font-size="10" font-weight="bold" text-anchor="middle">ALIMENTADO A 5V</text>
+
+            <circle cx="150" cy="180" r="34" fill="#1f2937" stroke="#ef4444" stroke-width="2" />
+            <line x1="150" y1="152" x2="150" y2="208" stroke="#ef4444" stroke-width="3" stroke-linecap="round" />
+            <line x1="122" y1="180" x2="178" y2="180" stroke="#ef4444" stroke-width="3" stroke-linecap="round" />
+            <circle cx="150" cy="180" r="6" fill="#fff" />
+
+            <!-- Salida S1 -->
+            <rect x="60" y="245" width="180" height="55" rx="6" fill="#1f2937" stroke="#374151" />
+            <circle cx="85" cy="272" r="5" fill="#ef4444" /><text x="85" y="290" fill="#ef4444" font-size="8" font-weight="bold" text-anchor="middle">Rojo (5V)</text>
+            <circle cx="150" cy="272" r="5" fill="#facc15" /><text x="150" y="290" fill="#facc15" font-size="8" font-weight="bold" text-anchor="middle">Amarillo</text>
+            <circle cx="215" cy="272" r="5" fill="#6b7280" /><text x="215" y="290" fill="#9ca3af" font-size="8" font-weight="bold" text-anchor="middle">Negro</text>
+          </g>
+
+          <!-- SENSOR 2: ALIMENTADO A 3.3V (DERECHA) -->
+          <g id="s2_unit" filter="url(#shadowBox)">
+            <rect x="940" y="80" width="220" height="240" rx="12" fill="#111827" stroke="#38bdf8" stroke-width="2" />
+            <text x="1050" y="108" fill="#38bdf8" font-size="13" font-weight="900" text-anchor="middle">CAUDALÍMETRO 2</text>
+            <rect x="975" y="118" width="150" height="20" rx="4" fill="#0369a1" />
+            <text x="1050" y="132" fill="#e0f2fe" font-size="10" font-weight="bold" text-anchor="middle">ALIMENTADO A 3.3V</text>
+
+            <circle cx="1050" cy="180" r="34" fill="#1f2937" stroke="#38bdf8" stroke-width="2" />
+            <line x1="1050" y1="152" x2="1050" y2="208" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" />
+            <line x1="1022" y1="180" x2="1078" y2="180" stroke="#38bdf8" stroke-width="3" stroke-linecap="round" />
+            <circle cx="1050" cy="180" r="6" fill="#fff" />
+
+            <!-- Salida S2 -->
+            <rect x="960" y="245" width="180" height="55" rx="6" fill="#1f2937" stroke="#374151" />
+            <circle cx="985" cy="272" r="5" fill="#38bdf8" /><text x="985" y="290" fill="#38bdf8" font-size="8" font-weight="bold" text-anchor="middle">Rojo (3V3)</text>
+            <circle cx="1050" cy="272" r="5" fill="#06b6d4" /><text x="1050" y="290" fill="#06b6d4" font-size="8" font-weight="bold" text-anchor="middle">Amarillo</text>
+            <circle cx="1115" cy="272" r="5" fill="#6b7280" /><text x="1115" y="290" fill="#9ca3af" font-size="8" font-weight="bold" text-anchor="middle">Negro</text>
+          </g>
+
+          <!-- ============================================================== -->
+          <!-- 2. PLACA SUPERIOR: TERMINAL ADAPTER DE FILTROS                 -->
+          <!-- ============================================================== -->
+          <g id="top_adapter" filter="url(#shadowBox)">
+            <rect x="340" y="50" width="520" height="350" rx="14" fill="url(#shieldGrad)" stroke="#8b5cf6" stroke-width="2" />
+            
+            <rect x="360" y="65" width="480" height="28" rx="5" fill="#1f2937" />
+            <text x="600" y="83" fill="#c4b5fd" font-size="11" font-weight="900" letter-spacing="1" text-anchor="middle">PLACA 1 (SUPERIOR): ADAPTER DE FILTROS Y PROTECCIÓN 5V/3.3V</text>
+
+            <!-- Bornera Verde Superior (Entrada) -->
+            <rect x="360" y="105" width="480" height="38" rx="4" fill="url(#terminalGreen)" stroke="#15803d" />
+            <text x="600" y="129" fill="#f0fdf4" font-size="10" font-weight="bold" text-anchor="middle">BORNERA SUPERIOR: CONEXIÓN DE CAUDALÍMETROS</text>
+
+            <!-- Zona central de componentes -->
+            <rect x="375" y="160" width="450" height="130" rx="8" fill="#111827" stroke="#374151" />
+
+            <!-- COMPONENTES MONTADOS EN PLACA SUPERIOR -->
+            <!-- 1. Resistencia 4.7k en serie para S1 (Protección 5V -> 3.3V) -->
+            <g id="comp_r1">
+              <rect x="480" y="175" width="54" height="20" rx="4" fill="#e2e8f0" stroke="#334155" />
+              <rect x="490" y="175" width="5" height="20" fill="#facc15" />
+              <rect x="500" y="175" width="5" height="20" fill="#a855f7" />
+              <rect x="510" y="175" width="5" height="20" fill="#ef4444" />
+              <text x="507" y="212" fill="#a855f7" font-size="10" font-weight="bold" text-anchor="middle">R = 4.7 kΩ (Protección 5V)</text>
+            </g>
+
+            <!-- 2. Capacitor 104 de S1 -->
+            <g id="comp_c1">
+              <circle cx="560" cy="255" r="14" fill="url(#capGrad)" stroke="#7c2d12" stroke-width="1.5" />
+              <text x="560" y="259" fill="#fff" font-size="8" font-weight="bold" text-anchor="middle">104</text>
+              <text x="560" y="280" fill="#fb923c" font-size="9" font-weight="bold" text-anchor="middle">Cap 104 (S1)</text>
+            </g>
+
+            <!-- 3. S2 directo (Sin R) + Capacitor 104 en puente a masa -->
+            <g id="comp_c2">
+              <circle cx="680" cy="255" r="14" fill="url(#capGrad)" stroke="#7c2d12" stroke-width="1.5" />
+              <text x="680" y="259" fill="#fff" font-size="8" font-weight="bold" text-anchor="middle">104</text>
+              <text x="680" y="280" fill="#fb923c" font-size="9" font-weight="bold" text-anchor="middle">Cap 104 (S2)</text>
+              <text x="680" y="195" fill="#38bdf8" font-size="10" font-weight="bold" text-anchor="middle">S2 Directo (Nativo 3.3V)</text>
+            </g>
+
+            <!-- Bornera Verde Inferior Placa 1 (Salida de bajada limpia) -->
+            <rect x="360" y="330" width="480" height="48" rx="4" fill="url(#terminalGreen)" stroke="#15803d" stroke-width="2" />
+
+            <!-- PINES DE SALIDA: 3V3 (x=380), P27 (x=535), P14 (x=640), GND (x=750), 5V (x=815) -->
+            <circle cx="380" cy="354" r="7" fill="#cbd5e1" stroke="#0284c7" stroke-width="2" />
+            <text x="380" y="395" fill="#38bdf8" font-size="10" font-weight="900" text-anchor="middle">3V3</text>
+
+            <circle cx="535" cy="354" r="7" fill="#facc15" stroke="#854d0e" stroke-width="2" />
+            <text x="535" y="395" fill="#facc15" font-size="10" font-weight="900" text-anchor="middle">P27 (Qp)</text>
+
+            <circle cx="640" cy="354" r="7" fill="#67e8f9" stroke="#0e7490" stroke-width="2" />
+            <text x="640" y="395" fill="#06b6d4" font-size="10" font-weight="900" text-anchor="middle">P14 (Qc)</text>
+
+            <circle cx="750" cy="354" r="7" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+            <text x="750" y="395" fill="#38bdf8" font-size="10" font-weight="900" text-anchor="middle">GND</text>
+
+            <circle cx="815" cy="354" r="7" fill="#cbd5e1" stroke="#ef4444" stroke-width="2" />
+            <text x="815" y="395" fill="#ef4444" font-size="10" font-weight="900" text-anchor="middle">5V</text>
+          </g>
+
+          <!-- ============================================================== -->
+          <!-- 3. PLACA INFERIOR: TERMINAL ADAPTER CON ESP32                  -->
+          <!-- ============================================================== -->
+          <g id="bottom_adapter" filter="url(#shadowBox)">
+            <rect x="340" y="560" width="520" height="380" rx="14" fill="url(#shieldGrad)" stroke="#374151" stroke-width="2" />
+            
+            <rect x="360" y="575" width="480" height="28" rx="5" fill="#1f2937" />
+            <text x="600" y="593" fill="#38bdf8" font-size="11" font-weight="900" letter-spacing="1" text-anchor="middle">PLACA 2 (INFERIOR): ESP32 TERMINAL ADAPTER (CONTROLADOR)</text>
+
+            <!-- ESP32 montado -->
+            <rect x="460" y="615" width="280" height="210" rx="6" fill="#1f2937" stroke="#4b5563" />
+            <rect x="520" y="630" width="160" height="170" rx="4" fill="url(#metalShield)" stroke="#cbd5e1" />
+            <text x="600" y="715" fill="#111827" font-size="14" font-weight="900" text-anchor="middle">ESP-WROOM-32</text>
+            <text x="600" y="735" fill="#4b5563" font-size="10" text-anchor="middle">NodeMCU-32S</text>
+
+            <!-- Borneras verdes inferiores del ESP32 -->
+            <rect x="360" y="855" width="480" height="50" rx="4" fill="url(#terminalGreen)" stroke="#15803d" stroke-width="2" />
+
+            <!-- PINES QUE RECIBEN LA BAJADA DIRECTA -->
+            <!-- 3V3 (x=380) -->
+            <circle cx="380" cy="880" r="7" fill="#cbd5e1" stroke="#0284c7" stroke-width="2" />
+            <text x="380" y="924" fill="#38bdf8" font-size="11" font-weight="900" text-anchor="middle">3V3</text>
+
+            <!-- P27 (x=535) -->
+            <circle cx="535" cy="880" r="7" fill="#facc15" stroke="#854d0e" stroke-width="2" />
+            <text x="535" y="924" fill="#facc15" font-size="11" font-weight="900" text-anchor="middle">P27</text>
+
+            <!-- P14 (x=640) -->
+            <circle cx="640" cy="880" r="7" fill="#67e8f9" stroke="#0e7490" stroke-width="2" />
+            <text x="640" y="924" fill="#06b6d4" font-size="11" font-weight="900" text-anchor="middle">P14</text>
+
+            <!-- GND (x=750) -->
+            <circle cx="750" cy="880" r="7" fill="#94a3b8" stroke="#0f172a" stroke-width="2" />
+            <text x="750" y="924" fill="#38bdf8" font-size="11" font-weight="900" text-anchor="middle">GND</text>
+
+            <!-- 5V (x=815) -->
+            <circle cx="815" cy="880" r="7" fill="#cbd5e1" stroke="#ef4444" stroke-width="2" />
+            <text x="815" y="924" fill="#ef4444" font-size="11" font-weight="900" text-anchor="middle">5V</text>
+          </g>
+
+          <!-- ============================================================== -->
+          <!-- 4. ENLACE VERTICAL DIRECTO A 90° (5 CABLES RECTOS)            -->
+          <!-- ============================================================== -->
+          <g id="vertical_trunk">
+            <rect x="360" y="415" width="480" height="120" rx="8" fill="#111827" stroke="#1f2937" stroke-width="1.5" />
+            <text x="600" y="480" fill="#475569" font-size="10" font-weight="bold" text-anchor="middle">BAJADA VERTICAL DIRECTA ENTRE TERMINAL ADAPTERS</text>
+
+            <!-- CABLE 1: 3.3V (Celeste/Azul) alimenta al Sensor 2 -->
+            <line class="wire wire-pwr3" x1="380" y1="361" x2="380" y2="873" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round" />
+            
+            <!-- CABLE 2: Señal S1 Permeado (Amarillo) hacia P27 -->
+            <line class="wire wire-s1" x1="535" y1="361" x2="535" y2="873" stroke="#facc15" stroke-width="4" stroke-linecap="round" />
+
+            <!-- CABLE 3: Señal S2 Retentado (Cian) hacia P14 -->
+            <line class="wire wire-s2" x1="640" y1="361" x2="640" y2="873" stroke="#06b6d4" stroke-width="4" stroke-linecap="round" />
+
+            <!-- CABLE 4: GND Masa Común (Gris) -->
+            <line class="wire wire-gnd" x1="750" y1="361" x2="750" y2="873" stroke="#6b7280" stroke-width="3.5" stroke-linecap="round" />
+
+            <!-- CABLE 5: 5V (Rojo) sube desde el ESP32 para alimentar a S1 -->
+            <line class="wire wire-pwr5" x1="815" y1="361" x2="815" y2="873" stroke="#ef4444" stroke-width="3.5" stroke-linecap="round" />
+
+            <!-- Puntos de conexión en bornes -->
+            <circle cx="380" cy="354" r="3" fill="#fff" /><circle cx="380" cy="880" r="3" fill="#fff" />
+            <circle cx="535" cy="354" r="3" fill="#fff" /><circle cx="535" cy="880" r="3" fill="#fff" />
+            <circle cx="640" cy="354" r="3" fill="#fff" /><circle cx="640" cy="880" r="3" fill="#fff" />
+            <circle cx="750" cy="354" r="3" fill="#fff" /><circle cx="750" cy="880" r="3" fill="#fff" />
+            <circle cx="815" cy="354" r="3" fill="#fff" /><circle cx="815" cy="880" r="3" fill="#fff" />
+          </g>
+
+          <!-- ============================================================== -->
+          <!-- 5. CABLES DESDE LOS SENSORES A LA PLACA SUPERIOR               -->
+          <!-- ============================================================== -->
+          
+          <!-- SENSOR 1 (5V) -> PLACA SUPERIOR -->
+          <!-- Rojo S1 (recibe 5V desde el borne 5V superior): (85,272) a borne 5V (815,354) por bus superior -->
+          <path class="wire wire-pwr5" d="M 85,272 L 85,124 L 815,124 L 815,330" fill="none" stroke="#ef4444" stroke-width="2.5" />
+          <!-- Amarillo S1 (entra a R 4.7k en x=480) -->
+          <path class="wire wire-s1" d="M 150,272 L 150,140 L 480,140 L 480,175" fill="none" stroke="#facc15" stroke-width="2.5" />
+          <!-- Negro S1 (GND): va a masa común en x=750 -->
+          <path class="wire wire-gnd" d="M 215,272 L 215,150 L 750,150 L 750,330" fill="none" stroke="#6b7280" stroke-width="2" />
+
+          <!-- SENSOR 2 (3.3V) -> PLACA SUPERIOR -->
+          <!-- Rojo S2 (recibe 3.3V desde el borne 3V3 superior): (985,272) a borne 3V3 (380,354) por bus superior -->
+          <path class="wire wire-pwr3" d="M 985,272 L 985,130 L 380,130 L 380,330" fill="none" stroke="#38bdf8" stroke-width="2.5" />
+          <!-- Amarillo S2 (va directo a salida P14 en x=640 sin R) -->
+          <path class="wire wire-s2" d="M 1050,272 L 1050,140 L 640,140 L 640,330" fill="none" stroke="#06b6d4" stroke-width="2.5" />
+          <!-- Negro S2 (GND): va a masa común en x=750 -->
+          <path class="wire wire-gnd" d="M 1115,272 L 1115,150 L 750,150" fill="none" stroke="#6b7280" stroke-width="2" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- TABLA Y EXPLICACIÓN DE INGENIERÍA 5V vs 3.3V -->
+    <div class="info-grid">
+
+      <div class="card">
+        <div class="card-title">
+          <span>⚡ Por qué uno lleva Resistencia y el otro No</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Parámetro</th>
+              <th>Caudalímetro 1 (Permeado Qp)</th>
+              <th>Caudalímetro 2 (Retentado Qc)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Alimentación (VCC)</strong></td>
+              <td>🔴 <strong>5V</strong> (del borne 5V del ESP32)</td>
+              <td>🔵 <strong>3.3V</strong> (del borne 3V3 del ESP32)</td>
+            </tr>
+            <tr>
+              <td><strong>Tensión de los Pulsos</strong></td>
+              <td>Pulsos de <strong>0V a 5V</strong></td>
+              <td>Pulsos de <strong>0V a 3.3V</strong> (Nativo)</td>
+            </tr>
+            <tr>
+              <td><strong>¿Necesita Resistencia?</strong></td>
+              <td>🟣 <strong>SÍ, R = 4.7 kΩ obligatoria:</strong> Limita la corriente y protege el pin P27 contra la sobretensión de 5V.</td>
+              <td>🟢 <strong>NO, directo a P14:</strong> Al estar alimentado a 3.3V, la señal ya es 100% segura para el ESP32.</td>
+            </tr>
+            <tr>
+              <td><strong>Capacitor 104 (100nF)</strong></td>
+              <td>🟠 Conectado entre la señal filtrada y GND.</td>
+              <td>🟠 Conectado en puente entre la señal directa y GND.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>🛡️ Seguridad Eléctrica para el ESP32</span>
+        </div>
+        <div class="alert-box green">
+          <div>
+            <strong>¡Tu diseño tiene total coherencia de ingeniería!:</strong><br>
+            • Los pines GPIO del ESP32 soportan un máximo de <strong>3.6V</strong>.<br>
+            • Al alimentar el Sensor 1 a <strong>5V</strong>, la resistencia en serie de <strong>4.7 kΩ</strong> absorbe la diferencia de potencial ($5\text{V} - 3.3\text{V} = 1.7\text{V}$) y limita la corriente a apenas $0.36\text{ mA}$, permitiendo que los diodos clamping internos del ESP32 recorten la señal sin calentarse ni quemarse.<br>
+            • Al alimentar el Sensor 2 a <strong>3.3V</strong>, no hay ningún riesgo de sobretensión, por lo que el cable viaja directo sin necesidad de resistencia.
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    function setHighlight(mode) {
+      document.querySelectorAll('.btn-filter').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const wires = document.querySelectorAll('#schematic_stacked_voltages .wire');
+      const s1 = document.getElementById('s1_unit');
+      const s2 = document.getElementById('s2_unit');
+
+      wires.forEach(w => w.style.opacity = '1');
+      if(s1) s1.style.opacity = '1';
+      if(s2) s2.style.opacity = '1';
+
+      if (mode === 'all') {
+        // Normal
+      } else if (mode === 's1_5v') {
+        wires.forEach(w => {
+          if (!w.classList.contains('wire-s1') && !w.classList.contains('wire-pwr5')) w.style.opacity = '0.12';
+        });
+        if(s2) s2.style.opacity = '0.2';
+      } else if (mode === 's2_3v3') {
+        wires.forEach(w => {
+          if (!w.classList.contains('wire-s2') && !w.classList.contains('wire-pwr3')) w.style.opacity = '0.12';
+        });
+        if(s1) s1.style.opacity = '0.2';
+      } else if (mode === 'power') {
+        wires.forEach(w => {
+          if (!w.classList.contains('wire-pwr5') && !w.classList.contains('wire-pwr3') && !w.classList.contains('wire-gnd')) w.style.opacity = '0.12';
+        });
+      } else if (mode === 'caps') {
+        wires.forEach(w => w.style.opacity = '0.15');
+      }
+    }
+  </script>
+</body>
+</html>
