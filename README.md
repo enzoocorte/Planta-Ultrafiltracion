@@ -1,69 +1,136 @@
 # 💧 PLANTA PILOTO DE ULTRAFILTRACIÓN INDUSTRIAL (FX100) & REACTOR DE COAGULACIÓN-SEDIMENTACIÓN
-## Proyecto de Tesis de Grado en Ingeniería Industrial — Automatización, Control IoT & Modelado de Membranas
+## Proyecto de Tesis de Grado en Ingeniería Industrial / Química — Automatización, Control IoT & Modelado de Membranas
+**Tesistas de Grado:** Antonella Guitián & Owen Cañizares  
+**Codirector de Tesis:** Ing. Enzo *(Investigador Doctoral — Tesis Doctoral en Procesos de Separación por Membranas)*  
+**Asesor de Automatización e Instrumentación:** Antigravity AI  
+**Ubicación de Montaje:** Laboratorio de Ingeniería — Salta, Argentina  
+**Última Actualización:** Septiembre 2026  
 
 ---
 
-## 👥 Equipo del Proyecto & Contexto Académico
-* **Codirector de Tesis**: **Ing. Enzo** *(Investigador Doctoral — Tesis Doctoral en Tratamiento de Aguas y Procesos de Separación por Membranas)*
-* **Tesistas de Grado (Ingeniería Industrial)**: **Antonella Guitián** & **Owen Cañizares**
-* **Asesor Técnico y Arquitectura de Control**: Antigravity AI
-* **Microcontrolador Principal**: ESP32 NodeMCU (38 Pines USB-C, Dual Core 240 MHz)
-* **Membrana de Ultrafiltración**: Fresenius Medical Care FX100 (Polisulfona / Helixone®, $A_m = 2.2\text{ m}^2$)
+## 🌐 1. Acceso Rápido al Servidor Web SCADA del ESP32
 
-> 📘 **DOCUMENTO PRINCIPAL**: Para una explicación exhaustiva de la arquitectura del sistema, el flujo de proceso y la guía detallada de qué se busca en cada hito, consultar el **[MANUAL_GENERAL_Y_GUIA_DE_NAVEGACION.md](./MANUAL_GENERAL_Y_GUIA_DE_NAVEGACION.md)**.
+Para operar la planta piloto, ver los caudalímetros en vivo, arrancar la bomba y exportar los datos a Excel, el ESP32 levanta una red Wi-Fi propia y simultáneamente se enlaza a la red del laboratorio:
+
+```
+                  ┌───────────────────────────────────────────────┐
+                  │             CÓMO CONECTARSE AL SCADA          │
+                  └───────────────────────────────────────────────┘
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  ▼                                               ▼
+     [ MODO 1: Wi-Fi Propio Directo ]               [ MODO 2: Router de Laboratorio ]
+     (Ideal en banco sin router)                    (Notebook conectada al Box804)
+     • Red Wi-Fi: Bomba_Peristaltica_UF             • Red Wi-Fi: Box804
+     • Clave: plantapiloto2                         • Clave: plantapiloto2
+     • En tu navegador ingresa a:                   • En tu navegador ingresa a:
+       👉 http://192.168.4.1                          👉 http://bomba.local
+```
+
+> [!TIP]
+> **Consejo para celulares**: Si te conectas a la red `Bomba_Peristaltica_UF` desde el teléfono móvil y la página no abre, desactiva momentáneamente los **Datos Móviles (4G/5G)** para que el teléfono no intente buscar la IP en internet.
 
 ---
 
-## 🧭 Estructura Modular de los 5 Hitos de Tesis (Consolidada)
+## 🧠 2. ¿Por qué usamos Git y Control de Versiones en esta Tesis?
+*(Sección de lectura obligatoria para Antonella y Owen)*
 
-Este repositorio está organizado en **una carpeta general de arquitectura P&ID y 5 carpetas modulares independientes**, estructuradas cronológicamente sin redundancias para que el equipo avance paso a paso:
+Muchas veces surge la pregunta: *¿Por qué no guardamos simplemente carpetas como `codigo_final_v2_este_si.ino` en un pendrive?*  
+En un proyecto de ingeniería industrial y aplicada, **el control de versiones con Git no es una herramienta para programadores informáticos; es la Bitácora de Laboratorio Digital e Inalterable**.
+
+### Las 4 razones fundamentales de ingeniería:
+1. **Trazabilidad Científica y Defensa de Tesis**:  
+   Ante el jurado evaluador, ustedes no están presentando un proyecto escolar que "funciona por casualidad". Git registra con fecha y hora exacta cada hipótesis, cada ensayo, cada fallo de ruido y la justificación matemática de cómo se solucionó.
+2. **Registro de Fallos y Diagnóstico Reproducible**:  
+   En la experimentación de laboratorio, si un ensayo funcionaba el lunes y el miércoles deja de funcionar, con Git se compara exactamente qué línea de código, qué resistencia o qué parámetro mecánico cambió en el camino.
+3. **Seguridad Absoluta (Cero Pérdida de Trabajo)**:  
+   Si una modificación de prueba desestabiliza el motor o rompe la lógica de la bomba, volver al estado anterior 100% estable toma un solo segundo con `git checkout`, sin temor a haber destruido horas de trabajo.
+4. **Trabajo Colaborativo en Paralelo**:  
+   Permite que Enzo supervise y corrija la arquitectura, mientras Antonella y Owen cargan datos de calibración o actualizan manuales, sin pisarse ni duplicar archivos.
+
+---
+
+## 📜 3. Bitácora de Commits Clave y Solución de Problemas (Changelog de Ingeniería)
+
+Esta tabla resume la evolución cronológica del sistema, los desafíos encontrados en el banco de pruebas y las soluciones implementadas:
+
+| Fecha | Commit | Desafío de Ingeniería Encontrado | Solución Técnica Implementada en el Repositorio |
+| :---: | :---: | :--- | :--- |
+| **29/09/2026** | `32a1994` | **Torque Ripple y Ruido en Bajas RPM**: Al operar a $20-35\text{ RPM}$ con manguera de $12\text{ mm}$, el NEMA 34 vibraba por pasos discretos a 1600 pulsos/rev. | Se actualizó `config.h` a **3200 pulsos/rev** (16 micropasos en Leadshine DM860: `SW5=OFF, SW6=OFF, SW7=ON, SW8=ON`), logrando un giro ultrasuave y silencioso. |
+| **28/09/2026** | `d731cdb`<br>`f6ec04f` | **Ruido EMI en Caudalímetros YF-S401**: El chopper de conmutación del motor (3A inductivos) inducía pulsos falsos en los pines con pull-up interno débil ($45\text{ k}\Omega$). | Diseño del **Módulo Front-End** con la segunda bornera ZS-1057: resistencias de pull-up externas de **$4.7\text{ k}\Omega$ a 3.3V** + filtro pasabajos RC con capacitor cerámico de **$100\text{ nF}$**. |
+| **28/09/2026** | `3047a8e`<br>`3f3013a` | **Bloqueo en Inversión de Sentido**: Si el operador presionaba STOP durante la rampa de frenado a 0 RPM para invertir giro, la consigna quedaba huérfana en 0 RPM. | Corrección de la máquina de estados finitos (FSM) de la bomba: fallback seguro a `RPM_INICIO` y totalizador de volumen desacoplado. |
+| **25/09/2026** | `5bfc067`<br>`ed5e8d6` | **Límite de Caudal de la Membrana FX100 ($600\text{ mL/min}$)**: La manguera de $12\text{ mm}$ desplaza $15.4\text{ mL/vuelta}$. A más de 36 RPM se supera el caudal seguro del filtro capilar. | Adaptación de la rampa SCADA a rango $20 - 42\text{ RPM}$, incorporación de alerta visual de caudal crítico y exportador CSV para planillas Excel. |
+| **24/09/2026** | `81949db`<br>`4f47370` | **Sentido de Giro Invertido y Error de Unidades**: Al cablear el DM860 en Cátodo Común, el pin DIR arrancaba en sentido antihorario (retrolavado) y el caudal dividía por 60 dos veces. | Inversión lógica de `PIN_DIR` para arranque en Filtración horaria por defecto y corrección analítica de la ecuación de flujo ($Q = F / K$). |
+| **23/09/2026** | `a0db29c` | **Código Monolítico Inmantenible**: El firmware inicial tenía más de 800 líneas en un solo archivo `.ino`, dificultando el aislamiento de errores. | Refactorización completa en arquitectura modular C++ orientada a objetos: `bomba.cpp`, `caudalimetro.cpp`, `config.h` e `index_html.h`. |
+
+---
+
+## 🗂️ 4. Estructura del Repositorio y Guía de Navegación de Archivos
+
+Cada carpeta tiene un propósito específico en las etapas de la tesis. **Aquí se detalla qué contiene cada una y para qué deben consultarla:**
 
 ```
 SistemaUF/
-├── 📁 00_General_y_P_ID_Planta/                    # 📐 ARQUITECTURA P&ID: Plano Maestro ISA 5.1, Boceto Original e Interactivo
-├── 📁 01_Hito1_Control_Accionamiento_NEMA34_DM860/ # ⚡ HITO 1: Bomba Peristáltica MBP-2000, NEMA 34, DM860, Bornera ESP32 & Web Wi-Fi
-├── 📁 02_Hito2_Instrumentacion_Sensores/           # 📊 HITO 2: Caudalímetros YF-S401, Sonda TDS, DS18B20 y Conversor ADS1115 (16 Bits)
-├── 📁 03_Hito3_Reactor_Sedimentador_Agitador/      # 🌪️ HITO 3: Driver L298N, Paleta PWM, Boya Inox, Gradiente G y Jar Test
-├── 📁 04_Hito4_Integracion_Automatizacion_IoT/     # 🌐 HITO 4: Automatización Integral FSM, Seguridad TMP ≤ 0.50 atm y SCADA
-└── 📁 05_Hito5_Ensayos_Membrana_VidaUtil/          # 🧪 HITO 5: Ensayos de Membrana FX100, Ley de Darcy, Fouling y Tesis Doctoral
+├── 📁 00_General_y_P_ID_Planta/
+├── 📁 01_Hito1_Control_Accionamiento_NEMA34_DM860/
+├── 📁 02_Hito2_Instrumentacion_Sensores/
+├── 📁 03_Hito3_Reactor_Sedimentador_Agitador/
+├── 📁 04_Hito4_Integracion_Automatizacion_IoT/
+├── 📁 05_Hito5_Ensayos_Membrana_VidaUtil/
+└── 📁 Archivado/
 ```
 
+### Detalle de Carpetas:
+
+#### 📐 `00_General_y_P_ID_Planta/`
+* **Contenido**: Planos maestros de instrumentación y tuberías bajo norma ISA 5.1, bocetos originales de ingeniería, dimensionamiento de tanques y el [diagrama_pid_interactivo.html](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html).
+* **¿Para qué leerlo?**: Para entender el flujo global del agua, la ubicación de las válvulas, tomas de presión y balances de materia de toda la planta.
+
+#### ⚡ `01_Hito1_Control_Accionamiento_NEMA34_DM860/`
+* **Contenido**: Toda la ingeniería de impulsión: motor NEMA 34, driver Leadshine DM860, cabezal MBP-2000, cálculo de torque y el [Inventario_Consolidado.md](./01_Hito1_Control_Accionamiento_NEMA34_DM860/01_Hardware_y_Cableado/Inventario_Consolidado.md).
+* **¿Para qué leerlo?**: Para consultar qué componentes tenemos en el laboratorio, qué ferretería falta comprar en Salta, y cómo se calculan las rampas de aceleración.
+
+#### 📊 `02_Hito2_Instrumentacion_Sensores/` *(¡Carpeta en Operación Actual!)*
+* **Contenido**: 
+  - El firmware operativo actual: [`subhito2_2_v2/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v2/) (Cátodo Común, 3200 pulsos/rev, SCADA Web).
+  - La guía de conexión física: [Guia_Montaje_Placa_Filtrado_FrontEnd.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Placa_Filtrado_FrontEnd.md).
+  - El esquema gráfico interactivo: [esquema_conexion_borneras.html](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/esquema_conexion_borneras.html).
+  - Protocolos de calibración de caudalímetros YF-S401, sensor de temperatura DS18B20 y conversor ADS1115 de 16 bits.
+* **¿Para qué leerlo?**: Es la guía práctica para el trabajo diario en el laboratorio, cableado de la segunda bornera y calibración de instrumentos.
+
+#### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/`
+* **Contenido**: Pretratamiento por coagulación-floculación (Jar Test), control del motor de agitación con driver L298N, cálculo del gradiente de velocidad ($G$), paleta normalizada y boya de nivel en acero inoxidable.
+* **¿Para qué leerlo?**: Para preparar los ensayos de dosificación química y acondicionamiento del agua turbia antes de pasar a la membrana.
+
+#### 🌐 `04_Hito4_Integracion_Automatizacion_IoT/`
+* **Contenido**: Automatización centralizada en FreeRTOS, enclavamientos de seguridad por Presión Transmembrana ($\text{TMP} \le 0.50\text{ bar}$) y corte por marcha en seco.
+* **¿Para qué leerlo?**: Para entender cómo el ESP32 coordina todos los subsistemas de forma autónoma sin intervención humana.
+
+#### 🧪 `05_Hito5_Ensayos_Membrana_VidaUtil/`
+* **Contenido**: Modelado fenomenológico del cartucho Fresenius FX100, Ley de Darcy modificada por temperatura (TCF), mecanismos de ensuciamiento (*cake layer*, *pore blocking*) y planillas modelo para la tesis.
+* **¿Para qué leerlo?**: Para redactar los capítulos de resultados experimentales, curvas de permeabilidad y conclusiones de la tesis de grado.
+
+#### 📦 `Archivado/`
+* **Contenido**: Códigos preliminares de prueba, librerías intermedias y documentación obsoleta.
+* **¿Para qué sirve?**: Historial de respaldo; no debe utilizarse en las pruebas activas de laboratorio.
+
 ---
 
-## 🗺️ Mapa de Ruta del Proyecto
+## 📌 5. Asignación Rápida de Pines del ESP32
 
-```mermaid
-flowchart LR
-    P_ID["📐 GENERAL<br>Plano P&ID Maestro"] -. Marco General .-> H1
-    H1["⚡ HITO 1<br>Bomba MBP-2000 & Wi-Fi"] --> H2["📊 HITO 2<br>Sensores & TDS"]
-    H2 --> H3["🌪️ HITO 3<br>Reactor L298N & Boya"]
-    H3 --> H4["🌐 HITO 4<br>SCADA & Enclavamientos"]
-    H4 --> H5["🧪 HITO 5<br>Ensayos FX100 & Tesis"]
-```
-
-
----
-
-## ⚡ Resumen Rápido de Pines del ESP32 (38 Pines)
-
-| Pin ESP32 | Función en Planta | Tipo de Señal | Componente Asociado |
-| :--- | :--- | :--- | :--- |
-| **GPIO 18** | Pulsos STEP (LEDC Hardware) | Salida Digital PWM | Driver Leadshine DM860 (PUL+) |
-| **GPIO 19** | Dirección de Giro (CW/CCW) | Salida Digital | Driver Leadshine DM860 (DIR+) |
-| **GPIO 4** | Velocidad Paleta Agitadora | Salida PWM | Driver L298N (Pin ENA) |
-| **GPIO 16** | Sentido de Giro Agitador A | Salida Digital | Driver L298N (Pin IN1) |
-| **GPIO 17** | Sentido de Giro Agitador B | Salida Digital | Driver L298N (Pin IN2) |
-| **GPIO 32** | Boya de Nivel (Seguridad) | Entrada Digital Pull-Up | Sensor Nivel Acero Inoxidable |
-| **GPIO 34** | Sensor Temperatura | Protocolo OneWire | Sonda Sumergible DS18B20 |
-| **GPIO 27** | Caudal Permeado ($Q_p$) | Interrupción por Pulsos | Caudalímetro YF-S401 |
-| **GPIO 14** | Caudal Retentado ($Q_c$) | Interrupción por Pulsos | Caudalímetro YF-S401 |
-| **GPIO 21** | I2C SDA (Datos) | Bus de Comunicación | Conversor ADS1115 (16 Bits) |
-| **GPIO 22** | I2C SCL (Reloj) | Bus de Comunicación | Conversor ADS1115 (16 Bits) |
+| Pin ESP32 | Función Operativa | Tipo de Señal | Conexión Física de Destino |
+| :---: | :--- | :--- | :--- |
+| **GPIO 18** | Pulsos STEP Bomba (LEDC) | Salida Digital | Driver Leadshine DM860 (`PUL+` / Cátodo Común) |
+| **GPIO 19** | Dirección de Giro (CW/CCW) | Salida Digital | Driver Leadshine DM860 (`DIR+` / Cátodo Común) |
+| **GPIO 14** | Caudalímetro FEED (Entrada) | Interrupción IRAM | Placa 2 Front-End (Borne P14 filtrado con RC) |
+| **GPIO 27** | Caudalímetro PERMEADO | Interrupción IRAM | Placa 2 Front-End (Borne P27 filtrado con RC) |
+| **GPIO 4** | Sensor Temperatura DS18B20 | Bus 1-Wire Digital | Placa 2 Front-End (Borne P4 con Pull-Up $4.7\text{ k}\Omega$) |
+| **GPIO 32** | Boya de Nivel Inox (Corte) | Entrada Digital Pull-Up | Placa 2 Front-End (Borne P32 con capacitor 100nF) |
+| **GPIO 21** | I2C SDA (Datos) | Bus I2C a 400 kHz | Conversor ADC 16-Bit ADS1115 (Pin SDA) |
+| **GPIO 22** | I2C SCL (Reloj) | Bus I2C a 400 kHz | Conversor ADC 16-Bit ADS1115 (Pin SCL) |
+| **GPIO 16/17** | Sentido Agitador Jar Test | Salidas Digitales | Driver L298N (Pines IN1 e IN2) |
+| **GPIO 5** | Velocidad Agitador (PWM) | Salida PWM 1 kHz | Driver L298N (Pin ENA) |
 
 ---
 
-## 🚀 Cómo Empezar a Trabajar
-1. Navega a la carpeta del hito en el que estés trabajando (ej. [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/)).
-2. Lee el archivo `README.md` de esa carpeta para comprender los fundamentos físicos y las conexiones.
-3. Abre el archivo de firmware `.ino` en Arduino IDE y súbelo al ESP32.
-4. Consulta el entregable y completa cada casilla de la lista de verificación para certificar el avance de tu tesis.
+> 📖 **Nota Metodológica**: Cada hito posee su propio archivo `README.md` interno donde se profundiza en las ecuaciones físico-químicas, diagramas de flujo y rutinas de calibración específicas.

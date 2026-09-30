@@ -12,7 +12,7 @@ constexpr uint8_t PIN_SENSOR_PERM = 27;  // Caudalímetro PERMEADO
 
 // ---- BOMBA PERISTÁLTICA ----
 // Desplazamiento nominal manguera 12mm: 15.4 mL/rev (se recalibra en P6 con probeta)
-constexpr uint16_t PULSOS_POR_REV   = 1600;      // ⚠️ IGUAL a los DIP SW5-SW8 del DM860 (3200 si 16 micropasos)
+constexpr uint16_t PULSOS_POR_REV   = 3200;      // ⚠️ IGUAL a los DIP SW5-SW8 del DM860 (3200 para 16 micropasos)
 constexpr float ML_POR_VUELTA       = 15.4f;     // mL por giro del cabezal
 constexpr float RPM_MIN             = 20.0f;     // 308 mL/min (mín. sensor: 300)
 constexpr float RPM_MAX             = 100.0f;    // máx exploratorio con agua
