@@ -56,6 +56,7 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 
 | Fecha | Commit | Desafío de Ingeniería Encontrado | Solución Técnica Implementada en el Repositorio |
 | :---: | :---: | :--- | :--- |
+| **30/09/2026** | *(Actual)* | **Ruido de 81 Hz (835.5 mL/min) en Reposo e Inversión de Canales**: Con bomba detenida, Feed registraba 81.9 Hz constante por acoplamiento de zumbido de 50 Hz/100 Hz que saturaba el filtro ISR de 12 ms ($1/0.0122\text{ s} \approx 81.9\text{ Hz}$). Además, los datasets del CSV revelaron $Q_{\text{perm}} \gg Q_{\text{feed}}$ ($627\text{ mL/min}$ en P27 vs $0\text{ mL/min}$ en P14). | Se documentó formalmente el modelado matemático para la tesis en [Diagnostico_y_Resolucion_Problemas_Instrumentacion.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md). Se activó `INPUT_PULLUP` interno como doble barrera en firmware, se corrigió el cruce de cables amarillos de señal entre borneras y se protocolizó el filtro RC ($4.7\text{ k}\Omega + 100\text{ nF}$) y masa común rígida ($0.0\ \Omega$). |
 | **29/09/2026** | `32a1994` | **Torque Ripple y Ruido en Bajas RPM**: Al operar a $20-35\text{ RPM}$ con manguera de $12\text{ mm}$, el NEMA 34 vibraba por pasos discretos a 1600 pulsos/rev. | Se actualizó `config.h` a **3200 pulsos/rev** (16 micropasos en Leadshine DM860: `SW5=OFF, SW6=OFF, SW7=ON, SW8=ON`), logrando un giro ultrasuave y silencioso. |
 | **28/09/2026** | `d731cdb`<br>`f6ec04f` | **Ruido EMI en Caudalímetros YF-S401**: El chopper de conmutación del motor (3A inductivos) inducía pulsos falsos en los pines con pull-up interno débil ($45\text{ k}\Omega$). | Diseño del **Módulo Front-End** con la segunda bornera ZS-1057: resistencias de pull-up externas de **$4.7\text{ k}\Omega$ a 3.3V** + filtro pasabajos RC con capacitor cerámico de **$100\text{ nF}$**. |
 | **28/09/2026** | `3047a8e`<br>`3f3013a` | **Bloqueo en Inversión de Sentido**: Si el operador presionaba STOP durante la rampa de frenado a 0 RPM para invertir giro, la consigna quedaba huérfana en 0 RPM. | Corrección de la máquina de estados finitos (FSM) de la bomba: fallback seguro a `RPM_INICIO` y totalizador de volumen desacoplado. |
@@ -92,11 +93,13 @@ SistemaUF/
 
 #### 📊 `02_Hito2_Instrumentacion_Sensores/` *(¡Carpeta en Operación Actual!)*
 * **Contenido**: 
+  - 🩺 **[Diagnostico_y_Resolucion_Problemas_Instrumentacion.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento para tesis**. Análisis matemático y físico de la saturación a 81 Hz (835.5 mL/min), solución al zumbido de 50 Hz/100 Hz, filtro pasabajos RC y resolución del cruce de canales.
   - El firmware operativo actual: [`subhito2_2_v2/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v2/) (Cátodo Común, 3200 pulsos/rev, SCADA Web).
   - La guía de conexión física: [Guia_Montaje_Placa_Filtrado_FrontEnd.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Placa_Filtrado_FrontEnd.md).
   - El esquema gráfico interactivo: [esquema_conexion_borneras.html](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/esquema_conexion_borneras.html).
+  - 📁 [Datos/](./02_Hito2_Instrumentacion_Sensores/Datos/): Registros CSV reales exportados en banco de pruebas.
   - Protocolos de calibración de caudalímetros YF-S401, sensor de temperatura DS18B20 y conversor ADS1115 de 16 bits.
-* **¿Para qué leerlo?**: Es la guía práctica para el trabajo diario en el laboratorio, cableado de la segunda bornera y calibración de instrumentos.
+* **¿Para qué leerlo?**: Es la guía práctica para el trabajo diario en el laboratorio, cableado de la segunda bornera, calibración de instrumentos y análisis de fallas para la redacción de la tesis.
 
 #### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/`
 * **Contenido**: Pretratamiento por coagulación-floculación (Jar Test), control del motor de agitación con driver L298N, cálculo del gradiente de velocidad ($G$), paleta normalizada y boya de nivel en acero inoxidable.

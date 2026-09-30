@@ -64,13 +64,22 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 ## 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
 * 📁 **[`01_Guias_Montaje_y_Calibracion/`](./01_Guias_Montaje_y_Calibracion/)**:
+  * 🩺 **[`Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento formal para tesis**. Diagnóstico de causas raíz del ruido de 81 Hz (835.5 mL/min), demostración matemática del filtro software, solución RC en Placa 2, corrección de inversión de canales y protocolo de ensayos.
+  * 🔌 **[`Guia_Montaje_Placa_Filtrado_FrontEnd.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Placa_Filtrado_FrontEnd.md)**: Manual de conexionado físico paso a paso de las 2 borneras ZS-1057 (Placa 1 Master ESP32 + Placa 2 Acondicionamiento RC).
+  * 🖥️ **[`esquema_conexion_borneras.html`](./01_Guias_Montaje_y_Calibracion/esquema_conexion_borneras.html)**: Esquema interactivo gráfico de terminales con lupa SVG y comparador pull-up 3.3V vs 5V.
   * 🌊 **[`Guia_Subhito2_1_Caudalimetros.md`](./01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md)**: Conexión, factor K (98 pulsos/L), monitoreo serie y calibración gravimétrica del YF-S401.
   * 🚰 **[`Guia_Montaje_Hidraulico_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md)**: Instalación física de caudalímetros y sondas en tubería con entregable y checklist.
   * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
+
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🌊 **[`subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino)**: Firmware modular de prueba para Subhito 2.1 con interrupciones por hardware y comandos interactivos de bomba MBP-2000.
-  * 🚀 **[`subhito2_2_v2/subhito2_2_v2.ino`](./02_Firmware_Test_Sensores/subhito2_2_v2/subhito2_2_v2.ino)**: **Firmware Modular V2 (Cátodo Común + Web SCADA)**: Arquitectura orientada a objetos (Bomba y Caudalímetro) con triple filtro anti-ruido, Wi-Fi dual (AP + STA) y servidor HTTP asíncrono.
-  * 💻 **[`firmware_sensores_test/firmware_sensores_test.ino`](./02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino)**: Sketch integral multivariable de adquisición de datos en tiempo real y transmisión serie en formato CSV.
+  * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: **Firmware Operativo Actual**: Driver Leadshine DM860 en Cátodo Común, 3200 pulsos/rev (16 micropasos), `INPUT_PULLUP` redundante, Web SCADA interactivo (`http://192.168.4.1` / `http://bomba.local`) y exportador CSV.
+  * 🌊 **[`subhito2_1_caudalimetros/`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/)**: Firmware básico de prueba para Subhito 2.1 con interrupciones por hardware.
+  * 💻 **[`firmware_sensores_test/`](./02_Firmware_Test_Sensores/firmware_sensores_test/)**: Sketch integral multivariable de adquisición de datos en tiempo real y transmisión serie.
+
+* 📁 **[`Datos/`](./Datos/)**:
+  * 📑 **[`datos_planta_uf_2026-09-30.csv`](./Datos/datos_planta_uf_2026-09-30.csv)**: Telemetría cruda en banco a 50–94 RPM donde se diagnosticó la inversión física de sensores (Q_Perm registrando 627 mL/min vs Q_Feed en 0).
+  * 📑 **[`datos_planta_uf_2026-09-30 (1).csv`](./Datos/datos_planta_uf_2026-09-30 (1).csv)**: Ensayo de verificación a 25, 36, 50, 74 y 80 RPM.
+
 
 
 
