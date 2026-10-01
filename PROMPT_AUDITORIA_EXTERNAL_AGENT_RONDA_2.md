@@ -11,25 +11,56 @@
 **Interlocutores:** Antigravity (Google DeepMind), Ing. Enzo (Co-director Doctoral), Antonella Guitián & Owen Cañizares (Tesistas UNSa).  
 **Contexto del Proyecto:** Planta Piloto de Ultrafiltración Tangencial (*Cross-Flow*) con Dializador Capilar Fresenius FX100 (Helixone®), bomba peristáltica industrial MBP-2000 (NEMA 34 + DM860) y microcontrolador ESP32.
 
+## 🏭 1. Contexto Físico del Sistema, Hardware y Restricciones Duras
+
+1. **El Proceso Físico:** Planta Piloto de Ultrafiltración tangencial (*cross-flow*) para una investigación doctoral y tesis de grado (Universidad Nacional de Salta, Argentina).
+   - **Módulo de Membrana:** Cartucho capilar **Fresenius FX100** de fibra hueca de Polisulfona modificada (**Helixone®** nanométrico).
+     - Superficie interfacial activa: **$2.2\text{ m}^2$**.
+     - Coeficiente de ultrafiltración nominal: **$K_{\text{UF}} = 73\text{ mL/(h}\cdot\text{mmHg)}$** (régimen de alto flujo / *high-flux*).
+     - Geometría de capilares: Diámetro interno $d_i = 185\ \mu\text{m}$, espesor de pared $\delta = 35\ \mu\text{m}$, longitud efectiva $L \approx 0.28\text{ m}$ ($\approx 13,500$ capilares en paralelo).
+     - Presión transmembrana máxima de seguridad: **$\text{TMP} \le 0.50\text{ bar}$** ($\text{TMP} = \frac{P_1 + P_2}{2} - P_3$).
+   - **Dinámica del Proceso Tangencial:** El fluido ingresa axialmente por el lumen de los capilares. Una fracción filtra a través de las paredes como permeado clarificado ($Q_{\text{perm}}$), y el resto sale axialmente como retentado ($Q_{\text{ret}} = Q_{\text{alim}} - Q_{\text{perm}}$) hacia una válvula manual de aguja que regula la contrapresión axial y fija la TMP.
+   - **Fluido de Ensayo:** Agua turbia y suspensiones coloidales tratadas previamente por coagulación-floculación con mucílago natural de *Opuntia ficus-indica*.
+2. **Subsistema de Impulsión y Bombeo:**
+   - Motor paso a paso industrial **NEMA 34 (4.5 Nm)**.
+   - Driver industrial **Leadshine DM860** configurado en **Cátodo Común** (PUL- y DIR- a GND común; GPIO 18 PUL+ y GPIO 19 DIR+ envían pulsos a 3.3V).
+   - Cabezal peristáltico industrial **MBP-2000** de 3 rodillos con manguera de silicona de $12\text{ mm}$ de diámetro interno.
+   - **Cilindrada Real Calibrada con Probeta:** **$13.6000\text{ mL/vuelta}$** ($680\text{ mL/min}$ a $50.0\text{ RPM}$).
+   - Resolución del driver: **3200 micropasos/rev** (1/16 micropasos) para eliminar resonancia armónica y torque ripple.
+   - **RESTRICCIÓN MECÁNICA INVIOLABLE:** La bomba peristáltica y el cabezal **NO deben desmontarse, modificarse ni intervenirse mecánicamente**.
+3. **Subsistema de Instrumentación (Caudalímetros):**
+   - Sensores de turbina con transistor Hall en colector abierto (**YF-S401**):
+     - `PIN_SENSOR_ALIMENTACION = 14` (Impulsión de bomba).
+     - `PIN_SENSOR_PERMEADO = 27` (Permeado filtrado).
+   - **Arquitectura de Doble Bornera Shield (ZS-1057):**
+     - Placa 1: ESP32 DevKit V1 (Master).
+     - Placa 2: Módulo Front-End pasivo. Contiene resistencias pull-up externas de **$4.7\text{ k}\Omega$ a 3.3V** y capacitores cerámicos pasabajos de **$100\text{ nF}$ a GND** ($f_c \approx 338\text{ Hz}$).
+     - *Antecedente resuelto:* Se erradicó un falso caudal de 81 Hz (835 mL/min) con bomba detenida provocado por el acople capacitivo de 50/100 Hz de la red eléctrica sobre cables DuPont largos; el front-end físico redujo la impedancia de línea ($4.7\text{ k}\Omega$ dominando sobre los $35\text{ k}\Omega$ internos del sensor) y el blanking software se redujo de 12 ms a 1.5 ms.
+   - **Factores K Calibrados:** $K_{\text{alim}} = 154.62$ ($105.14\text{ Hz} = 680\text{ mL/min}$) y $K_{\text{perm}} = 55.00$ ($5.50\text{ Hz} = 100\text{ mL/min}$).
+
 ---
 
-## 📋 1. Retroalimentación de la Ronda 1 y Aclaración Experimental Clave
+## 📋 2. Antecedentes de la Ronda 1 y Aclaración Experimental del Ing. Enzo
 
-Agradecemos y validamos el dictamen unánime de la primera ronda de auditoría. Sus observaciones sobre la inconsistencia de caudal ($44.12\text{ RPM} = 600\text{ mL/min}$ con $13.60\text{ mL/rev}$), el bug de consigna en la inversión de marcha, la fragmentación de heap por concatenación de `String` y el error de cuantización a bajo caudal en el permeado ($5.5\text{ Hz} \rightarrow \pm 18\%$) fueron sumamente precisas y fundamentadas.
+En la primera ronda de auditoría técnica externa, un panel de revisores seniors (Astra, Claude, GLM-5.3 y Modelo B) auditó la versión anterior (**v3**) e identificó 4 vulnerabilidades críticas:
+1. **Inconsistencia de Caudal vs. RPM:** Con $13.60\text{ mL/rev}$, el límite de $600\text{ mL/min}$ corresponde a **$44.12\text{ RPM}$**, no a 36 RPM. Y dejar `RPM_MAX = 75` permitía consignas de hasta $1020\text{ mL/min}$ ($1.7\times$ el límite de membrana).
+2. **Bug en Máquina de Estados de Inversión:** Si el usuario movía el slider web mientras la bomba desaceleraba para invertir marcha, `setRPM()` pisaba `_objetivo = 0.0f` y la rampa quedaba trabada frenando indefinidamente sin invertir. Además, pulsar STOP dejaba la consigna en 0 huérfana.
+3. **Fragmentación Severa de Heap:** El firmware construía JSONs gigantescos mediante concatenación de la clase `String` (`json += String(...)`) cada 500 ms en `/status` y generaba miles de allocs dinámicos en `/export_csv`, amenazando con provocar `kernel panic / alloc failed` tras 2 a 4 horas de ensayo continuo.
+4. **Cuantización a Bajo Caudal en Permeado:** A $100\text{ mL/min}$, la turbina YF-S401 entrega apenas $5.5\text{ Hz}$ (~5 pulsos/segundo). En una ventana fija de 1 segundo, la fluctuación de un solo pulso introducía un error de $\pm 18\%$.
 
 ### ⚠️ Aclaración Fundamental del Co-Director (Ing. Enzo) sobre el Límite de RPM:
-1. **Límite Clínico vs. Límite de Tesis de Ingeniería:**
-   El límite estricto de **$600\text{ mL/min}$** ($\approx 44.12\text{ RPM}$) es una especificación médica diseñada para **hemodiálisis con sangre humana** (evitar hemólisis de eritrocitos y colapso venoso).
-2. **Experimentación en la Tesis con Agua y Soluciones Modelo:**
-   En este proyecto doctoral y de grado se trabaja con agua y suspensiones modelo tratadas con mucílago coagulante de *Opuntia ficus-indica*. El laboratorio cuenta con disponibilidad de membranas para realizar ensayos de caracterización hidrodinámica severa y **diseño factorial de experimentos**.
-3. **Decisión de Diseño en Firmware v4:**
-   - Se eleva **`RPM_MAX` a $100.0\text{ RPM}$** ($\approx 1360\text{ mL/min}$ / $1.36\text{ L/min}$).
-   - Se preserva el umbral de **$44.0\text{ RPM}$** como **`RPM_ALARMA_MEMBRANA`** (aviso visual en UI y registro de telemetría indicando superación del régimen clínico nominal).
-   - Se mantiene la consigna de arranque suave en **$25.0\text{ RPM}$** ($\approx 340\text{ mL/min}$).
+- **Límite Clínico con Sangre vs. Tesis de Ingeniería con Agua:**  
+  El límite de **$600\text{ mL/min}$** ($\approx 44.12\text{ RPM}$) es un estándar médico para **hemodiálisis con sangre de pacientes** para prevenir hemólisis y daño celular.
+- **Experimentación en la Tesis:**  
+  En este proyecto se filtra agua y suspensiones modelo tratadas con *Opuntia*. El laboratorio cuenta con múltiples dializadores FX100 disponibles para ensayos severos, desgaste y **diseño factorial de experimentos**.
+- **Decisión de Diseño adoptada para la Versión 4:**
+  - Se eleva **`RPM_MAX` a $100.0\text{ RPM}$** ($\approx 1360\text{ mL/min}$ / $1.36\text{ L/min}$) para cubrir el espacio experimental del diseño factorial.
+  - Se establece **`RPM_ALARMA_MEMBRANA = 44.0f`** ($\approx 600\text{ mL/min}$) como alarma visual preventiva en la interfaz web y telemetría.
+  - Se fija la consigna de arranque suave en **`RPM_INICIO = 25.0f`** ($\approx 340\text{ mL/min}$).
 
 ---
 
-## 🛠️ 2. Código Fuente Refactorizado Completo — Versión 4 (`subhito2_2_v4`)
+## 🛠️ 3. Código Fuente Refactorizado Completo — Versión 4 (`subhito2_2_v4`)
 
 Se ha estructurado la nueva versión **v4** incorporando todas las soluciones a los hallazgos críticos de la Ronda 1:
 
@@ -356,7 +387,7 @@ private:
 
 ---
 
-## 🎯 3. Preguntas de Auditoría para la Ronda 2
+## 🎯 4. Preguntas de Auditoría para la Ronda 2
 
 Como auditor externo senior, solicitamos tu evaluación técnica sobre los siguientes puntos:
 
