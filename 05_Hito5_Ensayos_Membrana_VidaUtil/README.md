@@ -68,6 +68,7 @@ $$FRR (\%) = \left(\frac{J_{\text{post-lavado}}}{J_{\text{inicial}}}\right) \tim
 
 ## 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
+* 🗺️ **[`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](../HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md)**: **Documento Maestro de Ingeniería**. Detalle de la matriz factorial completa $3^2$ (11 ensayos con 3 puntos centrales), determinación de flujo crítico $J_c$ por método escalonado, modelado de compresibilidad coloidal $\alpha = \alpha_0 (\Delta P)^n$, y protocolos de limpieza física y química con NaOCl.
 * 📁 **[`01_Protocolo_Ensayos_Darcy_y_Fouling/`](./01_Protocolo_Ensayos_Darcy_y_Fouling/)**:
   * 🧪 **[`Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md)**: Protocolo científico exhaustivo de ensayos de ultrafiltración, factor de temperatura TCF, resistencias en serie y tabla comparativa del Código Alimentario Argentino (CAA).
 * 📁 **[`02_Planillas_y_Datos_Tesis/`](./02_Planillas_y_Datos_Tesis/)**:

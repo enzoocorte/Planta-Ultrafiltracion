@@ -75,7 +75,11 @@ Para avanzar con método científico y validación segura paso a paso en el banc
   * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
 
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: **HITO 2.2 V3 — CONSOLIDACIÓN DE PRODUCCIÓN**:
+  * 🚀 **[`subhito2_2_v4/`](./02_Firmware_Test_Sensores/subhito2_2_v4/)**: **HITO 2.2 V4 — FIRMWARE BLINDADO (HARDENED) & AUDITORÍA IA**:
+    * 🛡️ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/)**: Firmware optimizado con período recíproco de pulsos (<0.1% a 5.5 Hz), protección ante desbordes de `micros()`, rampa hasta 100 RPM para diseño factorial, módulo físico de Darcy embebido (`darcy.h`) y cero fragmentación de heap.
+    * 🤖 **[`AuditoriaIA/`](./02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/)**: Dictámenes técnicos y auditoría cruzada de ChatGPT 6 Astra, GLM 5.3 y Claude Sonnet 5 (FreeRTOS, ADS1115, seguridad física y Darcy).
+    * 🗺️ **[`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](../../HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md)**: Plan maestro de transición hacia Hito 2.3 (FreeRTOS dual-core) e Hito 5 (Ensayos de ultrafiltración y diseño factorial).
+  * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: **HITO 2.2 V3 — CONSOLIDACIÓN DE BANCO (ACTUAL EN ESP32)**:
     * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/)**: **FIRMWARE ACTIVO EN OPERACIÓN (Compilado y grabado en ESP32)**. Auto-calibración con probeta, Flash NVS permanente (`Preferences.h`), filtro anti-ruido a 2000 µs, datalogger de 600 muestras y Web SCADA en SoftAP puro (`192.168.4.1`).
     * 💻 **[`firmware_esp32_platformio/`](./02_Firmware_Test_Sensores/subhito2_2_v3/firmware_esp32_platformio/)**: Entorno de compilación incremental rápida con PlatformIO Core CLI.
     * ⚡ **[`scripts_compilacion_rapida/`](./02_Firmware_Test_Sensores/subhito2_2_v3/scripts_compilacion_rapida/)**: Accesos directos `.bat` para compilar, subir y abrir el monitor serie en 3 segundos.

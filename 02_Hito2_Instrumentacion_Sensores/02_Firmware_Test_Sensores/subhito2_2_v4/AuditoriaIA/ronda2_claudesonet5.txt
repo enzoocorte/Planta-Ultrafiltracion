@@ -1,0 +1,435 @@
+# Auditoría Técnica Externa, Ronda 2
+
+**Auditor:** Claude (Anthropic) · **Destinatarios:** Antigravity, Ing. Enzo, Antonella, Owen
+
+**Alcance:** solo veo los extractos de v4 que me pasaron. No vi `handleStatus()` ni `handleExportCSV()` completos, así que sobre heap valido el patrón y no el código. Antigravity debería enviármelos.
+
+---
+
+## 0. Correcciones a mi respuesta anterior (leer antes de implementar)
+
+Al releer mi propia respuesta encontré errores que, copiados tal cual, les habrían causado problemas. Esta versión los reemplaza.
+
+| # | Lo que dije antes | Corrección |
+|---|---|---|
+| 1 | ADS1115: `cfg \|= (ch & 3) << 12` | **Bug mío.** Eso selecciona pares *diferenciales*, no single-ended. Lo correcto es `(4 + ch) << 12`, que da `0xC383, 0xD383, 0xE383, 0xF383` para 128 SPS. |
+| 2 | Supervisor con `modoMembrana() && Q > Q_TRIP (620)` | **Contradice la decisión del Ing. Enzo** (RPM_MAX = 100). El caudal pasa a ser alarma. Los trips deben depender de presión (ver §3). |
+| 3 | `procesarComandos()` descartaba comandos con más de 500 ms de latencia | **Peligroso:** descartaba también DETENER. STOP y EMERGENCIA no pasan por la cola (ver §2). |
+| 4 | Snapshot con spinlock "puede quedar semi-actualizado"; "doble buffer" con `g_snapIdx` | **Falso.** Con spinlock en ambos lados la copia es atómica. Mi "doble buffer" nunca alternaba el índice. |
+| 5 | Retención del recíproco: bajar a `≤ 1×período` | **Empeora el problema:** con jitter produce falsos ceros. La solución correcta es una cota continua (§1.2). |
+| 6 | Bajar `FILTRO_RUIDO_US` a 800 µs ("rebotes de contacto") | **Retirado.** Un Hall NPN no tiene rebote mecánico. El problema histórico era el acople de red, y menos blanking es menos protección. Mantener 1500 µs: a 1360 mL/min hay ~210 Hz (período 4.8 ms), con margen 3×. |
+| 7 | Ecuación `TMP = (P1+P2)/2 − P3 = (…)/2` | Typo mío. La correcta es solo `TMP = (P1+P2)/2 − P3`. |
+| 8 | Python: "α = exponente de Hermia… 0.5 estándar, 2.0 incompresible" | **Incorrecto.** Hermia: n = 2 bloqueo completo, 1.5 estándar, 1 intermedio, 0 torta. La compresibilidad de torta es `s` en `α = α₀·TMP^s` (0 incompresible, ~1 muy compresible). |
+| 9 | Retrolavado "invirtiendo la bomba" | **Físicamente incorrecto** (ver §5.4). |
+| 10 | CIP "0.5 M NaOH + citrato", almacenamiento "20 % etanol + timol", coagulante "0.1–1 %" | Valores inventados o poco realistas. Reemplazados en §5.4. |
+| 11 | (Turno del WROOM) "loopTask corre en Core 0" | **Error.** En Arduino-ESP32 `loopTask` corre en **Core 1**. Wi-Fi corre en Core 0. |
+| 12 | (Turno del WROOM) `FALLING \| ESP_INTR_FLAG_IRAM` en `attachInterruptArg` | **No funciona:** ese argumento es el tipo de flanco, no flags de interrupción. Ver §2.4. |
+| 13 | (Turno del WROOM) "~3 A a 5 V", tabla de particiones, `#include "planta_rt.cpp"` | El motor se alimenta desde la fuente DC del DM860, no del riel de 5 V. No usen mi tabla de particiones: verifiquen con *Tools → Partition Scheme*. No incluyan `.cpp` desde el `.ino`. |
+
+---
+
+## 1. Validación de v4 (Pregunta A)
+
+### 1.1 Veredicto por ítem
+
+| Ítem | Veredicto |
+|---|---|
+| Bug de inversión | ✅ **Resuelto lógicamente.** Trazé los caminos: `setRPM` durante inversión, `detener` durante inversión y `arrancar` posterior. `_rpmGuardada` se preserva y `_objetivo` se restaura. |
+| Cuantización del permeado | ⚠️ **Mejorada, pero con 4 defectos** (§1.2) |
+| Fragmentación de heap | ⚠️ **Patrón correcto, no demostrado** (§1.3) |
+
+**Observaciones sobre la inversión:**
+- STOP durante una inversión detiene la bomba sin haber invertido. Es aceptable, pero documéntenlo en la UI.
+- La desaceleración de inversión usa el camino de "ajuste" (8 RPM/s). Desde 100 RPM son más de 12 s. Es suave para la manguera, y yo preferiría esto a frenar a 45 RPM/s. Retiro mi sugerencia anterior de usar `FRENADO_PARADA` al invertir.
+- Falta una **pausa de 300–500 ms en cero** antes de `fijarSentido()`. Hoy el DIR conmuta y 50 ms después ya hay pulsos.
+- Recomiendo un **test en PC** de `Bomba::tick()` con stubs de `ledc*`. Es barato y cubre estos casos: setRPM en inversión, stop en inversión, toggle doble, `setRPM(NAN)` y arrancar después de stop.
+
+### 1.2 Conteo recíproco: escenarios de borde
+
+**Respuesta a la pregunta A.2.** La retención de 2.5 períodos introduce *retardo*, no falsos ceros:
+
+| f real | Período | Con v4 tras una parada real |
+|---|---|---|
+| 5.5 Hz (100 mL/min) | 182 ms | La retención **nunca actúa**: una ventana de 1 s vacía ya implica parada. Detección ≤ 1 s. |
+| 1 Hz (~18 mL/min) | 1 s | Lectura fantasma hasta **2.5 s** |
+| 0.3 Hz (~5.5 mL/min) | 3.3 s | Lectura fantasma hasta **8 s** |
+
+Además, `_f > 0.1` en la rama de retención reinicia `_segSinPulso`, así que enmascara la detección de falla.
+
+**Defectos concretos en v4:**
+1. **Wrap de `micros()`:** `t_ult > t_prim` es falso si la ventana cruza el desborde (cada 71.6 min). Entonces ninguna rama se ejecuta y `_f` queda obsoleta ese tick. Corrección: resta modular sin comparar. (Antes dije que no había riesgo, y me equivoqué: miré la resta pero no la comparación.)
+2. **Se descarta el período entre ventanas.** Usar `t_ult − t_prim` con `n−1` períodos pierde información. Es mejor guardar el último flanco de la ventana anterior como referencia (`_tRef`) y medir `n` períodos completos.
+3. **`_periodo_us` tras un reposo largo** vale segundos o minutos, así que el primer pulso del arranque da una `f` espuria.
+4. **Ceros tardíos.** Hay que reemplazar el "retener y caer a cero" por una cota física continua: si pasó un tiempo `t` sin flanco, `f ≤ 1/t`.
+
+**Observación metrológica:** `fallo` del permeado con "bomba empujando y 0 pulsos" **no es una falla de sensor**. Es flujo cero (membrana saturada, TMP bajo) o caudal bajo la zona muerta de la turbina. Usen `sinSenal()` como interlock **solo para alimentación**.
+
+**Reemplazo propuesto (`caudalimetro.cpp`):**
+
+```cpp
+// caudalimetro.h — miembros
+volatile uint32_t _pulsos = 0, _t_primero = 0, _t_ultimo = 0;  // escribe la ISR
+uint32_t _tRef = 0;        // último flanco ya contabilizado (solo lector)
+bool     _refValida = false;
+uint32_t _timeoutUs;       // ctor: 2'000'000 feed / 5'000'000 permeado
+uint16_t _descartes = 0;   // reemplaza el Serial.printf dentro de la tarea de control
+
+// ISR
+void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
+  auto* c = static_cast<Caudalimetro*>(arg);
+  const uint32_t t = micros();
+  if ((uint32_t)(t - c->_t_ultimo) < FILTRO_RUIDO_US) return;
+  portENTER_CRITICAL_ISR(&c->_mux);
+  if (c->_pulsos == 0) c->_t_primero = t;
+  c->_t_ultimo = t;
+  c->_pulsos++;
+  portEXIT_CRITICAL_ISR(&c->_mux);
+}
+
+void Caudalimetro::actualizar(bool bombaEmpuja) {
+  uint32_t n, tPrim, tUlt;
+  portENTER_CRITICAL(&_mux);
+  n = _pulsos; tPrim = _t_primero; tUlt = _t_ultimo; _pulsos = 0;
+  portEXIT_CRITICAL(&_mux);
+  const uint32_t ahora = micros();
+
+  if (n > 0) {
+    // Restas modulares: correctas a través del wrap de micros()
+    const uint32_t periodos = _refValida ? n : n - 1;
+    const uint32_t span     = _refValida ? (tUlt - _tRef) : (tUlt - tPrim);
+    bool valido = true;
+    if (periodos > 0 && span > 0) {
+      const float f = (float)periodos * 1.0e6f / (float)span;
+      if (f * 1000.0f / _k <= Q_MAX_FISICO_MLMIN) _f = f;
+      else { valido = false; _descartes++; }
+    }
+    if (valido) _vol += (float)n / (_k * 60.0f);
+    _tRef = tUlt; _refValida = true;
+  } else if (_refValida) {
+    const uint32_t sin = ahora - _tRef;
+    if (sin > _timeoutUs) { _f = 0.0f; _refValida = false; }
+    else if (_f > 0.0f) {                         // cota física: f <= 1/tiempo sin flanco
+      const float cota = 1.0e6f / (float)sin;
+      if (cota < _f) _f = cota;
+    }
+  } else {
+    _f = 0.0f;
+  }
+
+  const float q = _f * 1000.0f / _k;
+  _q += 0.5f * (q - _q);                          // la recíproca ya promedia; EMA liviana
+  if (_f == 0.0f && _q < 0.5f) _q = 0.0f;
+
+  if (n > 0)            { _segSinPulso = 0; _fallo = false; }
+  else if (bombaEmpuja) { if (++_segSinPulso >= 5) _fallo = true; }
+  else                  { _segSinPulso = 0; _fallo = false; }
+}
+```
+
+**Dos cuestiones físicas adicionales:**
+- **Pulsación peristáltica.** Un cabezal de 3 rodillos pulsa a `3·RPM/60` Hz: 1.25 Hz a 25 RPM y 5 Hz a 100 RPM. Una ventana fija de 1 s no contiene un número entero de ciclos, y eso mete un error periódico en `Q_alim`, y también en las presiones. Mitigaciones: promediar sobre ≥ 5 ciclos (EMA con τ ≈ 3–5 s para métricas lentas) o ventanas múltiplo de `1/(3·RPM/60)`. Un **amortiguador de pulsos** en la línea de impulsión (no toca el cabezal) protegería además al módulo de picos de presión.
+- **K no lineal.** K_alim = 154.6 y K_perm = 55 difieren 2.8× entre unidades del mismo modelo (el nominal del YF-S401 ronda 98). Eso indica fuerte no linealidad a bajo caudal. El permeado necesita curva K(f) por tramos con referencia gravimétrica, y hay que medir el caudal mínimo al que la turbina deja de girar.
+
+### 1.3 Heap
+
+El patrón de v4 (`snprintf` sobre buffer estático, CSV chunked, métricas de heap en `/status`) es el correcto. Tres matices:
+- El `WebServer` de Arduino todavía arma cabeceras con `String` internamente (~300 B por respuesta). Son bloques cortos, de tamaño uniforme y liberados enseguida, así que fragmentan poco. "Cero Strings" no es alcanzable con esa librería. Si querían eliminarlo del todo, la opción es `esp_http_server` (`httpd_resp_send_chunk`).
+- **La prueba que decide es empírica:** 4 h con polling a 1 Hz y 5 exportaciones CSV, con `heap_blk` estable (variación < 5 %).
+- **El buffer de 600 registros sigue cubriendo solo 1.67 h**, y sin respaldo un reinicio lo borra. Para la campaña conviene duplicar el registro: **CSV acumulado en el navegador** a partir del polling de `/status` (independiente de la RAM del ESP) más LittleFS por lotes como segunda copia.
+
+---
+
+## 2. Transición a FreeRTOS (Pregunta B)
+
+### 2.1 Corrección sobre núcleos y prioridades
+
+- `loopTask` corre en **Core 1**. Si dejan `loop()` con `handleClient()`, el servidor web comparte núcleo con el control. Con control a prio 10 y `loopTask` a prio 1 el control gana, pero lo que ustedes piden (web en Core 0) requiere crear una tarea explícita.
+- El `tcpip_thread` de lwIP (prio ~18) puede no tener afinidad de núcleo según el sdkconfig del core instalado (`CONFIG_LWIP_TCPIP_TASK_AFFINITY`). Si puede correr en Core 1, **una prioridad de control de 10 queda por debajo**. Como el control consume < 1 % de CPU, subirlo a **prio 19–20** es inocuo y da determinismo real.
+- **La ISR GPIO vive en el núcleo que ejecutó el primer `attachInterrupt`**. Hay que llamar `sensor.begin()` desde `setup()`, que corre en Core 1, junto con la tarea de control. Así el spinlock nunca es entre núcleos.
+
+### 2.2 Sincronización del Snapshot
+
+**Recomendación: spinlock `portMUX` con struct POD ≤ ~300 B.** La copia tarda ~1 µs, es atómica (el escritor también está bajo el lock), no bloquea y no sufre inversión de prioridad. Un mutex FreeRTOS cuesta más que la propia sección crítica, y un doble buffer correcto sin bloqueo requiere *triple* buffer. Para blindarse contra crecimiento del struct:
+
+```cpp
+static_assert(std::is_trivially_copyable<Snapshot>::value, "POD");
+static_assert(sizeof(Snapshot) <= 320, "Snapshot demasiado grande para spinlock");
+```
+
+### 2.3 Estructura mínima
+
+Rutas de **parada separadas de la cola**. La cola es solo para eventos discretos (ARRANCAR, SET_RPM, INVERTIR, REARMAR) y su llenado se reporta a la UI (HTTP 503).
+
+```cpp
+// ===== planta_rt.h =====
+#pragma once
+#include <Arduino.h>
+#include <atomic>
+#include <type_traits>
+enum class Cmd : uint8_t { ARRANCAR, SET_RPM, INVERTIR, REARMAR };
+struct Comando { Cmd tipo; float valor; };
+struct Snapshot { /* campos POD como en el borrador previo + p_in_pico, ts_presion_ms, stackHW */ };
+namespace rt {
+  void     begin();
+  bool     enviar(Cmd c, float v = 0.0f);   // false => cola llena => responder 503
+  void     pedirParada();                   // bandera atómica: NUNCA por cola
+  void     pedirEmergencia();               // corte duro, bandera atómica
+  Snapshot leer();
+}
+```
+
+```cpp
+// ===== planta_rt.cpp (esqueleto) =====
+static QueueHandle_t       g_cola;
+static std::atomic<bool>   g_stop{false}, g_estop{false};
+static Snapshot            g_snap{};
+static portMUX_TYPE        g_snapMux = portMUX_INITIALIZER_UNLOCKED;
+
+void rt::pedirParada()     { g_stop.store(true); }
+void rt::pedirEmergencia() { g_estop.store(true); }
+bool rt::enviar(Cmd c, float v) { Comando m{c, v}; return xQueueSend(g_cola, &m, 0) == pdTRUE; }
+Snapshot rt::leer() { Snapshot s; portENTER_CRITICAL(&g_snapMux); s = g_snap; portEXIT_CRITICAL(&g_snapMux); return s; }
+
+static void tareaControl(void*) {
+  TickType_t t0 = xTaskGetTickCount();
+  uint32_t ciclo = 0;
+  Snapshot s{};
+  for (;;) {
+    vTaskDelayUntil(&t0, pdMS_TO_TICKS(50));
+
+    if (g_estop.load()) { g_estop.store(false); bomba.paradaDura(); }
+    if (g_stop.load())  { g_stop.store(false);  bomba.detener();    }
+    Comando m;
+    while (xQueueReceive(g_cola, &m, 0) == pdTRUE) {      // sin descarte por antigüedad
+      switch (m.tipo) {
+        case Cmd::ARRANCAR: bomba.arrancar(); break;
+        case Cmd::SET_RPM:  bomba.setRPM(m.valor); break;
+        case Cmd::INVERTIR: bomba.toggleSentido(); break;
+        case Cmd::REARMAR:  bomba.rearmar(); break;
+      }
+    }
+    bomba.tick(0.050f);
+
+    if (++ciclo % 20 == 0) {                              // 1 Hz
+      // 1) sensorAlim/Perm.actualizar(...)  2) leer presiones (§3)  3) supervisor (§3)
+      // 4) Darcy  5) rellenar s
+      // NO llamar heap_caps_get_largest_free_block() aquí: recorre el heap con lock tomado.
+      //   Hacerlo en handleStatus() o en una tarea de housekeeping.
+    }
+    s.rpm = bomba.rpmActual(); /* … resto de campos … */ s.t_ms = millis();
+    portENTER_CRITICAL(&g_snapMux); g_snap = s; portEXIT_CRITICAL(&g_snapMux);
+  }
+}
+
+static void tareaWeb(void*) {                              // Core 0
+  server.begin();
+  for (;;) { server.handleClient(); vTaskDelay(pdMS_TO_TICKS(2)); }
+}
+
+void rt::begin() {
+  g_cola = xQueueCreate(8, sizeof(Comando));
+  xTaskCreatePinnedToCore(tareaControl, "ctrl", 4096, nullptr, 19, nullptr, 1);
+  xTaskCreatePinnedToCore(tareaWeb,     "web",  8192, nullptr, 2,  nullptr, 0);
+}
+// loop(): vTaskDelay(pdMS_TO_TICKS(1000));   // loopTask queda ociosa
+```
+
+### 2.4 Reglas y advertencias
+
+- **`WebServer` no es thread-safe.** Todo handler corre en `tareaWeb`, incluidos los que usan los buffers `static`.
+- **Ningún handler toca `bomba` ni los sensores directamente.** Usan `rt::enviar/pedirParada/leer`. Las calibraciones que escriben K deben pasar por la cola con un comando propio.
+- **`Serial.printf` dentro de la tarea de control puede bloquear** si el FIFO de UART se llena: 115200 baud son ~87 µs/byte. Limiten el logging a eventos raros o usen una cola de mensajes.
+- **El slider de la UI** debe enviar en el evento `change`, no en `input`, para no inundar la cola.
+- **Escrituras a flash** (NVS al calibrar, LittleFS): suspenden la ejecución desde flash en ambos núcleos. El LEDC sigue generando pulsos y la bomba no se entera. Pero la ISR GPIO de Arduino-ESP32 no está en IRAM por defecto (`CONFIG_ARDUINO_ISR_IRAM` desactivado), así que **se pierden flancos** durante el borrado de sector. Opciones, de menor a mayor esfuerzo:
+  1. No calibrar ni cerrar logs en medio de un ensayo.
+  2. Contar volumen con **PCNT** (inmune a la parada de caché) y dejar la ISR solo para los timestamps de período.
+  3. Registrar la ISR vía IDF (`gpio_install_isr_service(ESP_INTR_FLAG_IRAM)` antes de cualquier `attachInterrupt`, más `gpio_isr_handler_add`). Verifiquen contra su versión del core, porque es dependiente de ella.
+
+---
+
+## 3. Seguridad con RPM_MAX = 100 (hallazgo nuevo)
+
+La decisión del Ing. Enzo es razonable para agua. Pero **una bomba peristáltica es de desplazamiento positivo**: si alguien cierra la válvula de aguja, la presión sube hasta lo que permitan el torque y la manguera, no hasta lo que tolere el módulo. A 4.5 Nm la presión alcanzable supera por mucho lo que aguantan los capilares y los conectores. Con el supervisor basado en caudal de mi borrador anterior esto no se detectaba.
+
+Propuesta que **respeta el rango 15–100 RPM** pero lo condiciona a instrumentación sana:
+
+1. **Techo dinámico de RPM:**
+   ```cpp
+   // Bomba: _techo = RPM_ALARMA_MEMBRANA por defecto; tick(): objetivo = fminf(_objetivo, _techo)
+   bomba.setTecho(presOk ? RPM_MAX : RPM_ALARMA_MEMBRANA);
+   ```
+   `presOk` significa transductores válidos, dato con edad < 1.5 s y valores dentro de rango. Hasta que existan los transductores del Hito 2.3, operar por encima de 44 RPM debería requerir una confirmación explícita en la UI, con la válvula abierta y la protección mecánica instalada.
+2. **Trips por presión**, no por caudal. Caudal sobre 600 mL/min queda como alarma. Disparos: `P_in` **pico** (no media) mayor al límite, y TMP media mayor a 0.45 bar. El límite estructural de `P_in` lo tiene que fijar el Ing. Enzo con el datasheet y las instrucciones de Fresenius. Yo no lo conozco. Un valor de partida conservador sería 1.0 bar.
+3. **Dos tipos de parada.** En sobrepresión, una rampa de frenado de 45 RPM/s (2.2 s desde 100 RPM) sigue empujando mientras la presión sube. Para sobrepresión usen `paradaDura()`:
+   ```cpp
+   void Bomba::paradaDura() { _bloqueada = true; _enMarcha = false; _invirtiendo = false;
+                              _actual = 0; ledcWrite(PIN_PUL, 0); _fActual = 0; }
+   ```
+   Un corte inmediato de pulsos en un paso a paso con carga peristáltica no es dañino. Reserven la rampa para STOP normal y falla de sensor de caudal.
+4. **Protección independiente del firmware**, imprescindible: una **válvula de alivio mecánica** (o presostato) en la impulsión, y un **hongo de emergencia** que corte el DM860 o use su entrada ENA. Verifiquen la polaridad de ENA en el manual de Leadshine.
+5. **Monitor de deriva `Q_medido` vs `Q_teórico`** en régimen estable. Una desviación > 15 % indica desgaste de manguera, aire o falla de sensor. Es barato y muy informativo en ensayos largos a 100 RPM.
+
+---
+
+## 4. ADS1115 y TDS (Pregunta C)
+
+### 4.1 Single-ended vs diferencial
+
+**Recomiendo single-ended**, por tres razones:
+- Necesitan `P1` absoluta para el trip estructural, y el diferencial la oculta.
+- El diferencial **no cancela** los offsets de cada transductor. Cancela solo ruido de modo común, y ese no es su problema aquí.
+- Obtener TMP diferencial exige cablear P3 a dos entradas. En la práctica ocupa los mismos canales y entrega menos información.
+
+TMP se calcula en firmware: `TMP = (P1 + P2)/2 − P3`.
+
+Detalles de hardware:
+- Con ADS1115 a 3.3 V, ninguna entrada puede superar VDD+0.3 V. Si los transductores son 0.5–4.5 V ratiométricos a 5 V, hace falta divisor (resistencias 0.1 %). Si son **4–20 mA con shunt de 150 Ω** (0.6–3.0 V), entran directo y con detección de cable roto (< 3.6 mA).
+- **Rango:** para TMP ≤ 0.5 bar, transductores de 0–1 bar. Con 0–10 bar el error de cero (±0.5 % FS = 50 mbar) vale la mitad del límite.
+- **Offset hidrostático:** una diferencia de altura de 10 cm entre transductores son ~10 mbar, o el 20 % de un TMP de 0.05 bar. Instalen los tres a la misma cota y hagan una **tara automática con la bomba parada y las líneas llenas**, guardada en NVS, además de una calibración de dos puntos.
+- Para TDS, un **segundo ADS1115 en 0x49** (también útil para medir el riel de 5 V si hay ratiometría). Las sondas tipo DFRobot interfieren entre sí por el agua.
+- El TDS en UF casi no informa rechazo (las sales pasan). Su valor real es verificar el enjuague posterior a la limpieza, y la turbidez de permeado sirve como prueba de integridad de membrana.
+
+### 4.2 Muestreo y estructura de tarea
+
+Una tarea de FreeRTOS **ya es** una máquina de estados, así que no hace falta la de cinco estados de mi borrador. Con `vTaskDelay` el CPU queda libre y solo esa tarea espera. El I²C es suyo en exclusiva, a 400 kHz, y su ISR es breve, por lo que no afecta a la ISR del caudalímetro.
+
+- **Frecuencia:** 250 SPS (4 ms por conversión), unos 55 Hz por canal en round-robin de 3 canales, suficiente para capturar la pulsación de 1.25–5 Hz.
+- **Trackeen el pico de `P_in`** en cada ventana de 1 s. La media oculta los picos pulsátiles que son los peligrosos.
+- **Dead-man:** la tarea publica `ts_presion_ms`. Si el control ve dato con edad > 1.5 s, `presOk = false` (techo de 44 RPM) y, si sigue por encima, la bomba baja.
+- Si el ADS no responde: **no hacer `vTaskSuspend`**. Publicar `valido = false`, y `arrancar()` por encima del techo queda bloqueado.
+
+```cpp
+static constexpr uint16_t ads_cfg(uint8_t ch, uint8_t dr /*4=128, 5=250, 6=475 SPS*/) {
+  // OS=1 | MUX=100+ch (AINx vs GND) | PGA ±4.096 V | single-shot | DR | comparador off
+  return 0x8000 | ((uint16_t)(4 + ch) << 12) | 0x0200 | 0x0100 | ((uint16_t)dr << 5) | 0x0003;
+}
+// ch0 @128 SPS = 0xC383 ; ch1 = 0xD383 ; ch2 = 0xE383 ; ch3 = 0xF383
+
+static void tareaPresion(void*) {
+  ADS1115Async ads(0x48);
+  float acc[3] = {0}, pico0 = -1e9f; uint8_t n[3] = {0}; uint8_t fallos = 0;
+  TickType_t tPub = xTaskGetTickCount();
+  for (;;) {
+    for (uint8_t ch = 0; ch < 3; ++ch) {
+      float v; bool ok = ads.iniciarCfg(ads_cfg(ch, 5));
+      vTaskDelay(pdMS_TO_TICKS(5));                       // 4 ms de conversión + margen
+      ok = ok && ads.leerVolt(v);
+      if (ok && voltajeEnRango(v)) {                      // rechaza cable roto / saturación
+        acc[ch] += v; n[ch]++; fallos = 0;
+        if (ch == 0) pico0 = fmaxf(pico0, v);
+      } else if (++fallos > 5) { ADS1115Async::recuperarBus(); fallos = 0; }
+    }
+    if (xTaskGetTickCount() - tPub >= pdMS_TO_TICKS(1000)) {
+      tPub = xTaskGetTickCount();
+      // convertir con calibración/tara de NVS; publicar {pIn, pOut, pPerm, pInPico, ts, valido}
+      // valido = (n[0] > 20 && n[1] > 20 && n[2] > 20)
+      memset(acc, 0, sizeof acc); memset(n, 0, sizeof n); pico0 = -1e9f;
+    }
+  }
+}
+```
+
+(Para un esquema por interrupción, usar el pin ALERT/RDY con `COMP_QUE=00` y los registros de umbral `Hi=0x8000`, `Lo=0x0000`. No es necesario a esta escala.)
+
+---
+
+## 5. Diseño experimental (Pregunta D)
+
+### 5.1 Qué implica operar a 200–1360 mL/min
+
+Con N ≈ 13 500 fibras y L ≈ 0.28 m. **Ojo:** esos valores son una estimación mía de la Ronda 1, no un dato de ficha técnica, y el área efectiva de 2.2 m² puede estar basada en diámetro interno o externo. Validen midiendo el ΔP del módulo con agua a 3–4 caudales.
+
+| Q_feed (mL/min) | v (m/s) | Re | γ̇_w = 8v/dᵢ (s⁻¹) | τ_w (Pa) | ΔP axial (bar) | TMP mín. ≈ ΔP/2 | TMP máx. (recup. ≤ 30 %) |
+|---|---|---|---|---|---|---|---|
+| 200 | 0.0092 | 1.7 | 397 | 0.40 | 0.024 | 0.012 | 0.066 |
+| 600 | 0.0275 | 5.1 | 1190 | 1.19 | 0.072 | 0.036 | 0.197 |
+| 900 | 0.0413 | 7.6 | 1787 | 1.79 | 0.108 | 0.054 | 0.296 |
+| 1360 | 0.0625 | 11.5 | 2700 | 2.70 | 0.163 | 0.082 | 0.447 |
+
+Cálculo para agua a 20 °C. El TMP máximo usa K_UF nominal (≈ 913 mL/min por bar). Todo es régimen laminar.
+
+**Lo que esto implica:**
+1. **El rango ampliado tiene justificación científica.** Subir de 600 a 1360 mL/min lleva γ̇_w de ~1200 a ~2700 s⁻¹, el rango donde empiezan a importar los mecanismos de transporte inducidos por corte.
+2. **El espacio (Q, TMP) no es rectangular.** A Q alto, el TMP mínimo está acotado por el ΔP axial (a 1360 mL/min, TMP < 0.08 bar es inalcanzable con P3 = 0, y hay backfiltración en la salida). A Q bajo, el TMP máximo está acotado por la recuperación: a 200 mL/min, 0.45 bar daría un permeado teórico (411 mL/min) mayor que la alimentación. Un factorial cruzado 3×3 incluye celdas infactibles. Si necesitan TMP bajo a Q alto, estrangulen el permeado para subir P3.
+3. **Lp ≈ 25 LMH/bar.** Todo el rango permitido (TMP ≤ 0.5) corresponde a ≤ 12 LMH con agua limpia. Para observar `J_c` dentro de ese rango, la alimentación debe ensuciar fuerte (turbidez alta, sobredosis de mucílago). Si no, el resultado honesto será "J_c > J_máx observable".
+4. **Rotura de flóculos.** A mayor γ̇_w los flóculos se rompen, de modo que Q cambia además la distribución de tamaños. Midan turbidez (o PSD) en el retentado para no confundir factores.
+
+### 5.2 Estrategia por etapas
+
+El factorial 3³ completo con réplicas (54–81 corridas, ~2–3 h cada una incluyendo limpieza) que propuse antes es excesivo y poco eficiente. Propongo:
+
+**Etapa 0, caracterización con agua (por módulo):**
+- Lp y R_m con 4–5 TMP, normalizado a 20 °C con la temperatura medida.
+- ΔP(Q) para validar la geometría.
+- Rendimiento volumétrico de la bomba vs. RPM y contrapresión.
+- Calibración gravimétrica de K_perm(f).
+
+**Etapa 1, preparación de la alimentación:**
+- *Jar test* para hallar la dosis óptima de mucílago. Las dosis se expresan en **mg/L** (típicamente decenas), no en %.
+- Niveles de dosis: sub-óptima, óptima, sobre-óptima. El exceso deja mucílago disuelto, que es un foulante fuerte.
+- Usar **un solo lote de mucílago**, con trazabilidad de fecha, y preparar uno fresco con frecuencia: se degrada microbiológicamente en días.
+- Para reproducibilidad, considerar una suspensión modelo (caolín/bentonita) como base.
+
+**Etapa 2, flujo crítico (el método correcto es escalonado):**
+- **TMP-stepping:** 6–8 escalones de 15–20 min, ascendentes y luego descendentes. Graficar `J` vs `TMP` contra la recta de agua limpia. `J_c` (forma débil) es donde se separa de esa recta. La **histéresis** ascenso/descenso mide el ensuciamiento irreversible.
+- Una corrida por condición de Q, en lugar de 27.
+- Como la válvula es manual y el TMP deriva, analicen con `R(t) = TMP/(μ·J)`, que no depende de que el TMP se mantenga constante.
+- **Predicción falsable:** `J_c ∝ γ̇_w^n`. Con difusión browniana (Lévêque), n ≈ 1/3. Con difusión inducida por corte (partículas mayores a ~1 µm, flóculos), n ≈ 1 o más. La pendiente en log-log distingue el mecanismo.
+
+**Etapa 3, diseño para la tasa de ensuciamiento:**
+- Factorial 2³ (Q, TMP, dosis) más ≥ 3 puntos centrales para estimar error puro (~11 corridas). Si hay curvatura significativa, ampliar a un central compuesto de caras centradas (~20 corridas).
+- Como el espacio es no rectangular, analicen por **regresión de superficie de respuesta**, no por ANOVA de cruce completo.
+- **Aleatorizar** el orden, y **bloquear por módulo y por día**. Los módulos difieren en R_m, así que usen J_w0 de cada uno como covariable.
+
+**Compresibilidad α:**
+- Corridas a TMP constante con ≥ 4 niveles (0.1–0.4 bar), Q bajo, y torta bien desarrollada.
+- Modelo de Ruth: `R_c = α·m_c/A`. Con `m_c` por balance de masa (TSS o turbidez de permeado) y/o masa de torta recuperada al final, la pendiente de `R_c` vs `V/A` da `α·C_b`.
+- Luego `α = α₀·TMP^s`: la pendiente de `ln α` vs `ln TMP` es el índice de compresibilidad `s`.
+- No pueden hacer *dead-end* con la bomba peristáltica sin una línea de retorno: cerrar el retentado con una bomba de desplazamiento positivo dispara la presión.
+- Los modelos de Hermia (n = 2, 1.5, 1, 0) se ajustan offline sobre `J(t)`.
+
+**Descomposición de resistencias** (estándar en el área):
+1. J de agua limpia da R_m.
+2. Filtración da R_total.
+3. Enjuague hidráulico sin químicos y J de agua dan R_m + R_irr (hidráulicamente irreversible). Entonces R_rev = R_total − R_m − R_irr.
+4. Limpieza química y J de agua dan el R_irr químicamente irreversible.
+
+### 5.3 Qué debe guardar el firmware
+
+Por muestra: `t, rpm, q_alim, q_perm, p_in_media, p_in_pico, p_out, p_perm, tmp, T_C, J_LMH, J20, R_total, R_torta, tds, flags` y marcadores de inicio y fin de escalón. En `darcy.h`, el default `temp_C = 20.0f` oculta la ausencia de sensor de temperatura. Hagan que devuelva `valido = false` si no hay temperatura real. En el resultado, `R_torta` incluye polarización y adsorción además de torta, así que llámenlo `R_foul`.
+
+### 5.4 Protocolo de limpieza entre réplicas (corregido)
+
+**Primero:** validar contra las instrucciones de uso de Fresenius (pH, cloro, temperatura, presión máxima, compatibilidad del potting). Mis valores son típicos de literatura para membranas de polisulfona con PVP, no del FX100.
+
+1. **Enjuague directo (*forward flush*):** agua DI/RO, caudal alto (RPM alto), válvula de retentado abierta, TMP ≈ 0, ~10 min. Medir J de agua en 3 TMP: `J_w1`.
+2. **Alcalino con oxidante suave:** pH 10–11, típicamente NaOH 0.01–0.1 M con ~100–200 ppm NaOCl (si Fresenius lo permite), 25–35 °C, recirculación 20–30 min a TMP bajo. Es lo que ataca polisacáridos como el mucílago.
+3. **Enjuague** hasta pH/conductividad neutros. Aquí el sensor TDS sí aporta valor.
+4. **Ácido:** ácido cítrico 1–2 % (pH 2–3), 20–30 min, contra puentes Ca/Mg-polisacárido. Enjuague.
+5. **Aceptación:** `J_w2` normalizado a 20 °C dentro de ±5 % de `J_w0` del módulo. Midan la pendiente `J` vs `TMP` en TMP ≥ 0.2 bar. A 0.1 bar el error del transductor es del orden del criterio.
+6. **Retrolavado:** **invertir la bomba no hace un retrolavado a través de la membrana.** Aspira por el puerto de alimentación y puede ingerir aire por la línea de retentado. Un retrolavado real requiere una fuente del lado permeado (carga hidrostática, jeringa o bomba) con **TMP invertido controlado, ≤ 0.1–0.2 bar** como arranque conservador, hasta que Fresenius indique un valor. La inversión de la bomba sirve para drenar el módulo.
+7. **Almacenamiento:** retiro mi receta de etanol/timol. Para menos de 48 h, mantener húmedo, cerrado y a 4 °C. Para períodos más largos, consultar a Fresenius (los dializadores son de un solo uso y no hay protocolo oficial). Una práctica habitual en membranas de UF es metabisulfito de sodio al 0.5–1 %.
+8. **Temperatura:** registrar T en cada punto y trabajar dentro de ±1 °C. J20 corrige la viscosidad, no otros efectos.
+
+---
+
+## 6. Orden de trabajo y criterios de aceptación
+
+| Orden | Tarea |
+|---|---|
+| 1 | Válvula de alivio mecánica y hongo/ENA. Sin esto, no operar sobre 44 RPM con la válvula de aguja estrangulada |
+| 2 | Fixes de `caudalimetro` (§1.2): wrap, referencia persistente, cota continua, `fallo` solo para alimentación |
+| 3 | `rt::` con tarea de control (prio 19), web en Core 0, STOP/EMERGENCIA por banderas, `paradaDura()` |
+| 4 | LittleFS por lotes y CSV en el navegador como doble registro |
+| 5 | ADS1115 con config corregida, tara, pico de `P_in`, dead-man y techo dinámico de RPM |
+| 6 | Calibración gravimétrica de K_perm(f), Lp y R_m por módulo (Etapa 0) |
+| 7 | Etapas 1–3 del plan experimental |
+
+**Criterios de aceptación** (ensayo de 4 h, polling a 1 Hz, 5 exportaciones CSV):
+- `heap_blk` estable (variación < 5 %).
+- Latencia de STOP medida en osciloscopio sobre PUL < 100 ms. En EMERGENCIA, corte de pulsos en < 1 tick.
+- Cero reinicios y cero entradas de `watchdog`.
+- Volumen de alimentación integrado vs. gravimétrico < 2 %.
+- Trip de sobrepresión probado **con agua y una válvula de alivio instalada**, nunca solo por software.
+
+**Para la próxima ronda**, necesito que Antigravity me envíe `handleStatus()`, `handleExportCSV()` y `handleCmd()` completos, el modelo de los transductores de presión (rango y salida) y la versión exacta del core Arduino-ESP32 instalada.
