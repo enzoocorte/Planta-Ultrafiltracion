@@ -246,7 +246,7 @@
           <line x1="685" y1="332" x2="745" y2="332" stroke="#a5b4fc" stroke-width="1.5" stroke-dasharray="3,1"/>
           <line x1="685" y1="345" x2="745" y2="345" stroke="#a5b4fc" stroke-width="1.5" stroke-dasharray="3,1"/>
           <text x="715" y="270" fill="#818cf8" font-size="10" text-anchor="middle" font-weight="bold">FILTRO FX100</text>
-          <text x="715" y="375" fill="#94a3b8" font-size="8" text-anchor="middle">1.8 m² Capilar</text>
+          <text x="715" y="375" fill="#94a3b8" font-size="8" text-anchor="middle">2.2 m² Capilar</text>
         </g>
 
         <!-- 6. SENSORES DE RETENTADO Y VÁLVULA MANUAL DE AGUJA (V_reg) -->
@@ -439,7 +439,7 @@
       prefiltro: {
         titulo: "🛡️ Prefiltro Y-Strainer (Malla Inoxidable 120 Mesh / 125 µm)",
         tipo: "Protección Mecánica Indispensable",
-        desc: "<b>Por qué es imprescindible:</b> Los capilares de la membrana Fresenius FX100 tienen un diámetro interno de solo <b>200 µm (0.2 mm)</b>. Cualquier microfibra de la penca de tuna, arena o flóculo apelmazado taponaría las fibras capilares de forma <b>irreversible</b>.<br><br>" +
+        desc: "<b>Por qué es imprescindible:</b> Los capilares de la membrana Fresenius FX100 tienen un diámetro interno de solo <b>185 µm (0.185 mm)</b> con grosor de pared de 35 µm. Cualquier microfibra de la penca de tuna, arena o flóculo apelmazado taponaría las fibras capilares de forma <b>irreversible</b>.<br><br>" +
               "<b>Ventajas del modelo tipo Y:</b><br>" +
               "• Vaso transparente para ver si está sucio sin desarmar.<br>" +
               "• Malla inox lavable bajo la canilla.<br>" +
@@ -448,12 +448,12 @@
       bomba: {
         titulo: "🌀 Bomba Peristáltica MBP-2000 (Hito 1 Validado)",
         tipo: "Accionamiento NEMA 34 + Leadshine DM860",
-        desc: "<b>Rango Operativo Calibrado:</b> 70 a 160 RPM (0.294 a 0.672 L/min). Rango óptimo que evita la resonancia armónica (<60 RPM) y previene la pérdida de paso por contrafuerza electromotriz (BEMF).<br><br>" +
-              "<b>Conexión Ánodo Común 5V:</b><br>" +
-              "• VIN (5V) puenteado a PUL+ y DIR+.<br>" +
-              "• P18 (GPIO 18) a PUL- (Pulsos LEDC).<br>" +
-              "• P19 (GPIO 19) a DIR- en modo <code>OUTPUT_OPEN_DRAIN</code>.<br>" +
-              "• Inversión automática con rampa de frenado a 0 RPM a 40 RPM/s."
+        desc: "<b>Rango Operativo Calibrado:</b> 15 a 75 RPM (consustancial con límite de 600 mL/min a ~36 RPM para el FX100). Desplazamiento real: <b>13.60 mL/rev</b>.<br><br>" +
+              "<b>Conexión Cátodo Común 3.3V/5V:</b><br>" +
+              "• PUL- y DIR- a GND común.<br>" +
+              "• P18 (GPIO 18) a PUL+ (Pulsos LEDC).<br>" +
+              "• P19 (GPIO 19) a DIR+.<br>" +
+              "• Rampa cuadrática S-Curve y desaceleración suave."
       },
       p1: {
         titulo: "📊 Transductor de Presión de Entrada Feed (P1)",
@@ -465,14 +465,14 @@
         titulo: "🌊 Caudalímetro de Alimentación Feed (Q1)",
         tipo: "Sensor Digital de Efecto Hall (YF-S401)",
         desc: "<b>Conexión al ESP32:</b> <b>DIRECTA</b> a pin de interrupción <b>GPIO 14</b>.<br>" +
-              "<b>Función:</b> Mide el caudal de entrada para corroborar la entrega volumétrica de la bomba (4.2 mL/rev)."
+              "<b>Función:</b> Mide el caudal de entrada para corroborar la entrega volumétrica de la bomba (13.60 mL/rev)."
       },
       membrana: {
         titulo: "🧪 Módulo de Ultrafiltración Capilar Fresenius FX100",
-        tipo: "Membrana de Fibra Hueca (Polisulfona / Helixone)",
-        desc: "<b>Superficie activa:</b> 1.8 m² con miles de capilares de 200 µm de diámetro interno. Tamaño de poro de corte: ~0.005 µm (retiene bacterias, virus y coloides).<br><br>" +
+        tipo: "Membrana de Fibra Hueca (Polisulfona Modificada / Helixone®)",
+        desc: "<b>Superficie activa:</b> 2.2 m² con miles de capilares de 185 µm de diámetro interno (grosor pared 35 µm). Estructura interna nanométrica cilíndrica de alto flujo (high-flux, KUF = 73 mL/h·mmHg).<br><br>" +
               "<b>Límites Críticos de Operación:</b><br>" +
-              "• Caudal máximo: <b>0.60 L/min</b> (~143 RPM).<br>" +
+              "• Caudal máximo seguro: <b>600 mL/min</b> (~36 RPM).<br>" +
               "• Presión Transmembrana máxima: <b>TMP ≤ 0.50 atm (~0.51 bar)</b>."
       },
       p2: {

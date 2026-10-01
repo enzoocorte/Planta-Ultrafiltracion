@@ -77,7 +77,7 @@ flowchart LR
         direction TB
         P1["📊 Transductor Presión P1<br><b>(Entrada Feed: 0-1.2 bar)</b>"]:::sensor
         Q1["🌊 Caudalímetro Entrada Q1<br><b>(Efecto Hall YF-S401)</b>"]:::sensor
-        MEMBRANA["🧪 MEMBRANA FX100<br><b>Filtro Capilar Fresenius</b><br>(1.8 m² Polisulfona / Helixone)"]:::filtro
+        MEMBRANA["🧪 MEMBRANA FX100<br><b>Filtro Capilar Fresenius</b><br>(2.2 m² Polisulfona / Helixone®)"]:::filtro
         
         P2["📊 Transductor Presión P2<br><b>(Retentado / Salida Axial)</b>"]:::sensor
         V_REG["🔴 Válvula de Aguja V_reg<br><b>(Regulación de Contrapresión / TMP)</b>"]:::valvula
@@ -200,7 +200,7 @@ Al analizar tu boceto manuscrito con criterios estrictos de ingeniería de proce
 * **¿Qué sucede si no estuviera?**: El agua tomaría el camino de menor resistencia (el conducto axial interno de los capilares) y retornaría toda al sedimentador, dando un caudal de permeado casi nulo ($Q_p \approx 0$).
 
 ### 5.2. El Prefiltro: ¿Por qué tipo "Y" de 120 mesh ($125\,\mu\text{m}$)?
-* Los capilares de la membrana FX100 tienen un diámetro interno de **$200\,\mu\text{m}$**.
+* Los capilares de la membrana FX100 tienen un diámetro interno de **$185\,\mu\text{m}$** (con un grosor de pared de **$35\,\mu\text{m}$**).
 * El coagulante natural (*Opuntia ficus-indica*) produce flóculos gelatinosos y puede contener micro-fibras vegetales.
 * Si una partícula mayor a $150\,\mu\text{m}$ ingresa a la membrana, tapona físicamente la embocadura de una fibra capilar, inutilizándola permanentemente.
 * Un prefiltro tipo "Y" lavable de $120\text{ mesh}$ ($125\,\mu\text{m}$) retiene todo cuerpo sólido peligroso sin generar una pérdida de carga excesiva que cavite la succión de la bomba peristáltica.
