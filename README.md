@@ -69,46 +69,41 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 
 ## 🗂️ 4. Estructura del Repositorio y Guía de Navegación de Archivos
 
-Cada carpeta tiene un propósito específico en las etapas de la tesis. **Aquí se detalla qué contiene cada una y para qué deben consultarla:**
+> 🧭 **Guía de Organización del Equipo:** Para conocer en detalle la distribución de archivos, responsabilidades y protocolos de Git entre Enzo, Owen y Antonella, consultar:  
+> 👉 **[`ORGANIZACION_PROYECTO_Y_EQUIPO.md`](./ORGANIZACION_PROYECTO_Y_EQUIPO.md)**
 
-```
+```text
 SistemaUF/
+├── 📄 ORGANIZACION_PROYECTO_Y_EQUIPO.md
 ├── 📁 00_General_y_P_ID_Planta/
 ├── 📁 01_Hito1_Control_Accionamiento_NEMA34_DM860/
 ├── 📁 02_Hito2_Instrumentacion_Sensores/
 ├── 📁 03_Hito3_Reactor_Sedimentador_Agitador/
 ├── 📁 04_Hito4_Integracion_Automatizacion_IoT/
 ├── 📁 05_Hito5_Ensayos_Membrana_VidaUtil/
-├── 📁 Capitulo_4_Programacion_Firmware/
 └── 📁 Archivado/
 ```
 
 ### Detalle de Carpetas:
 
 #### 📐 `00_General_y_P_ID_Planta/`
-* **Contenido**: Planos maestros de instrumentación y tuberías bajo norma ISA 5.1, bocetos originales de ingeniería, dimensionamiento de tanques y el [diagrama_pid_interactivo.html](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html).
+* **Contenido**: Planos maestros de instrumentación y tuberías bajo norma ISA 5.1, bocetos originales de ingeniería, dimensionamiento de tanques, el [diagrama_pid_interactivo.html](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html) y las especificaciones oficiales de la membrana [ParametrosFiltroFX100.txt](./00_General_y_P_ID_Planta/ParametrosFiltroFX100.txt).
 * **¿Para qué leerlo?**: Para entender el flujo global del agua, la ubicación de las válvulas, tomas de presión y balances de materia de toda la planta.
 
 #### ⚡ `01_Hito1_Control_Accionamiento_NEMA34_DM860/`
 * **Contenido**: Toda la ingeniería de impulsión: motor NEMA 34, driver Leadshine DM860, cabezal MBP-2000, cálculo de torque y el [Inventario_Consolidado.md](./01_Hito1_Control_Accionamiento_NEMA34_DM860/01_Hardware_y_Cableado/Inventario_Consolidado.md).
 * **¿Para qué leerlo?**: Para consultar qué componentes tenemos en el laboratorio, qué ferretería falta comprar en Salta, y cómo se calculan las rampas de aceleración.
 
-#### 📊 `02_Hito2_Instrumentacion_Sensores/` *(¡Carpeta en Operación Actual!)*
+#### 📊 `02_Hito2_Instrumentacion_Sensores/` *(¡Carpeta en Operación y Calibración Actual!)*
 * **Contenido**: 
-  - 🌟 **[firmware_planta/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/)**: **Firmware Oficial de Producción**. NVS Flash persistente, auto-calibración en marcha con probeta, rampa S-Curve, y Web SCADA.
+  - 🌟 **[firmware_planta/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/)**: **Firmware Oficial de Producción**. NVS Flash permanente (`Preferences.h`), auto-calibración en marcha con probeta, rampa S-Curve, y Web SCADA en SoftAP puro (`192.168.4.1`).
+  - ⚡ **[scripts_compilacion_rapida/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/scripts_compilacion_rapida/)**: Scripts `.bat` para compilar con PlatformIO y subir binarios al ESP32 en 3 segundos.
   - 🩺 **[Diagnostico_y_Resolucion_Problemas_Instrumentacion.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento para tesis**. Análisis matemático y físico de la saturación a 81 Hz (835.5 mL/min), solución al zumbido de 50 Hz/100 Hz, filtro pasabajos RC y resolución del cruce de canales.
-  - La guía de conexión física: [Guia_Montaje_Placa_Filtrado_FrontEnd.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Placa_Filtrado_FrontEnd.md).
-  - El esquema gráfico interactivo: [esquema_conexion_borneras.html](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/esquema_conexion_borneras.html).
-  - 📁 [Datos/](./02_Hito2_Instrumentacion_Sensores/Datos/): Registros CSV reales exportados en banco de pruebas y planilla Excel de calibración a 50/72 RPM.
+  - 📈 **[Simulaciones_Filtro_RC/](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Simulaciones_Filtro_RC/)**: Simulación en **LTspice** (`simulacion_filtro_caudalimetro.asc`), script de modelado en Python y curvas de atenuación de ruido.
+  - 🖥️ **[Esquemas_Conexionado_HTML/](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Esquemas_Conexionado_HTML/)**: Colección de planos interactivos SVG (borneras ZS-1057, protoboard, capacitor de desacoplo y nodo pull-up).
+  - 📝 **[Bitacoras_Calibracion/](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Bitacoras_Calibracion/)**: Registro cronológico de jornadas de Owen, ensayos en probeta y matriz de fallas resueltas.
+  - 📁 **[Datos/](./02_Hito2_Instrumentacion_Sensores/Datos/)**: Planilla oficial de calibración de probeta a 50/72 RPM (`.xlsx`) y datasets de telemetría cruda en banco (`.csv`).
 * **¿Para qué leerlo?**: Es la guía práctica para el trabajo diario en el laboratorio, cableado de la segunda bornera, calibración de instrumentos y análisis de fallas para la redacción de la tesis.
-
-#### 💻 `Capitulo_4_Programacion_Firmware/` *(¡Nuevo! Documentación y Firmware para Tesis)*
-* **Contenido**: 
-  - Simulación de filtros pasabajos RC en **LTspice** y script Python de análisis de respuesta temporal.
-  - Esquemas interactivos HTML de conexionado en protoboard y shield.
-  - Scripts de automatización en consola (`.bat` para compilar en 2.8s con PlatformIO CLI).
-  - Bitácoras cronológicas completas de desarrollo y calibración experimental.
-* **¿Para qué leerlo?**: Fuente principal para redactar el Capítulo 4 de la Memoria de Tesis de Grado (UNSa).
 
 #### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/`
 * **Contenido**: Pretratamiento por coagulación-floculación (Jar Test), control del motor de agitación con driver L298N, cálculo del gradiente de velocidad ($G$), paleta normalizada y boya de nivel en acero inoxidable.

@@ -1,0 +1,46 @@
+#include <SoftwareSerial.h>
+SoftwareSerial BT(10, 11); // RX, TX
+const int PUL = 2;
+const int DIR = 3;
+bool motorOn = false;
+int velocidad = 100; // En microsegundos (delay entre pasos)
+bool sentidoHorario = true;
+void enviarVelocidad() {
+BT.print("VEL:");
+BT.println(velocidad);
+Serial.print("Velocidad enviada: ");
+Serial.println(velocidad);
+}
+void setup() {
+pinMode(PUL, OUTPUT);
+pinMode(DIR, OUTPUT);
+digitalWrite(PUL, LOW);
+digitalWrite(DIR, LOW);
+BT.begin(9600);
+Serial.begin(9600);
+Serial.println("Listo para controlar el motor por Bluetooth");
+}
+void loop() {
+if (BT.available()) {
+char comando = BT.read();
+Serial.print("Comando recibido: ");
+Serial.print(comando);
+Serial.println("'");
+code
+Code
+switch (comando) {
+  case 'D': sentidoHorario = true;  break;
+  case 'I': sentidoHorario = false; break;
+  case 'E': motorOn = true; velocidad = 100; enviarVelocidad();  break; // Encender
+  case 'A': motorOn = false; break; // Apagar
+  case '+':
+    if (velocidad > 20) {
+      velocidad -= 5;
+      enviarVelocidad();
+    }
+    break;
+  case '-':
+    velocidad += 5;
+    enviarVelocidad();
+    break;
+}
