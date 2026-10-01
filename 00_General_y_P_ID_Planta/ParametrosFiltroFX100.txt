@@ -1,0 +1,8 @@
+parametROS fx10
+Especificaciones de la membrana y el dializador FX100
+• Material de la membrana: Polisulfona modificada (Helixone®) fabricada con tecnología nanométrica.
+• Tipo de flujo: Alto flujo (high-flux), optimizado para la eliminación eficiente de moléculas medianas (como la β₂-microglobulina).
+• Superficie efectiva: 2,2 m².
+• Coeficiente de ultrafiltración (KUF): 73 ml/h×mmHg.
+• Diámetro interno de la fibra: 185 μm (con un grosor de pared de 35 μm).
+• Estructura del poro: Poros lisos y cilíndricos en la capa interna que reducen la resistencia al paso de toxinas urémicas.

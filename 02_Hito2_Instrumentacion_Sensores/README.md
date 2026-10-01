@@ -72,13 +72,15 @@ Para avanzar con método científico y validación segura paso a paso en el banc
   * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
 
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: **Firmware Operativo Actual**: Driver Leadshine DM860 en Cátodo Común, 3200 pulsos/rev (16 micropasos), `INPUT_PULLUP` redundante, Web SCADA interactivo (`http://192.168.4.1` / `http://bomba.local`) y exportador CSV.
+  * 🌟 **[`firmware_planta/`](./02_Firmware_Test_Sensores/firmware_planta/)**: **FIRMWARE OFICIAL DE PRODUCCIÓN (Grabado en ESP32)**: Auto-calibración en marcha con probeta, persistencia Flash NVS (`Preferences.h`), filtro anti-ruido optimizado a 2000 µs, datalogger multi-sesión (600 muestras), rampa S-Curve progresiva, y Web SCADA en SoftAP puro (`192.168.4.1`).
+  * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: Firmware modular base previo con arquitectura C++ (Bomba y Caudalímetro).
   * 🌊 **[`subhito2_1_caudalimetros/`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/)**: Firmware básico de prueba para Subhito 2.1 con interrupciones por hardware.
   * 💻 **[`firmware_sensores_test/`](./02_Firmware_Test_Sensores/firmware_sensores_test/)**: Sketch integral multivariable de adquisición de datos en tiempo real y transmisión serie.
 
 * 📁 **[`Datos/`](./Datos/)**:
-  * 📑 **[`datos_planta_uf_2026-09-30.csv`](./Datos/datos_planta_uf_2026-09-30.csv)**: Telemetría cruda en banco a 50–94 RPM donde se diagnosticó la inversión física de sensores (Q_Perm registrando 627 mL/min vs Q_Feed en 0).
+  * 📑 **[`datos_planta_uf_2026-09-30.csv`](./Datos/datos_planta_uf_2026-09-30.csv)**: Telemetría cruda en banco a 50–94 RPM donde se diagnosticó la inversión física de sensores.
   * 📑 **[`datos_planta_uf_2026-09-30 (1).csv`](./Datos/datos_planta_uf_2026-09-30 (1).csv)**: Ensayo de verificación a 25, 36, 50, 74 y 80 RPM.
+  * 📊 **[`CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx`](./02_Firmware_Test_Sensores/firmware_planta/CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx)**: Planilla de calibración de probeta a 50 RPM y 72 RPM con factores K resultantes.
 
 
 
