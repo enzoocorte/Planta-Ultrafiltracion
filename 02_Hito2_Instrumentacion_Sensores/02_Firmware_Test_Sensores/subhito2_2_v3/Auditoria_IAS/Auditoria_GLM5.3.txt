@@ -1,0 +1,182 @@
+Auditoría completa del v3 — y primero: lo que estos cambios confirman
+Antes de las respuestas A–G, dos validaciones que salen de nuestra historia compartida:
+
+El cruce de cables estaba diagnosticado correctamente: "Se corrigió una inversión física de cables (el sensor de bomba estaba conectado en P27 en vez de P14)" — exactamente lo que el análisis del CSV predijo (P27 contando el feed, FEED en cero). El sanity-check qPerm > qAlim que propuse entonces no está en el v3 — lo reclamo en hallazgos.
+La nueva arquitectura anti-ruido es la correcta y definitiva: front-end físico (4.7k + 100nF) como defensa primaria + blanking software mínimo (2 ms) que ya no pelea con el hum. Es exactamente la jerarquía que convenimos: hardware cura, software verifica. El episodio del "81 Hz con bomba detenida" es la confirmación experimental del trade-off que documentamos.
+Ahora sí, la auditoría en el formato pedido.
+
+1. Diagnóstico Ejecutivo
+Fortalezas: S-curve de 4 tasas con easing (calidad industrial), portabilidad LEDC 2.x/3.x con #if, NVS para parámetros, enRegimenEstable() para gating de auto-cal, AP Wi-Fi dedicado con setSleep(false) (decisión pragmática correcta para banco), LED de estado, datalogger estático.
+
+Vulnerabilidades, en orden de gravedad:
+
+#
+Hallazgo
+Gravedad
+0.1	REGRESIÓN: setRPM() perdió la rama _invirtiendo → Bug 1 reintroducido	🔴 Alta
+0.2	REGRESIÓN: volumen fuera del else → pulsos imposibles contaminan totalizador	🟡 Media
+0.3	INCONSISTENCIA DE SEGURIDAD: RPM_ALARMA=36 ya no corresponde a 600 mL/min con ML=13.6	🔴 Alta
+0.4	K_PERM=55 fisicamente implausible + riesgo de calibración circular	🔴 Alta (científica)
+0.5	handleStatus() volvió a String concatenado	🟡 Media (es la pregunta A)
+
+2. Hallazgos Críticos y Código Refactorizado
+0.1 — Regresión del Bug 1 (inversión + cambio de consigna)
+Con el setRPM actual, mover el slider durante el frenado de inversión pisa _objetivo, la rampa nunca llega a 0.1 RPM y el sistema queda atrapado en _invirtiendo=true hasta un STOP. El fix estaba probado en la versión anterior y se perdió en la reescritura:
+
+cpp
+
+void Bomba::setRPM(float rpm) {
+  float r = constrain(rpm, RPM_MIN, RPM_MAX);
+  if (_invirtiendo) _rpmGuardada = r;   // consigna post-inversión si cambia durante frenado
+  else              _objetivo = r;
+}
+void Bomba::arrancar() {
+  _enMarcha = true;
+  if (_objetivo < RPM_MIN)              // restaura consigna huérfana (STOP→DIR→START)
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+}
+0.3 — La alarma ya no protege la membrana (número duro)
+Q 
+alarma
+​
+ =RPM 
+alarma
+​
+ ×ML=36×13.6=490 mL/min
+
+=600
+
+Y peor: RPM_MAX=75 admite 
+75×13.6=1020
+ mL/min teóricos — 1.7× el límite de la FX100. Con el ML nuevo, los umbrales correctos son:
+
+cpp
+
+constexpr float RPM_MAX             = 75.0f;   // SOLO ensayos sin membrana / retrolavado — DOCUMENTAR
+constexpr float RPM_ALARMA_MEMBRANA = 44.0f;   // 44 × 13.6 = 598 mL/min → reconecta la alarma al límite
+La web ya recibe rpm_al dinámicamente, así que solo cambia config.h. Pero RPM_MAX=75 con membrana conectada exige aviso explícito en la UI (misma lógica que la alerta amarilla actual).
+
+0.4 — Los factores K no cierran entre sí (punto científico crítico)
+Sensor
+K
+f a su punto de calibración
+Observación
+ALIMENTACION	154.62	105.1 Hz @ 680 mL/min	+58% sobre el nominal 98 — plausible solo si los 680 mL/min vinieron de probeta
+PERMEADO	55.00	5.5 Hz @ 100 mL/min	−44% respecto al feed. Dos unidades del mismo modelo no difieren 2.8× (la dispersión unidad-a-unidad de turbinas es ±10%)
+
+Dos explicaciones posibles, ambas accionables:
+
+K_PERM calibrado debajo del rango del sensor. 100 mL/min está por debajo del mínimo especificado del YF-S401 (300 mL/min). En la zona sub-espec, la turbina resbala → menos Hz por mL/min → K aparente más bajo. Es exactamente lo que la física predice. El permeado de esta planta (Y≈5–15%) opera estructuralmente fuera de spec para este sensor.
+Calibración circular: si los 680 mL/min de ML=13.6 se midieron con el caudalímetro y el K se derivó de la bomba, el sistema se auto-valida. Regla: ML_POR_VUELTA solo con probeta/balanza; K solo contra probeta.
+Acciones: (a) verificar cómo se obtuvo cada número; (b) para el permeado, calibrar una curva polinómica f(Q) con 5–6 puntos de probeta en 50–300 mL/min en vez de un K lineal (la no-linealidad a bajo flujo es real y medible), o evaluar un sensor de micro-caudal dedicado para permeado en el presupuesto del Hito 3; (c) test definitivo de unidad: intercambiar físicamente los sensores de línea y ver si el K sigue al sensor o a la línea.
+
+2.x — Sanity-check de cruce (perdido en v3, restaurarlo)
+cpp
+
+// En el bloque de 1 s:
+bool cruceSensores = (qPerm > qAlim + 50.0f) && (bomba.rpmActual() > 5.0f);
+// → al JSON y al badge PERM de la web. Un cruce de cables es un error de 5 segundos
+//   de detección vs una hora de análisis forense de CSV.
+3. Datalogger y Heap (preguntas A y C)
+A — String: riesgo real, sí. handleStatus() se llama cada 500 ms por cliente; cada llamada hace ~15 realocaciones de String → fragmentación del heap de ~250 KB libres tras WiFi. En sesiones de 2–4 h con CSV abierto, es receta para alloc failed. Solución: snprintf + buffer estático (ya lo teníamos — otra regresión silenciosa):
+
+cpp
+
+void handleStatus() {
+  char j[512];
+  int n = snprintf(j, sizeof(j),
+    "{\"on\":%d,...,\"rpm_al\":%.1f,...}", ...);   // mismo patrón del v2.2
+  server.send(200, "application/json", j);
+}
+Export CSV: nunca armar 60 KB en un String. Streaming por chunks:
+
+cpp
+
+void handleExportCSV() {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/csv", "");
+  server.sendContent("Hora;RPM;Q_Teor;...\n");
+  char fila[160];
+  for (size_t i = 0; i < numRegistros; i++) {
+    int len = snprintf(fila, sizeof(fila), "%u;%.1f;%.1f;...\n",
+                       (unsigned)bufferLog[i].t_relativo_s, bufferLog[i].rpm, ...);
+    server.sendContent(fila, len);
+    if ((i & 31) == 0) yield();          // alimenta al watchdog WiFi
+  }
+  server.sendContent("");                // cierra chunked
+}
+C — RAM vs LittleFS: el buffer estático en RAM es la elección correcta (33.6 KB fijos, cero fragmentación, cero desgaste). La escritura automática a flash cada 10 s serían ~8.600 escrituras/día sin beneficio: un corte de luz igual corrompe la sesión en curso. Recomendación: RAM como buffer primario + commit explícito a LittleFS por botón ("Guardar ensayo") al cerrar sesión + CSV como export principal. Desgaste: 20 commits/día × 34 KB con wear-leveling de LittleFS = décadas de vida útil. Agregar aviso en UI si se detiene el ensayo sin guardar.
+
+4. Bajo Caudal (pregunta E) — conteo recíproco, no input capture
+El problema es real: a 5.5 Hz, ventana de 1 s → 4–7 pulsos → ±1 cuenta = ±18% de cuantización. Pero la solución no es Input Capture por hardware (en ESP32 exigiría RMT/MCPWM y reingeniería): es conteo recíproco híbrido, que el ISR ya puede calcular gratis midiendo el período:
+
+cpp
+
+// ISR: registrar también el período entre pulsos válidos
+void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
+  Caudalimetro* c = static_cast<Caudalimetro*>(arg);
+  uint32_t t = micros();
+  uint32_t periodo = t - c->_t_ultimo;
+  c->_t_ultimo = t;
+  if (periodo >= FILTRO_RUIDO_US) {
+    if (c->_pulsos == 0) c->_t_primero = t;
+    c->_periodo_us = periodo;
+    c->_pulsos++;
+  }
+}
+// actualizar(): f según régimen
+if      (n >= 2) _f = (float)(n - 1) * 1e6f / (float)(_t_ultimo - _t_primero);
+else if (n == 1) _f = 1e6f / (float)_periodo_us;
+else             _f = 0.0f;
+Resolución a 5.5 Hz: el período (~182 ms) se mide con reloj de 4 µs → 0.002% de resolución en vez de ±18%. Coste: 2 volátiles más por instancia. (Leer n, _t_primero, _t_ultimo y _periodo_us bajo el mismo portENTER_CRITICAL.)
+
+5. ADS1115 / TMP (pregunta F)
+Patrón no-bloqueante: conversión single-shot a 860 SPS (~1.2 ms) + lectura I2C a 400 kHz (~0.3 ms) por canal. Estado máquina en el bloque de 1 s (no en el de 50 ms): la bomba ni se entera. La rampa ya absorbe cualquier jitter por compensación dt.
+Reglas I2C: Wire.setTimeOut(50) (evita hang de bus eterno), pull-ups 4.7k, cables <30 cm, jamás Wire dentro de ISR, y un contador de errores CRC/NAK con reset del periférico si el ADS se cuelga (modo degradado: bomba sigue, TMP marca "stale").
+Cuando TMP llegue al Hito 4: el enclavamiento TMP > 0.50 bar va en el bloque de 1 s con lectura stale-aware: si la presión tiene >3 s sin actualizar, el enclavamiento entra en modo seguro (STOP), no en modo ciego.
+6. Hidráulica FX100 y Darcy (pregunta G)
+Con Q_feed 200–600 mL/min en el haz capilar (verificar N de fibras del datasheet Fresenius; con A_m=2.2 m² y L≈0.25–0.32 m da N≈11.500–15.000):
+
+Magnitud
+Fórmula
+@200 mL/min
+@600 mL/min
+v tangencial	
+v=Q/(N⋅πd 
+i
+2
+​
+ /4)
+1.1 cm/s	3.2 cm/s
+Re	
+ρvd 
+i
+​
+ /μ
+≈ 2	≈ 6
+γ_w pared	
+8v/d 
+i
+​
+ 
+≈ 470 s⁻¹	≈ 1400 s⁻¹
+
+Implicación: régimen profundamente laminar siempre (no hay transición turbulenta posible). El control del fouling coloidal de Opuntia no vendrá de turbulencia sino del esfuerzo de corte: γ_w ≥ ~1000 s⁻¹ (Q_feed ≥ ~450 mL/min) reduce significativamente el depósito de torta en flocs blandos. La tensión de diseño: subir Q_feed mejora γ_w pero a válvula fija sube TMP → más arrastre convectivo hacia la membrana. El punto óptimo es el flujo crítico: operar justo por debajo de donde J deja de ser lineal con TMP (eso se mide en el Hito 5 con steps de TMP).
+
+Firmware Darcy (Hito 5): matemática liviana, va en el bloque de 1 s — no necesita tarea propia ni toca el determinismo:
+
+cpp
+
+float J_LMH   = (qPerm / 60000.0f) / AM_M2 * 3600.0f;        // L/m²·h
+float J20     = J_LMH * (viscosidad(T_agua) / 0.001002f);     // corrección TCF
+float R_total = (J_LMH > 0.5f) ? (TMP_pa / (J20 * 2.778e-7f)) : NAN;  // Pa·s/m
+// R_m: de ensayo de agua limpia (regresión TMP vs J); R_torta = R_total − R_m
+Coherencia útil ya verificable hoy: con K_UF=73, TMP = Qp[mL/h]/73 → a 100 mL/min de permeado, TMP limpia ≈ 82 mmHg ≈ 0.11 bar — por debajo del límite mecánico con margen 4.5×. Esa ecuación cruzada es un chequeo de sanidad gratis entre caudalímetro y futuros transductores.
+
+Orden de implementación sugerido para Antigravity
+0.1 + 0.3 (seguridad de membrana y máquina de estados) — bloqueante para ensayar con membrana
+0.4 (verificación de origen de K y ML) — bloqueante para creer los datos
+A (snprintf) + sanity-check de cruce — 30 min, elimina el riesgo de heap
+E (conteo recíproco) — el mayor salto de calidad de dato por línea de código
+C y F — para el cierre del 2.2 y el inicio del 2.3
+Nota final para el manual: la afirmación "filtro RC con f_c≈338 Hz" es correcta pero no es lo que mata el hum de 100 Hz (atenuación a 100 Hz: solo 4%). El mecanismo real del front-end es reducción de impedancia (4.7k dominan sobre los ~35k internos del sensor: la tensión inducida se divide ~10×), y los 100 nF absorben los transitorios de µs del chopping del driver. Precisión que conviene corregir antes de la defensa, porque un jurado puede preguntar por qué un filtro con polo a 338 Hz no filtra 100 Hz.

@@ -45,19 +45,20 @@ SistemaUF/
 │   │   │
 │   │   ├── 📁 subhito2_1_caudalimetros/  ──> Firmware inicial de prueba de pulsos
 │   │   ├── 📁 subhito2_2_v2/             ──> Firmware modular base previo (Cátodo Común)
-│   │   └── 🌟 subhito2_2_v3/             ──> 🚀 HITO 2.2 V3 (VERSIÓN CONSOLIDADA DE PRODUCCIÓN)
-│   │       │
-│   │       ├── 🌟 EN_USO_firmware_planta/   ──> ⭐ SCRIPT ACTUAL EN OPERACIÓN (Grabado en el ESP32)
-│   │       │   ├── EN_USO_firmware_planta.ino ──> Servidor Web SCADA, SoftAP anti-desconexión y datalogger
-│   │       │   ├── config.h                   ──> Pines, 3200 pul/rev, K_alim=154.62, K_perm=55.0, RPM_INICIO=25
-│   │       │   ├── Bomba.h / Bomba.cpp        ──> Rampa S-Curve, control LEDC PWM y Cátodo Común
-│   │       │   ├── caudalimetro.h / .cpp      ──> Cerrojos FreeRTOS (portMUX) y filtro 2000 µs
-│   │       │   └── index_html.h / .cpp        ──> Dashboard web con calibración en marcha y CSV
-│   │       │
-│   │       ├── 💻 firmware_esp32_platformio/  ──> Proyecto configurado para PlatformIO Core CLI
-│   │       ├── 💻 firmware_sensores_test/     ──> Sketch multivariable de adquisición continua
-│   │       └── ⚡ scripts_compilacion_rapida/ ──> Scripts .bat (compilar, flashear y monitor en 3s)
-│   │
+│   │   ├── 📁 subhito2_2_v3/             ──> 🚀 HITO 2.2 V3 (FIRMWARE GRABADO EN ESP32 PARA CALIBRACIÓN)
+│   │   │   ├── 📁 Auditoria_IAS/         ──> 🧠 Informes técnicos de auditoría de Astra, Claude, GLM y Modelo B
+│   │   │   ├── 📁 EN_USO_firmware_planta/ ──> Versión compilada por Owen en banco
+│   │   │   └── ⚡ scripts_compilacion_rapida/
+│   │   │
+│   │   └── 🌟 subhito2_2_v4/             ──> 💎 HITO 2.2 V4 (VERSIÓN MEJORADA TRAS AUDITORÍA DE 4 IAs)
+│   │       ├── 🌟 EN_USO_firmware_planta/   ──> ⭐ CÓDIGO REFACTORIZADO DE PRODUCCIÓN (Listo para compilar)
+│   │       │   ├── EN_USO_firmware_planta.ino ──> Cero fragmentación heap (snprintf/chunked), telemetría heap, cruce
+│   │       │   ├── config.h                   ──> RPM_MAX=100 (factorial agua), alarma 44 RPM, constantes FX100
+│   │       │   ├── Bomba.h / Bomba.cpp        ──> Fix de inversión, setRPM(bool), corte seguro de pulsos
+│   │       │   ├── caudalimetro.h / .cpp      ──> Conteo recíproco (resolución <0.1% a 5.5 Hz), mux independiente
+│   │       │   ├── darcy.h                    ──> Modelo de resistencias en serie, Vogel μ(T), J20 (LMH)
+│   │       │   └── index_html.h / .cpp        ──> Slider 100 RPM, indicador de Flujo Darcy y alerta de cruce
+│   │       └── ⚡ scripts_compilacion_rapida/
 │   └── 📁 Datos/                        ──> 📊 REGISTROS Y ENSAYOS EXPERIMENTALES
 │       ├── CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx ──> Planilla de calibración de probeta de Owen
 │       ├── datos_planta_uf_2026-09-30.csv                     ──> Telemetría cruda en banco

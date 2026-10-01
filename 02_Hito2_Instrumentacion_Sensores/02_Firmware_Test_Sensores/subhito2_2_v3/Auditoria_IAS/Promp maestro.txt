@@ -1,0 +1,647 @@
+# 🏛️ CONTEXTO Y MISIÓN: AUDITORÍA TÉCNICA EXTERNA DE FIRMWARE Y CONTROL INDUSTRIAL
+Eres un **Arquitecto Senior de Sistemas Embebidos (C++ / ESP32 / FreeRTOS)** y **Especialista en Control de Procesos e Instrumentación Industrial**.
+Tu misión es actuar como un **Agente Auditor Externo de Élite** para revisar, auditar, optimizar y criticar constructivamente el firmware de una Planta Piloto de Ultrafiltración.
+Tu interlocutor principal tras recibir tu respuesta será **Antigravity** (el asistente de IA de Google DeepMind en el IDE), junto con el co-director del proyecto (Ing. Enzo) y los tesistas (Owen y Antonella). Por lo tanto, tu respuesta debe ser extremadamente técnica, rigurosa, orientada a C++ moderno y estructurada para que Antigravity pueda analizar tus recomendaciones e implementar las mejoras directamente.
+---
+## 🏭 1. Contexto del Proceso Físico y Restricciones Duras
+1. **El Proceso:** Planta Piloto de Ultrafiltración de flujo tangencial (*cross-flow*) para una tesis de grado (Universidad Nacional de Salta, Argentina).
+   - **Cartucho de Membrana:** Fresenius FX100 (fibras capilares huecas de polisulfona modificada Helixone® de tecnología nanométrica).
+     - **Superficie efectiva ($A_m$):** $2.2\text{ m}^2$.
+     - **Coeficiente de ultrafiltración ($K_{\text{UF}}$):** $73\text{ mL/(h}\cdot\text{mmHg)}$ (régimen de alto flujo / *high-flux*).
+     - **Geometría de fibras:** Diámetro interno de capilar $d_i = 185\ \mu\text{m}$, grosor de pared $\delta = 35\ \mu\text{m}$.
+     - **Morfología de poros:** Poros lisos y cilíndricos en la capa interna activa, optimizados para mínima resistencia al transporte convectivo.
+   - **Límite Hidráulico Crítico:** Caudal máximo seguro de membrana: **$600\text{ mL/min}$** ($\approx 36\text{ RPM}$ con $13.60\text{ mL/rev}$). Presión transmembrana máxima permitida: **$\text{TMP} \le 0.50\text{ bar}$**. Por encima de estos valores existe riesgo inminente de ruptura de capilares y colapso estructural.
+2. **Subsistema de Impulsión:**
+   - Motor paso a paso NEMA 34 (4.5 Nm, con corriente ajustada a ~3A).
+   - Driver industrial **Leadshine DM860**. Conexión en **Cátodo Común** (PUL- y DIR- a GND común; GPIOs del ESP32 envían HIGH a 3.3V / ~8mA a PUL+ y DIR+ para activar los optoacopladores).
+   - Cabezal peristáltico industrial **MBP-2000** con manguera de silicona de $12\text{ mm}$ de diámetro interno.
+   - **Restricción Mecánica:** La bomba y el cabezal **NO deben desmontarse ni modificarse mecánicamente**.
+   - Desplazamiento real calibrado: $\approx 13.60\text{ mL/vuelta}$ (680 mL/min a 50 RPM).
+   - Resolución del driver: **3200 micropasos/rev** (1/16 paso, SW5=OFF, SW6=OFF, SW7=ON, SW8=ON) para eliminar el torque ripple y la resonancia acústica.
+3. **Subsistema de Instrumentación (Caudalímetros):**
+   - Sensores de turbina con transistor Hall NPN en colector abierto (**YF-S401**):
+     - `PIN_SENSOR_ALIMENTACION = 14` (Salida de bomba / Feed).
+     - `PIN_SENSOR_PERMEADO = 27` (Permeado filtrado).
+   - **Arquitectura de Doble Bornera Shield (ZS-1057):**
+     - Placa 1: CPU Master (ESP32 DevKit V1 de 30/38 pines montado).
+     - Placa 2: Módulo Front-End pasivo. Contiene resistencias pull-up externas de **$4.7\text{ k}\Omega$ a 3.3V** y capacitores cerámicos pasabajos de **$100\text{ nF}$ a GND** ($f_c \approx 338\text{ Hz}$).
+   - Salida del sensor Hall: Polarizada a 3.3V para proteger los pines del ESP32 (los sensores se alimentan con 5V en VCC para garantizar la conmutación del chip Hall).
+4. **Estado Actual del Proyecto (Hito 2.2 V3):**
+   - Se resolvió un bug donde el sensor marcaba 81 Hz (835.5 mL/min) con bomba detenida: el filtro por software de $12000\ \mu\text{s}$ ($12\text{ ms}$) actuaba como divisor de frecuencia saturándose ante el zumbido de 50/100 Hz de la red. Se redujo el blanking software a $2000\ \mu\text{s}$ ($2\text{ ms}$) y se colocó el filtro RC físico.
+   - Se corrigió una inversión física de cables (el sensor de bomba estaba conectado en P27 en vez de P14).
+   - Se incorporó persistencia en Flash NVS (`Preferences.h`), rampa cuadrática S-Curve, SoftAP Wi-Fi dedicado (`192.168.4.1`), exportador CSV y datalogger en RAM multi-sesión.
+---
+## 💻 2. Código Fuente Actual Completo (`subhito2_2_v3 / EN_USO_firmware_planta`)
+### A. `config.h`
+```cpp
+#pragma once
+#include <Arduino.h>
+// 1. ASIGNACIÓN DE PINES (PINOUT)
+constexpr uint8_t PIN_PUL                = 18;  // DM860 PUL+ (PUL- a GND común)
+constexpr uint8_t PIN_DIR                = 19;  // DM860 DIR+ (DIR- a GND común)
+constexpr uint8_t PIN_LED_BOMBA          = 2;   // LED Azul Onboard
+constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Caudalímetro Feed
+constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Caudalímetro Permeado (Pull-up 4.7k a 3.3V)
+// 2. PARÁMETROS CINEMÁTICOS DE LA BOMBA (MOTOR NEMA 34 / DM860)
+constexpr uint16_t PULSOS_POR_REV = 3200;     // DM860: 1/16 micropasos
+constexpr float ML_POR_VUELTA     = 13.6000f; // Calibrado: 680.0 mL/min / 50.0 RPM
+constexpr float RPM_MIN           = 15.0f;    // ~204 mL/min
+constexpr float RPM_MAX           = 75.0f;    // ~1020 mL/min
+constexpr float RPM_INICIO        = 25.0f;    // Consigna arranque seguro (<36 RPM límite FX100)
+constexpr float RPM_ALARMA_MEMBRANA = 36.0f;  // Umbral de precaución para el filtro capilar FX100
+constexpr float ACEL_ARRANQUE_RPM_S  = 2.0f;   // 2.0 RPM/s despegue inicial suave
+constexpr float ACEL_NOMINAL_RPM_S   = 3.5f;   // 3.5 RPM/s aceleración progresiva
+constexpr float DESACEL_AJUSTE_RPM_S = 8.0f;   // 8.0 RPM/s desaceleración en marcha
+constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido STOP (< 1.5s)
+// 3. CALIBRACIÓN DE CAUDALÍMETROS YF-S401
+constexpr float K_ALIMENTACION = 154.62f; // Factor K Alimentación (105.14 Hz = 680.0 mL/min)
+constexpr float K_PERMEADO     = 55.00f;  // Factor K Permeado (5.50 Hz = 100.0 mL/min)
+constexpr uint32_t FILTRO_RUIDO_US = 2000;    // 2.0 ms blanking anti-rebote
+constexpr float Q_MAX_FISICO_MLMIN = 6000.0f; // Límite de corte físico (6.0 L/min)
+// 4. DATALOGGER Y AUTO-CALIBRACIÓN
+constexpr uint32_t INTERVALO_LOG_MS   = 10000;  // Registro cada 10s
+constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 1.66 horas
+constexpr size_t   MAX_ENSAYOS        = 20;     // Hasta 20 corridas
+constexpr uint8_t  MUESTRAS_AUTO_CAL  = 15;     // 15 muestras para auto-cal
+// 5. WI-FI
+constexpr const char* SSID_AP  = "Bomba_Peristaltica_UF";
+constexpr const char* PASS_AP  = "plantapiloto2";
+constexpr const char* SSID_STA = "Box804";
+constexpr const char* PASS_STA = "plantapiloto2";
+
+  
+B. Bomba.h & Bomba.cpp
+
+  
+cpp
+// Bomba.h
+#pragma once
+#include <Arduino.h>
+#include "config.h"
+class Bomba {
+public:
+  void begin();
+  void arrancar();
+  void detener();
+  void setRPM(float rpm);
+  void toggleSentido();
+  float rpmActual() const           { return _actual; }
+  float rpmObjetivo() const         { return _objetivo; }
+  bool  enMarcha() const            { return _enMarcha; }
+  bool  invirtiendo() const         { return _invirtiendo; }
+  bool  sentidoHorario() const      { return _horario; }
+  bool  enRegimenEstable() const    { return (_enMarcha && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
+  float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
+  void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
+  float getMlPorVuelta() const      { return _mlPorVuelta; }
+  void     setPulsosPorRev(uint16_t p) { if (p >= 200) _pulsosPorRev = p; }
+  uint16_t getPulsosPorRev() const     { return _pulsosPorRev; }
+  void tick(float dt);
+private:
+  void fijarSentido(bool horario);
+  bool _enMarcha = false;
+  bool _horario = true;
+  bool _invirtiendo = false;
+  float _objetivo = RPM_INICIO;
+  float _actual = 0.0f;
+  float _rpmGuardada = RPM_INICIO;
+  uint32_t _fActual = 0;
+  float    _mlPorVuelta  = ML_POR_VUELTA;
+  uint16_t _pulsosPorRev = PULSOS_POR_REV;
+};
+
+  
+cpp
+// Bomba.cpp
+#include "Bomba.h"
+void Bomba::begin() {
+  pinMode(PIN_DIR, OUTPUT);
+  fijarSentido(true);
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+  ledcAttach(PIN_PUL, 800, 10);
+  ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF
+#else
+  ledcSetup(0, 800, 10);
+  ledcAttachPin(PIN_PUL, 0);
+  ledcWrite(0, 0);
+#endif
+}
+void Bomba::arrancar() { _enMarcha = true; }
+void Bomba::detener()  { _enMarcha = false; _invirtiendo = false; }
+void Bomba::setRPM(float rpm) {
+  _objetivo = constrain(rpm, RPM_MIN, RPM_MAX);
+}
+void Bomba::toggleSentido() {
+  if (_invirtiendo) return;
+  if (_actual < 1.0f) {
+    fijarSentido(!_horario);
+  } else {
+    _invirtiendo = true;
+    _rpmGuardada = _objetivo;
+    _objetivo = 0.0f;
+  }
+}
+void Bomba::fijarSentido(bool horario) {
+  _horario = horario;
+  digitalWrite(PIN_DIR, horario ? LOW : HIGH);
+}
+void Bomba::tick(float dt) {
+  float objetivo = _enMarcha ? _objetivo : 0.0f;
+  if (_actual < objetivo) {
+    if (_actual < 1.0f) _actual = 1.0f;
+    float tasaAcel = ACEL_NOMINAL_RPM_S;
+    if (_actual < 10.0f) {
+      tasaAcel = ACEL_ARRANQUE_RPM_S + (_actual / 10.0f) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
+    }
+    float delta = objetivo - _actual;
+    if (delta < 3.0f) tasaAcel = max(0.8f, tasaAcel * (delta / 3.0f));
+    _actual = min(objetivo, _actual + tasaAcel * dt);
+  } else if (_actual > objetivo) {
+    if (!_enMarcha) {
+      _actual = max(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
+      if (_actual < 1.0f) _actual = 0.0f;
+    } else {
+      float tasaDecel = DESACEL_AJUSTE_RPM_S;
+      float delta = _actual - objetivo;
+      if (delta < 3.0f) tasaDecel = max(1.0f, tasaDecel * (delta / 3.0f));
+      _actual = max(objetivo, _actual - tasaDecel * dt);
+    }
+  }
+  if (_invirtiendo && _actual <= 0.1f) {
+    fijarSentido(!_horario);
+    _invirtiendo = false;
+    _objetivo = _rpmGuardada;
+  }
+  if (_actual >= 1.0f) {
+    uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
+    if (f < 50) f = 50;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    if (f != _fActual) { ledcChangeFrequency(PIN_PUL, f, 10); _fActual = f; }
+    ledcWrite(PIN_PUL, 512); // Duty 50%
+#else
+    if (f != _fActual) { ledcSetup(0, f, 10); _fActual = f; }
+    ledcWrite(0, 512);
+#endif
+  } else if (_fActual != 0) {
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
+    _fActual = 0;
+  }
+}
+
+  
+C. caudalimetro.h & caudalimetro.cpp
+
+  
+cpp
+// caudalimetro.h
+#pragma once
+#include <Arduino.h>
+#include "config.h"
+class Caudalimetro {
+public:
+  Caudalimetro(uint8_t pin, float k, const char* nombre);
+  void begin();
+  void actualizar(float dt_s, bool bombaEmpuja);
+  float caudal_mLmin()  const { return _q; }
+  float caudal_Lmin()   const { return _q / 1000.0f; }
+  float frecuencia_Hz() const { return _f; }
+  float volumen_L()     const { return _vol; }
+  bool  sinSenal()      const { return _fallo; }
+  void  resetVolumen()        { _vol = 0.0f; }
+  const char* nombre()  const { return _nombre; }
+  void  setK(float nuevoK)    { if (nuevoK > 0.1f) _k = nuevoK; }
+  float getK()          const { return _k; }
+private:
+  static void IRAM_ATTR isrPuente(void* arg);
+  const uint8_t _pin;
+  float         _k;
+  const char*   _nombre;
+  volatile uint32_t _pulsos = 0;
+  volatile uint32_t _t_ultimo = 0;
+  float _f = 0.0f, _q = 0.0f, _vol = 0.0f;
+  uint8_t _segSinPulso = 0;
+  bool _fallo = false;
+  static portMUX_TYPE _mux;
+};
+
+  
+cpp
+// caudalimetro.cpp
+#include "caudalimetro.h"
+portMUX_TYPE Caudalimetro::_mux = portMUX_INITIALIZER_UNLOCKED;
+Caudalimetro::Caudalimetro(uint8_t pin, float k, const char* nombre)
+  : _pin(pin), _k(k), _nombre(nombre) {}
+void Caudalimetro::begin() {
+  pinMode(_pin, INPUT_PULLUP);
+  attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, FALLING);
+}
+void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
+  portENTER_CRITICAL(&_mux);
+  uint32_t n = _pulsos;
+  _pulsos = 0;
+  portEXIT_CRITICAL(&_mux);
+  _f = (dt_s > 0.0f) ? ((float)n / dt_s) : 0.0f;
+  float q = (_f * 1000.0f) / _k;
+  if (q > Q_MAX_FISICO_MLMIN) {
+    q = 0.0f;
+  }
+  // Suavizado EMA
+  _q = (n > 0) ? (0.4f * q + 0.6f * _q) : 0.0f;
+  _vol += (float)n / (_k * 60.0f);
+  if (n > 0) {
+    _segSinPulso = 0;
+    _fallo = false;
+  } else if (bombaEmpuja) {
+    if (++_segSinPulso >= 5) _fallo = true;
+  } else {
+    _segSinPulso = 0;
+    _fallo = false;
+  }
+}
+void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
+  Caudalimetro* c = reinterpret_cast<Caudalimetro*>(arg);
+  uint32_t t = micros();
+  if (t - c->_t_ultimo >= FILTRO_RUIDO_US) {
+    portENTER_CRITICAL_ISR(&_mux);
+    c->_pulsos++;
+    portEXIT_CRITICAL_ISR(&_mux);
+    c->_t_ultimo = t;
+  }
+}
+
+  
+D. EN_USO_firmware_planta.ino (Esqueleto Principal y WebServer)
+
+  
+cpp
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+#include "config.h"
+#include "caudalimetro.h"
+#include "Bomba.h"
+#include "index_html.h"
+struct RegistroCalibracion {
+  uint8_t  id_ensayo;
+  uint32_t t_relativo_s;
+  float    rpm, q_bomba, f_alim, q_alim, vol_alim, f_perm, q_perm, vol_perm, q_ret, recov, delta, k_alim, k_perm;
+};
+struct EnsayoInfo {
+  uint8_t  id;
+  float    rpm_consigna;
+  uint32_t t_inicio_ms, duracion_s;
+  uint16_t muestras;
+  float    vol_alim, vol_perm;
+};
+RegistroCalibracion bufferLog[MAX_REGISTROS];
+size_t numRegistros = 0;
+EnsayoInfo listaEnsayos[MAX_ENSAYOS];
+size_t numEnsayos = 0;
+uint8_t ensayoActualId = 1;
+uint32_t tInicioEnsayo_ms = 0;
+float volAlimInicioEnsayo = 0.0f, volPermInicioEnsayo = 0.0f;
+bool  bombaEnMarchaAnterior = false;
+bool    autoCalibrando = false;
+uint8_t autoCalMuestras = 0;
+float   autoCalSumFrecAlim = 0.0f, autoCalSumFrecPerm = 0.0f;
+String  autoCalMensaje = "";
+Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION");
+Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO");
+Bomba bomba;
+WebServer server(80);
+Preferences prefs;
+float qRet_mLmin = 0.0f, recuperacion = 0.0f, deltaBomba = 0.0f;
+uint32_t tLoop = 0, tCaudal = 0, tDatalogger = 0;
+void cargarParametrosNVS() {
+  prefs.begin("planta_uf", false);
+  sensorAlimentacion.setK(prefs.getFloat("k_alim", K_ALIMENTACION));
+  sensorPermeado.setK(prefs.getFloat("k_perm", K_PERMEADO));
+  bomba.setMlPorVuelta(prefs.getFloat("ml_rev", ML_POR_VUELTA));
+  bomba.setPulsosPorRev(prefs.getUShort("pul_rev", PULSOS_POR_REV));
+}
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+  prefs.putFloat("k_alim", ka);
+  prefs.putFloat("k_perm", kp);
+  prefs.putFloat("ml_rev", ml);
+  prefs.putUShort("pul_rev", pul);
+}
+// Rutas WebServer:
+// - GET "/" -> handleRoot (envía INDEX_HTML desde Flash PROGMEM)
+// - GET "/status" -> handleStatus (arma JSON grande con concatenación de String)
+// - GET "/cmd?act=start|stop|rev" -> control de marcha
+// - GET "/set?rpm=XX" -> setRPM
+// - GET "/calibrar_rpm_q?rpm=XX&qa=XX&qp=XX" -> recalcula K y cilindrada y graba NVS
+// - GET "/export_csv?ensayo=all|actual|ID" -> descarga CSV formateado para Excel
+// - GET "/iniciar_auto_cal" -> inicia rutina de 15 muestras en régimen estable
+void setup() {
+  Serial.begin(115200);
+  cargarParametrosNVS();
+  pinMode(PIN_LED_BOMBA, OUTPUT);
+  sensorAlimentacion.begin();
+  sensorPermeado.begin();
+  bomba.begin();
+  // Wi-Fi SoftAP Dedicado Anti-Desconexión
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_AP);
+  WiFi.setSleep(false);                 // Desactiva ahorro de energía RF
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);  // Potencia máxima
+  WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4);
+  MDNS.begin("bomba");
+  server.begin();
+  tLoop = millis();
+  tCaudal = millis();
+  tDatalogger = millis();
+}
+void loop() {
+  server.handleClient();
+  uint32_t tAhora = millis();
+  // 1. Control cinemático cada 50 ms
+  if (tAhora - tLoop >= 50) {
+    float dt = (tAhora - tLoop) / 1000.0f;
+    tLoop = tAhora;
+    bomba.tick(dt);
+    digitalWrite(PIN_LED_BOMBA, (bomba.rpmActual() > 0.5f) ? HIGH : LOW);
+  }
+  // 2. Muestreo de caudal cada 1000 ms
+  if (tAhora - tCaudal >= 1000) {
+    float dt = (tAhora - tCaudal) / 1000.0f;
+    tCaudal = tAhora;
+    bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
+    sensorAlimentacion.actualizar(dt, bombaEmpuja);
+    sensorPermeado.actualizar(dt, bombaEmpuja);
+    float qAlim = sensorAlimentacion.caudal_mLmin();
+    float qPerm = sensorPermeado.caudal_mLmin();
+    qRet_mLmin   = max(0.0f, qAlim - qPerm);
+    recuperacion = (qAlim > 1.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
+    // Lógica de Auto-calibración (si está activa, promedia 15 muestras estables)
+  }
+  // 3. Datalogger cada 10 segundos (guarda en bufferLog[MAX_REGISTROS])
+  if (tAhora - tDatalogger >= INTERVALO_LOG_MS) {
+    tDatalogger = tAhora;
+    if (bomba.enMarcha() || sensorAlimentacion.caudal_mLmin() > 10.0f) {
+      guardarMuestraDatalogger();
+    }
+  }
+}
+
+  
+
+  
+🎯 3. Preguntas y Áreas de Auditoría que Debes Analizar
+
+  
+
+Por favor, como Arquitecto Senior y Auditor Externo, analiza exhaustivamente el código y el sistema, respondiendo a los siguientes puntos críticos:
+
+
+  
+A. Gestión de Memoria y Fragmentación de Heap (Riesgo en Operación Continua)
+
+  
+
+  
+En handleStatus() y handleExportCSV(), el firmware utiliza concatenación extensiva de la clase String de Arduino (json += ... y chunk += ...). ¿Existe riesgo real de fragmentación de heap y kernel panic en ensayos prolongados de 2 a 4 horas? ¿Qué recomiendas: snprintf con buffers estáticos, vsnprintf en chunks de streaming, o una biblioteca ligera?
+
+  
+
+  
+B. Arquitectura de Concurrencia y Sincronización FreeRTOS
+
+  
+
+  
+Analiza la interacción entre la interrupción ISR (isrPuente que usa portENTER_CRITICAL_ISR(&_mux)), la lectura en actualizar() (portENTER_CRITICAL(&_mux)), y el servidor web corriendo en el hilo principal de Arduino (Core 1).
+
+  
+¿Hay algún riesgo de contención excesiva, inversión de prioridad o jitter en el timer PWM de la bomba?
+
+  
+
+  
+C. Almacenamiento del Datalogger (RAM vs. LittleFS/Flash)
+
+  
+
+  
+Actualmente bufferLog[MAX_REGISTROS] consume 
+≈
+33.6
+ KB
+≈33.6 KB de RAM estática (
+600
+×
+56
+ bytes
+600×56 bytes).
+
+  
+¿Es adecuado mantenerlo en RAM volátil considerando reinicios accidentales, o sugieres migrar el buffer circular a LittleFS en la partición SPIFFS? ¿Cómo afectaría el desgaste de escritura de la memoria flash?
+
+  
+
+  
+D. Cinemática del Motor y Protección del Driver DM860
+
+  
+
+  
+Evalúa el generador de pulsos en Bomba.cpp basado en ledcChangeFrequency y ledcWrite(PIN_PUL, 512).
+
+  
+¿Es óptimo cambiar la frecuencia del módulo LEDC en tiempo real en cada ciclo de 50 ms? ¿Hay glitches de conmutación o micropasos truncados durante las rampas de aceleración que puedan inducir vibración o pérdida de pasos en el NEMA 34?
+
+  
+
+  
+E. Procesamiento de Señal de Caudal y No-Linealidad a Bajo Flujo
+
+  
+
+  
+El sensor de permeado trabaja con frecuencia muy baja a bajos caudales (
+5.5
+ Hz
+5.5 Hz para 
+100
+ mL/min
+100 mL/min). A 
+100
+ mL/min
+100 mL/min, una turbina YF-S401 apenas entrega ~5 pulsos por segundo.
+
+  
+¿Es suficiente un intervalo de cálculo de 
+1.0
+ s
+1.0 s para el permeado o se produce cuantización severa en el cálculo instantáneo? ¿Recomiendas medir período entre pulsos en microsegundos (Input Capture) en vez de contar pulsos por segundo para el canal de bajo caudal?
+
+  
+
+  
+F. Preparación para los Próximos Hitos: Integración de ADS1115 (I2C) y TDS
+
+  
+
+  
+En los siguientes pasos (Hitos 2.3 y 2.4), se incorporará un conversor ADC ADS1115 de 16 bits por bus I2C (GPIO 21 y 22) para leer 3 transductores de presión (TMP) y una sonda TDS de conductividad.
+
+  
+¿Qué precauciones de temporización y bloqueo I2C debemos tomar para que la lectura del ADS1115 no bloquee el loop de 50 ms de la bomba ni interfiera con las interrupciones del caudalímetro?
+
+  
+
+  
+G. Modelado de Fenómenos de Transporte y Membrana FX100 (Hito 5 - Darcy y Fouling)
+
+  
+
+  
+Conociendo que el dializador FX100 posee 
+𝐴
+𝑚
+=
+2.2
+ m
+2
+A
+m
+	​
+
+=2.2 m
+2
+, 
+𝐾
+UF
+=
+73
+ mL/(h
+⋅
+mmHg)
+K
+UF
+	​
+
+=73 mL/(h⋅mmHg), capilares con diámetro interno 
+𝑑
+𝑖
+=
+185
+ 
+𝜇
+m
+d
+i
+	​
+
+=185 μm y pared 
+𝛿
+=
+35
+ 
+𝜇
+m
+δ=35 μm:
+  
+  
+
+  
+¿Cuál es la implicación hidrodinámica de operar a caudales de alimentación de 
+200
+200 a 
+600
+ mL/min
+600 mL/min en términos de velocidad tangencial capilar (
+𝑣
+𝑐
+𝑎
+𝑝
+v
+cap
+	​
+
+), número de Reynolds laminar y esfuerzo de corte en la pared capilar (
+𝛾
+𝑤
+γ
+w
+	​
+
+) para mitigar la formación de torta coloidal de Opuntia?
+
+  
+¿Cómo recomiendas estructurar en el firmware FreeRTOS el cálculo en tiempo real del flujo normalizado 
+𝐽
+20
+J
+20
+	​
+
+ (
+LMH
+LMH) y la resistencia hidráulica total (
+𝑅
+total
+=
+𝑅
+𝑚
++
+𝑅
+torta
+R
+total
+	​
+
+=R
+m
+	​
+
++R
+torta
+	​
+
+) según la Ley de Darcy sin degradar el determinismo del sistema?
+
+  
+
+  
+
+  
+
+  
+📋 4. Formato de Respuesta Requerido
+
+  
+
+Estructura tu respuesta técnica en las siguientes secciones:
+
+
+  
+
+  
+Diagnóstico Ejecutivo: Evaluación general del diseño actual (fortalezas y vulnerabilidades críticas detectadas).
+
+  
+Hallazgos Críticos y Código Refactorizado: Mejoras concretas y listas para implementar (con fragmentos de código C++ / Arduino listos para copiar y reemplazar).
+
+  
+Optimización del Datalogger y Eliminación de Fragmentación de Heap: Solución técnica para el armado de JSON/CSV sin fugas de memoria.
+
+  
+Propuesta para Mediciones de Bajo Caudal (Permeado): Algoritmo recomendado para eliminar el error de cuantización en frecuencias 
+<
+10
+ Hz
+<10 Hz.
+
+  
+Recomendaciones de Arquitectura para la integración de TMP/ADS1115 (Hitos 2.3 y 2.4).
+
+  
+Consideraciones Hidráulicas y Modelado Darcy para la Membrana FX100 (Hito 5).

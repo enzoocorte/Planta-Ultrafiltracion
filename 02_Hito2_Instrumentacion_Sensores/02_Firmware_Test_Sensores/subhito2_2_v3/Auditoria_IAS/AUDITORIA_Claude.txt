@@ -1,0 +1,52 @@
+MODELO A
+// darcy.h — modelo de resistencias en serie, unidades SI internas
+#pragma once
+#include <math.h>
+
+struct ResultadoDarcy { float J_LMH, J20_LMH, mu_Pas, Rtot, Rcake, TCF; bool valido; };
+
+class ModeloDarcy {
+public:
+  static constexpr float AREA_M2 = 2.2f;
+  static constexpr float MU20    = 1.002e-3f;           // Pa·s, agua a 20 °C
+
+  void setRm(float rm) { if (rm > 1e11f && rm < 1e15f) _Rm = rm; }
+  float Rm() const     { return _Rm; }
+
+  // Viscosidad del agua (Vogel): mu = A·10^(B/(T−C)), T en K
+  static float muAgua(float T_C) {
+    const float T = T_C + 273.15f;
+    return 2.414e-5f * powf(10.0f, 247.8f / (T - 140.0f));
+  }
+
+  ResultadoDarcy calcular(float qPerm_mLmin, float tmp_bar, float T_C) const {
+    ResultadoDarcy r{};
+    if (!isfinite(tmp_bar) || !isfinite(T_C) || tmp_bar < 0.02f || qPerm_mLmin < 1.0f) return r;
+
+    r.mu_Pas  = muAgua(T_C);
+    r.TCF     = r.mu_Pas / MU20;                         // Factor de corrección por temperatura
+    r.J_LMH   = (qPerm_mLmin * 0.06f) / AREA_M2;         // mL/min → L/h, dividido por m²
+    r.J20_LMH = r.J_LMH * r.TCF;
+
+    const float J_SI   = r.J_LMH / 3.6e6f;               // LMH → m/s
+    const float TMP_Pa = tmp_bar * 1.0e5f;
+    r.Rtot  = TMP_Pa / (r.mu_Pas * J_SI);                // Darcy: J = TMP / (mu·Rtot)
+    r.Rcake = r.Rtot - _Rm;                              // Torta + polarización + adsorción
+    r.valido = true;
+    return r;
+  }
+
+  // Ajuste de Rm con agua limpia: regresión J vs TMP por mínimos cuadrados con ordenada nula
+  void acumularPuntoAgua(float J_SI, float TMP_Pa) { _sJP += J_SI * TMP_Pa; _sPP += TMP_Pa * TMP_Pa; }
+  bool cerrarCalibracionRm(float mu) {
+    if (_sJP <= 0.0f) return false;
+    const float Lp = _sJP / _sPP;                        // m/(s·Pa)
+    setRm(1.0f / (mu * Lp));
+    _sJP = _sPP = 0.0f;
+    return true;
+  }
+
+private:
+  float _Rm = 1.45e13f;                                  // Nominal; reemplazar por el medido
+  float _sJP = 0.0f, _sPP = 0.0f;
+};
