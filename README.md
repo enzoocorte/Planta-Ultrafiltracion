@@ -96,8 +96,8 @@ SistemaUF/
 
 #### 📊 `02_Hito2_Instrumentacion_Sensores/` *(¡Carpeta en Operación y Calibración Actual!)*
 * **Contenido**: 
-  - 🌟 **[firmware_planta/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/)**: **Firmware Oficial de Producción**. NVS Flash permanente (`Preferences.h`), auto-calibración en marcha con probeta, rampa S-Curve, y Web SCADA en SoftAP puro (`192.168.4.1`).
-  - ⚡ **[scripts_compilacion_rapida/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/scripts_compilacion_rapida/)**: Scripts `.bat` para compilar con PlatformIO y subir binarios al ESP32 en 3 segundos.
+  - 🌟 **[subhito2_2_v3 / EN_USO_firmware_planta/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/)**: **Firmware Oficial de Producción en Uso (Compilado en ESP32)**. NVS Flash permanente (`Preferences.h`), auto-calibración en marcha con probeta, rampa S-Curve, y Web SCADA en SoftAP puro (`192.168.4.1`).
+  - ⚡ **[scripts_compilacion_rapida/](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v3/scripts_compilacion_rapida/)**: Scripts `.bat` para compilar con PlatformIO y subir binarios al ESP32 en 3 segundos.
   - 🩺 **[Diagnostico_y_Resolucion_Problemas_Instrumentacion.md](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento para tesis**. Análisis matemático y físico de la saturación a 81 Hz (835.5 mL/min), solución al zumbido de 50 Hz/100 Hz, filtro pasabajos RC y resolución del cruce de canales.
   - 📈 **[Simulaciones_Filtro_RC/](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Simulaciones_Filtro_RC/)**: Simulación en **LTspice** (`simulacion_filtro_caudalimetro.asc`), script de modelado en Python y curvas de atenuación de ruido.
   - 🖥️ **[Esquemas_Conexionado_HTML/](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Esquemas_Conexionado_HTML/)**: Colección de planos interactivos SVG (borneras ZS-1057, protoboard, capacitor de desacoplo y nodo pull-up).

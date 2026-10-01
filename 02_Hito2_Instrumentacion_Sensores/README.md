@@ -75,12 +75,13 @@ Para avanzar con método científico y validación segura paso a paso en el banc
   * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
 
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🌟 **[`firmware_planta/`](./02_Firmware_Test_Sensores/firmware_planta/)**: **FIRMWARE OFICIAL DE PRODUCCIÓN (Grabado en ESP32)**: Auto-calibración en marcha con probeta, persistencia Flash NVS (`Preferences.h`), filtro anti-ruido optimizado a 2000 µs, datalogger multi-sesión (600 muestras), rampa S-Curve progresiva, y Web SCADA en SoftAP puro (`192.168.4.1`).
-  * 💻 **[`firmware_esp32_platformio/`](./02_Firmware_Test_Sensores/firmware_esp32_platformio/)**: Entorno de compilación rápida para desarrolladores con PlatformIO Core CLI.
-  * ⚡ **[`scripts_compilacion_rapida/`](./02_Firmware_Test_Sensores/scripts_compilacion_rapida/)**: Accesos directos `.bat` para compilar, subir y abrir el monitor serie en segundos.
+  * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: **HITO 2.2 V3 — CONSOLIDACIÓN DE PRODUCCIÓN**:
+    * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/)**: **FIRMWARE ACTIVO EN OPERACIÓN (Compilado y grabado en ESP32)**. Auto-calibración con probeta, Flash NVS permanente (`Preferences.h`), filtro anti-ruido a 2000 µs, datalogger de 600 muestras y Web SCADA en SoftAP puro (`192.168.4.1`).
+    * 💻 **[`firmware_esp32_platformio/`](./02_Firmware_Test_Sensores/subhito2_2_v3/firmware_esp32_platformio/)**: Entorno de compilación incremental rápida con PlatformIO Core CLI.
+    * ⚡ **[`scripts_compilacion_rapida/`](./02_Firmware_Test_Sensores/subhito2_2_v3/scripts_compilacion_rapida/)**: Accesos directos `.bat` para compilar, subir y abrir el monitor serie en 3 segundos.
+    * 💻 **[`firmware_sensores_test/`](./02_Firmware_Test_Sensores/subhito2_2_v3/firmware_sensores_test/)**: Sketch multivariable de adquisición continua.
   * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: Firmware modular base previo con arquitectura C++ (Bomba y Caudalímetro).
   * 🌊 **[`subhito2_1_caudalimetros/`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/)**: Firmware básico de prueba para Subhito 2.1 con interrupciones por hardware.
-  * 💻 **[`firmware_sensores_test/`](./02_Firmware_Test_Sensores/firmware_sensores_test/)**: Sketch integral multivariable de adquisición de datos en tiempo real y transmisión serie.
 
 * 📁 **[`Datos/`](./Datos/)**:
   * 📊 **[`CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx`](./Datos/CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx)**: Planilla oficial de calibración de probeta de Owen a 50 RPM y 72 RPM con factores K resultantes.

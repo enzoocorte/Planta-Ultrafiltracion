@@ -43,15 +43,20 @@ SistemaUF/
 │   │
 │   ├── 📁 02_Firmware_Test_Sensores/
 │   │   │
-│   │   ├── 🌟 firmware_planta/           ──> 🚀 FIRMWARE OFICIAL DE PRODUCCIÓN (Grabado en el ESP32)
-│   │   │   ├── firmware_planta.ino       ──> Servidor Web SCADA, SoftAP anti-desconexión y datalogger
-│   │   │   ├── config.h                  ──> Pines, 3200 pul/rev, K_alim=154.62, K_perm=55.0, RPM_INICIO=25
-│   │   │   ├── Bomba.h / Bomba.cpp       ──> Rampa S-Curve, control LEDC PWM y Cátodo Común
-│   │   │   ├── caudalimetro.h / .cpp     ──> Cerrojos FreeRTOS (portMUX) y filtro 2000 µs
-│   │   │   └── index_html.h / .cpp       ──> Dashboard web con calibración y exportación CSV
-│   │   │
-│   │   ├── 📁 firmware_esp32_platformio/ ──> Proyecto configurado para compilar con PlatformIO Core CLI
-│   │   └── 📁 scripts_compilacion_rapida/──> Scripts .bat (compilar, flashear y monitor en 3 segundos)
+│   │   ├── 📁 subhito2_1_caudalimetros/  ──> Firmware inicial de prueba de pulsos
+│   │   ├── 📁 subhito2_2_v2/             ──> Firmware modular base previo (Cátodo Común)
+│   │   └── 🌟 subhito2_2_v3/             ──> 🚀 HITO 2.2 V3 (VERSIÓN CONSOLIDADA DE PRODUCCIÓN)
+│   │       │
+│   │       ├── 🌟 EN_USO_firmware_planta/   ──> ⭐ SCRIPT ACTUAL EN OPERACIÓN (Grabado en el ESP32)
+│   │       │   ├── EN_USO_firmware_planta.ino ──> Servidor Web SCADA, SoftAP anti-desconexión y datalogger
+│   │       │   ├── config.h                   ──> Pines, 3200 pul/rev, K_alim=154.62, K_perm=55.0, RPM_INICIO=25
+│   │       │   ├── Bomba.h / Bomba.cpp        ──> Rampa S-Curve, control LEDC PWM y Cátodo Común
+│   │       │   ├── caudalimetro.h / .cpp      ──> Cerrojos FreeRTOS (portMUX) y filtro 2000 µs
+│   │       │   └── index_html.h / .cpp        ──> Dashboard web con calibración en marcha y CSV
+│   │       │
+│   │       ├── 💻 firmware_esp32_platformio/  ──> Proyecto configurado para PlatformIO Core CLI
+│   │       ├── 💻 firmware_sensores_test/     ──> Sketch multivariable de adquisición continua
+│   │       └── ⚡ scripts_compilacion_rapida/ ──> Scripts .bat (compilar, flashear y monitor en 3s)
 │   │
 │   └── 📁 Datos/                        ──> 📊 REGISTROS Y ENSAYOS EXPERIMENTALES
 │       ├── CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx ──> Planilla de calibración de probeta de Owen
@@ -68,10 +73,10 @@ SistemaUF/
 
 ---
 
-## ⚙️ 3. El Firmware Oficial de la Planta (`firmware_planta`)
+## ⚙️ 3. El Firmware Oficial de la Planta (`subhito2_2_v3 / EN_USO_firmware_planta`)
 
 El código oficial que rige el proyecto y que se encuentra compilado en el microcontrolador es:  
-👉 **[`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/)**
+👉 **[`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/)**
 
 ### Parámetros Maestros en `config.h`:
 * **Driver Leadshine DM860:** Cátodo Común (`PIN_PUL = 18`, `PIN_DIR = 19`).
