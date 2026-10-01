@@ -45,7 +45,7 @@ private:
   float _f = 0.0f;
   float _q = 0.0f;
   float _vol = 0.0f;
-  uint8_t _segSinPulso = 0;
+  float _tiempoSinPulso_s = 0.0f;
   bool _fallo = false;
 
   portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;

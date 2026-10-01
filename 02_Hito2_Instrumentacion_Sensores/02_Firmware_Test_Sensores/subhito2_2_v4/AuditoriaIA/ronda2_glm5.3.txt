@@ -1,0 +1,240 @@
+🏛️ AUDITORÍA RONDA 2 — Veredicto sobre v4 y respuestas A–D
+✅ Validación de v4: los tres hallazgos de Ronda 1 están correctamente resueltos
+Fix
+Verificación línea a línea
+Inversión de marcha	Recorrí todos los caminos: DIR en marcha → _rpmGuardada capturado con guarda ✓ · cambio de slider durante frenado → _rpmGuardada actualizado ✓ · STOP durante inversión → _invirtiendo=false con _rpmGuardada intacto (el guard de detener() evita guardar el 0) ✓ · START posterior → restauración con fallback ✓ · conmutación en tick() con corte de pulsos antes del flip (ledcWrite 0 → fijarSentido) ✓. Máquina de estados cerrada.
+Fragmentación de heap	snprintf + streaming chunked + telemetría de getFreeHeap()/largestFreeBlock() = solución correcta y además auditable en vivo (podés graficar el heap durante un ensayo de 2 h y mostrar la planitud como evidencia)
+Cuantización a bajo flujo	Conteo recíproco híbrido bien implementado: n≥2 usa el span ventana (precisión de reloj), n==1 usa el período del último par de pulsos (que cruza ventanas — correcto por diseño), retención anti-parpadeo a 2.5 períodos ✓
+
+La reorganización del límite clínico (44 RPM = 598 mL/min ✓ verificado: 44×13.6=598.4) con RPM_MAX=100 como régimen exploratorio es coherente y está bien documentada. El _mux individual por sensor también es la mejora correcta (elimina contención cruzada entre ISRs).
+
+🔍 A. Escenarios de borde del conteo recíproco — 3 hallazgos (1 real, 2 documentales)
+A.1 🔴 El wrap del período tras parada larga (hardening recomendado)
+uint32_t micros() envuelve cada ~71.6 min. Si la bomba estuvo detenida más de 71 min, el primer flanco del reinicio calcula dt = t - _t_ultimo sobre el contador envuelto → puede dar un valor pequeño falso (ej. 10 ms) → _periodo_us=10000 → ventana siguiente n==1 → _f = 100 Hz fantasma. Probabilidad baja, pero un ensayo que arranca después del almuerzo puede caer justo ahí. Guard en la ISR:
+
+cpp
+
+void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
+  Caudalimetro* c = reinterpret_cast<Caudalimetro*>(arg);
+  uint32_t t = micros();
+  uint32_t dt = t - c->_t_ultimo;
+  if (dt > 10000000UL) {                       // hueco > 10 s: parada larga o wrap
+    portENTER_CRITICAL_ISR(&c->_mux);
+    c->_t_primero = t;  c->_periodo_us = 0;    // re-armar sin período falso
+    c->_t_ultimo  = t;  c->_pulsos++;          // el pulso cuenta volumen, no frecuencia
+    portEXIT_CRITICAL_ISR(&c->_mux);
+    return;
+  }
+  if (dt >= FILTRO_RUIDO_US) { /* ... igual que ahora ... */ }
+}
+A.2 La retención suprime temporalmente el "SIN SEÑAL" (documentar, no corregir)
+Durante la retención, _f > 0.1f resetea _segSinPulso → la alerta de falla se retrasa en 2.5 × período + 5 s. Números: a 5.5 Hz → +0.46 s (imperceptible); a 1 Hz → 7.5 s; a 0.2 Hz → ~17.5 s. Siempre finito y acotado — aceptable, pero anotarlo en el manual para que nadie lo confunda con un fallo de detección.
+
+A.3 Menores
+setRPM usa std::isfinite → falta #include <cmath> en Bomba.h.
+El frenado de inversión usa DESACEL_AJUSTE (8 RPM/s): desde 100 RPM son ~12.5 s de frenado. Válido, pero si el retrolavado frecuente lo hace lento, un _invirtiendo ? 20 : DESACEL_AJUSTE lo lleva a ~5 s. Decisión de proceso, no bug.
+A.4 ⚠️ Pendiente científico que arrastro de Ronda 1: procedencia de K_ALIM=154.62 y K_PERM=55
+Ninguna de las dos calibraciones cierra contra el nominal (98) con la dispersión normal de turbinas (±10%). Dos hipótesis físicas que explicarían el +58% del feed y que conviene verificar/citar:
+
+Orientación de montaje: la K de datasheet asume horizontal. El FEED está montado vertical ascendente (fricción axial del eje sobre la turbina) → K aparente mayor. Test: calibrar por probeta en la orientación instalada (ya lo hacen — solo falta documentar que la K es de instalación, no de datasheet).
+K_PERM=55 calibrado a 100 mL/min, debajo del mínimo de spec (300 mL/min): en zona sub-espec la turbina resbala → K aparente menor. El comentario "régimen laminar" no explica un salto de 2.8× entre unidades.
+Y la pregunta incómoda que el jurado hará: ¿los 680 mL/min de ML=13.6 salieron de probeta o del propio caudalímetro? Si fue del sensor, ML y K están calibrados circularmente (se auto-validan). Regla de oro para el protocolo: ML solo contra probeta/balanza; K solo contra probeta; nunca uno contra el otro.
+
+🏗️ B. Transición FreeRTOS con Snapshot (Hito 2.3)
+Estructura mínima
+Dato clave que condiciona todo: las ISRs de los caudalímetros corren en el core donde se llamó attachInterrupt() (setup → core 1), y el loop() de Arduino vive en core 1. La asignación limpia es:
+
+Tarea
+Core
+Prioridad
+Contenido
+taskControl	0	10	bomba.tick, caudalímetros, (futuro ADS/TMP), Darcy, datalogger, interlock
+loop() (web)	1	1 (Arduino)	server.handleClient() + construcción de JSON
+ISRs sensores	1	—	Cero solapamiento con el control
+
+WiFi/lwIP corren en core 0 con prioridad 19-23: preemption breve (µs–ms) de taskControl, absorbida sin drama por el deadline de 50 ms. El PWM es hardware LEDC — el jitter de scheduling no lo toca jamás (reafirmo lo de Ronda 1).
+
+cpp
+
+void taskControl(void*) {
+  TickType_t next = xTaskGetTickCount();
+  for (;;) {
+    vTaskDelayUntil(&next, pdMS_TO_TICKS(50));   // deadline ABSOLUTO: sin deriva
+    float dt = 0.05f;
+    bomba.tick(dt);
+    // cada 20 ciclos (1 s): caudalímetros, TMP, Darcy, enclavamiento, datalogger
+    static uint8_t div = 0;
+    if (++div >= 20) { div = 0; muestreoCaudalYProceso(); }
+    publicarEstado();
+  }
+}
+// en setup():
+xTaskCreatePinnedToCore(taskControl, "ctrl", 4096, nullptr, 10, nullptr, 0);
+Sincronización: seqlock (ni doble-buffer con punteros ni mutex)
+Con un POD de ~100 B y un lector a 2 Hz contra un escritor a 20 Hz, la contención es irrelevante en magnitud — pero el seqlock da lo mejor de ambos mundos: escritura sin bloqueo jamás (el control nunca espera) y lectura sin bloqueo con reintento. Cero inversión de prioridad por diseño:
+
+cpp
+
+struct EstadoPlanta { float rpm, rpmObj, qAlim, qPerm, qRet, recov, volA, volP, tmpBar, mlRev; bool cruce; };
+EstadoPlanta g_estado;
+std::atomic<uint32_t> g_seq{0};          // par = estable, impar = escribiendo
+
+// ESCRITOR (taskControl): nunca bloquea
+void publicarEstado() {
+  EstadoPlanta s = construirSnapshot();  // copia local coherente
+  uint32_t seq = g_seq.load();
+  g_seq.store(seq + 1);                  // impar
+  g_estado = s;                          // struct POD ~100 B
+  g_seq.store(seq + 2);                  // par
+}
+
+// LECTOR (web): reintento si pilló escritura a mitad
+EstadoPlanta leerEstado() {
+  EstadoPlanta local; uint32_t s1, s2;
+  do {
+    s1 = g_seq.load();
+    local = g_estado;
+    s2 = g_seq.load();
+  } while (s1 != s2 || (s1 & 1));
+  return local;
+}
+Un mutex FreeRTOS corto (~1 µs de memcpy) también funcionaría y es defendible — pero el seqlock elimina la categoría de problema entera, y para la tesis la frase "el lazo de control nunca es bloqueable por el consumidor de telemetría" es oro en defensa.
+
+📡 C. ADS1115: single-ended, y una decisión de compra crítica
+Differential vs single-ended: la respuesta es estructural, no de preferencia
+Los pares diferenciales del ADS1115 son fijos: {AIN0−AIN1} y {AIN2−AIN3}. Necesitás ΔP_in = P1−P3 y ΔP_out = P2−P3 → P3 tendría que ocupar dos canales simultáneamente: imposible con un solo ADS1115 (requeriría dos chips). Pero además, single-ended es mejor acá por tres razones:
+
+Diagnóstico: P3 negativo (succión) o P1 caído son alarmas distintas que el valor diferencial borra. El enclavamiento necesita TMP; la salud de la planta necesita cada manométrica.
+Ruido: promediar 8-16 lecturas digitales por canal y restar en software es más limpio que confiar en el CMRR analógico con sensores de 0.5–4.5V ratiométricos (su error dominante es el propio sensor, no el ADC).
+Flexibilidad: AIN3 queda libre para la TDS.
+TMP= 
+2
+P 
+1
+​
+ +P 
+2
+​
+ 
+​
+ −P 
+3
+​
+ (calculado en firmware, con las 3 presiones promediadas)
+
+⚠️ La decisión de compra que define la calidad del Hito 5: el rango del transductor
+Rango del transductor
+Error típico (1% FS)
+Error en TMP=0.25 bar
+¿Sirve para Jc?
+0–1 bar	10 mBar	±4%	✅
+0–6 bar (típico barato)	60 mBar	±24%	❌ inutilizable
+0–1.2 MPa	120 mBar	±48%	❌
+
+Conseguir 3 transductores de 0–1 bar (0.5–4.5V ratiométricos) es la prioridad de compras antes del Hito 2.3. Con ellos y PGA ±6.144V (gain 2/3, 0.1875 mV/LSB): ~21 LSB/mBar → TMP con ruido <0.1 mBar tras promediar. Esto vale más que cualquier mejora de firmware para el Darcy.
+
+Cableado (dos opciones válidas)
+Opción A: ADS a 5V
+Opción B: ADS a 3.3V
+I2C hacia ESP32	Requiere level shifter (BSS138) — a 5V el VIH=3.5V > 3.3V del ESP32	Directo
+Entradas analógicas	0.5–4.5V directo (abs max VDD+0.3 ✓)	Requiere divisor ÷2 (4.5V > 3.6V abs max)
+PGA / resolución	±6.144V / 0.1875 mV/LSB	±2.048V / 0.0625 mV/LSB (tras divisor)
+
+FSM no bloqueante (integrada en taskControl, cada 5 ms)
+cpp
+
+// Máquina: INICIO_CONV → ESPERAR(9 ms @128 SPS) → LEER → siguiente canal
+// Escaneo completo de 4 canales: ~40 ms. Set cada 250 ms, promedio de 4 lecturas por canal.
+// Hardening: Wire.setTimeOut(50); contador de NAK; si NAK consecutivos > 5
+//   → bus recovery (9 pulsos SCL) + reinit + flag "TMP stale".
+// INTERLOCK (Hito 4): TMP con timestamp — si stale > 3 s → modo seguro (STOP), nunca ciego.
+La dinámica de TMP es de segundos: no hace falta muestrear más rápido, hace falta no bloquear nunca el bus (timeout + recovery) y sellar la frescura del dato que alimenta el enclavamiento.
+
+🧪 D. Diseño factorial para Jc y α (Hito 5) — propuesta en 4 fases
+Fase 0 — Rm de referencia (antes de cada jornada, 15 min)
+Agua destilada, 5 escalones de TMP (0.05→0.40 bar), regresión TMP vs J → 
+R 
+m
+​
+ =ΔTMP/(μΔJ)
+. Este número es el covariable de envejecimiento de toda la campaña.
+
+Fase 1 — Jc por escalones de flujo (método constant-flux, 1 jornada)
+Dosis fija (la óptima del Jar Test del Hito 3), Q_feed máximo (900 mL/min → γw más alta). Escalones de flujo permeado: 5→10→15→20→25→30 LMH, 15 min por escalón. Jc = flujo donde dTMP/dt ≥ 3× la deriva base. (Esto exige el ADS instalado — la secuencia 2.3→5 es mandatoria, el TMP debe medirse, nunca inferirse de la válvula.)
+
+Fase 2 — Matriz 3×3 en estado estacionario (J_ss)
+TMP 0.10 bar
+TMP 0.25 bar
+TMP 0.40 bar
+Q 200 mL/min (γw≈470 s⁻¹)	run 1	run 2	run 3
+Q 450 mL/min (γw≈1050)	run 4	centro ×3	run 5
+Q 900 mL/min (γw≈2100)	run 6	run 7	run 8
+
+30 min de estabilización por corrida, J_ss promediado en los últimos 10. Punto central replicado ×3 → varianza experimental sin duplicar los 9. Orden aleatorizado.
+
+⚠️ Nota honesta de diseño experimental: con una sola válvula de aguja, Q y TMP no son factores independientes (subir Q a válvula fija sube TMP). Dos salidas: (a) re-sintonizar la válvula en cada corrida para fijar el TMP objetivo (limpio, laborioso), o (b) registrar el TMP real de cada corrida y ajustar por ANCOVA en vez de ANOVA factorial estricta. Recomiendo (a) para la matriz y (b) como verificación.
+
+Fase 3 — Compresibilidad α (1 jornada)
+Q fijo (450), dosis fija, 4 escalones de TMP {0.10, 0.20, 0.30, 0.40}. Por corrida:
+
+R 
+cake
+​
+ = 
+μ⋅J 
+ss
+​
+ 
+TMP
+​
+ −R 
+m
+​
+ α= 
+m 
+cake
+​
+ 
+R 
+cake
+​
+ ⋅A 
+m
+​
+ 
+​
+ 
+
+con 
+m 
+cake
+​
+ 
+ por gravimetría: filtrar volumen conocido de alimentación (membrana 0.45 µm), secado 105 °C, pesada. Ajuste 
+α=α 
+0
+​
+ ⋅ΔP 
+n
+ 
+ en log-log: n≈0 = torta incompresible; n→0.5-1 = coloidal fuertemente compresible (lo esperable para mucílago de Opuntia — y un resultado publicable por sí mismo).
+
+Protocolo de lavado entre corridas (criterio cuantitativo de aceptación)
+Enjuague hidráulico: 10 min agua destilada a Q máx, retentado abierto, permeado a drenaje
+Retro-lavado suave: 100–200 mL de agua destilada en sentido inverso (gravedad o UIF leve) — desmonta la torta laxa
+Verificación Rm: 2-3 puntos agua limpia → criterio: Rm_post ≤ 1.05 × Rm_0. Si falla →
+Limpieza química (el mucílago es polisacárido → NaOCl funciona sobre polisulfona): NaOCl 300–500 ppm, 20-30 min a ambiente → enjuague → (si hay incrustación) ácido cítrico 0.5%, 15 min → enjuague a pH neutro → re-verificar con criterio más estricto (≤1.02×Rm_0)
+Bitácora: Rm vs nº de corrida (el envejecimiento es covariable), T° de cada ensayo (TCF), y jamás cambiar calibración de sensores a mitad de campaña
+Presupuesto total: ~25-30 corridas de ~45 min = 3-4 jornadas de laboratorio. Realista para la tesis, y con las replicas del punto central tiene potencia estadística para el ANOVA.
+
+🎯 Orden de ejecución que recomiendo
+A.1 (guard del wrap en ISR) + #include <cmath> — 10 min, cierra el firmware v4
+A.4 — documento de procedencia de K y ML (quién midió qué, contra qué patrón) — bloqueante para creer datos
+B (taskControl + seqlock) — al iniciar 2.3, base de todo lo que viene
+Compra de transductores 0–1 bar — la dependencia física más urgente del Hito 5
+C (ADS single-ended + FSM) — implementación 2.3
+D — protocolo experimental redactado como documento del repo (Protocolo_Diseño_Factorial_Jc_Alpha.md)
+El v4 es, con el guard del wrap, la primera versión del firmware que yo firmaría como lista para campaña de datos. El salto de calidad restante ya no está en el código: está en los transductores y en la disciplina de procedencia de calibración.
+
+
+

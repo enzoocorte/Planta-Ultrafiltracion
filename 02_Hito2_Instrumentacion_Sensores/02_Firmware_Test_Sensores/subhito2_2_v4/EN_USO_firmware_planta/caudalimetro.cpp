@@ -21,15 +21,17 @@ void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
   // - Con 2 o más pulsos en la ventana: f = (n - 1) / (t_ult - t_prim) -> resolución microsegundo
   // - Con 1 pulso: f = 1e6 / periodo_us
   // - Con 0 pulsos: verificar si el último pulso es reciente para evitar falsos escalones a 0
-  if (n >= 2 && t_ult > t_prim) {
-    _f = ((float)(n - 1) * 1000000.0f) / (float)(t_ult - t_prim);
+  uint32_t intervalo = t_ult - t_prim;
+  if (n >= 2 && intervalo > 0) {
+    _f = ((float)(n - 1) * 1000000.0f) / (float)intervalo;
   } else if (n == 1 && per_us > 0) {
     _f = 1000000.0f / (float)per_us;
   } else if (n == 0) {
     uint32_t tAhora = micros();
     uint32_t tSinFlanco = tAhora - t_ult;
+    uint32_t maxEspera_us = (uint32_t)fminf(3000000.0f, (float)per_us * 2.5f);
     // Si no hubo pulsos en este segundo pero el flujo es bajo (<10 Hz) y el último pulso fue reciente:
-    if (per_us > 0 && tSinFlanco < (25 * per_us) / 10 && _f > 0.1f) {
+    if (per_us > 0 && tSinFlanco < maxEspera_us && _f > 0.1f) {
       // Mantener frecuencia estimada suavemente sin colapsar a 0
     } else {
       _f = 0.0f;
@@ -56,14 +58,15 @@ void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
     _q = 0.0f;
   }
 
-  // 5. Diagnóstico de pérdida de flujo o cable desconectado
+  // 5. Diagnóstico de pérdida de flujo o cable desconectado (basado en tiempo real dt_s)
   if (n > 0 || _f > 0.1f) {
-    _segSinPulso = 0;
+    _tiempoSinPulso_s = 0.0f;
     _fallo = false;
   } else if (bombaEmpuja) {
-    if (++_segSinPulso >= 5) _fallo = true;
+    _tiempoSinPulso_s += dt_s;
+    if (_tiempoSinPulso_s >= 5.0f) _fallo = true;
   } else {
-    _segSinPulso = 0;
+    _tiempoSinPulso_s = 0.0f;
     _fallo = false;
   }
 }
@@ -72,6 +75,17 @@ void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
   Caudalimetro* c = reinterpret_cast<Caudalimetro*>(arg);
   uint32_t t = micros();
   uint32_t dt = t - c->_t_ultimo;
+
+  // Inactividad prolongada (> 10s) o reinicio/wrap de micros(): re-armar sin periodo espurio
+  if (dt > 10000000UL) {
+    portENTER_CRITICAL_ISR(&c->_mux);
+    c->_t_primero  = t;
+    c->_periodo_us = 0;
+    c->_t_ultimo   = t;
+    c->_pulsos++; // Se contabiliza para volumen, pero no genera frecuencia con dt gigantesco
+    portEXIT_CRITICAL_ISR(&c->_mux);
+    return;
+  }
 
   // Blanking anti-rebote en microsegundos
   if (dt >= FILTRO_RUIDO_US) {
