@@ -82,55 +82,54 @@ Determinar el desplazamiento volumétrico real por revolución ($V_{\text{vuelta
 ```
 
 ### Procedimiento:
-1. Desconectar la manguera de impulsión de la entrada de la membrana y colocar el extremo libre descargando directamente dentro de la probeta graduada.
-2. Realizar cuatro corridas de prueba a distintos niveles de RPM durante un tiempo cronometrado exacto de **$2\text{ minutos}$ ($120\text{ segundos}$)** cada una:
-   - **Corrida A**: $30.0\text{ RPM}$
-   - **Corrida B**: $50.0\text{ RPM}$
-   - **Corrida C**: $70.0\text{ RPM}$
-   - **Corrida D**: $90.0\text{ RPM}$
-3. En cada corrida: vaciar la probeta, encender la bomba con el botón START, arrancar el cronómetro al alcanzar las RPM de régimen, y presionar STOP al cumplirse los 120 segundos.
-4. Leer y anotar el volumen recolectado ($V_{\text{probeta}}$ en $\text{mL}$).
-5. Calcular el desplazamiento volumétrico específico para cada corrida:
-   $$V_{\text{vuelta}, i} = \frac{V_{\text{probeta}, i}}{\text{RPM}_i \times 2.0\text{ min}}\quad [\text{mL/rev}]$$
-6. Promediar los cuatro valores para obtener el $V_{\text{vuelta, medio}}$.
-7. **Carga en el Firmware**:
+### Procedimiento:
+1. Desconectar la manguera de impulsión de la entrada de la membrana y colocar el extremo libre descargando directamente dentro de la probeta graduada de $1000\text{ mL}$.
+2. Realizar corridas de ensayo con cronómetro a distintos niveles de RPM:
+   - Para velocidades de **$20$ a $70\text{ RPM}$**: Cronometrar exactamente **$1.0\text{ minuto}$ ($60\text{ s}$)**. El volumen recolectado en mL es directamente el caudal en $\text{mL/min}$ ($Q = V_{\text{probeta}}$).
+   - Para velocidades de **$80$ y $90\text{ RPM}$**: Cronometrar **$0.5\text{ minutos}$ ($30\text{ s}$)** para evitar que la probeta de $1000\text{ mL}$ desborde. El caudal se calcula como $Q = V_{\text{probeta}} / 0.5$.
+3. Cargar los datos directamente en la planilla automatizada **[`PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx`](./PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx)** (Hoja 1).
+4. La planilla calcula de forma automática:
+   - La cilindrada puntual para cada corrida: $V_{\text{vuelta}, i} = Q_i / \text{RPM}_i\ [\text{mL/rev}]$.
+   - El promedio aritmético ($\overline{V_{\text{vuelta}}}$), la desviación estándar y el coeficiente de variación (CV%).
+   - La pendiente por regresión lineal ($Q$ vs $\text{RPM}$) y el coeficiente de determinación ($R^2$).
+5. **Carga en el Firmware / SCADA**:
+   - Copiar el valor recomendado por la planilla (celda destacada en verde).
    - En la interfaz web, abrir el modal **"Modo Desarrollador"**.
    - En el campo `Cilindrada Bomba (mL/rev)`, escribir el valor obtenido (ej. `13.60`).
    - Tildar la casilla **"Guardar en Memoria Flash (NVS)"** y hacer clic en **Guardar Cambios**.
-   - Constatar que en la consola Serial del ESP32 aparezca el mensaje: `[NVS] Parametros guardados en memoria Flash con exito`.
 
 ---
 
 ## 🧪 ENSAYO 3: Calibración y Puesta a Punto del Caudalímetro de Alimentación ($K_{\text{alim}}$)
 
 ### Objetivo:
-Ajustar la constante de calibración $K_{\text{alim}}$ $[\text{Hz}/(\text{L/min})]$ del sensor YF-S401 de la línea de impulsión, verificando la linealidad entre la frecuencia de pulsos generada y el caudal real medido por probeta.
+Ajustar la constante de calibración $K_{\text{alim}}$ $[\text{Hz}/(\text{L/min})]$ del sensor YF-S401 de la línea de impulsión, verificando la linealidad entre la frecuencia de pulsos generada y el caudal real medido por probeta de $1000\text{ mL}$.
 
 ### Instrumental Requerido:
 - Sensor YF-S401 conectado en el borne 12 superior (GPIO 14).
-- Circuito hidráulico en serie: Bomba $\rightarrow$ Sensor de Alimentación $\rightarrow$ Probeta.
+- Circuito hidráulico en serie: Bomba $\rightarrow$ Sensor de Alimentación $\rightarrow$ Probeta de $1000\text{ mL}$.
+- Planilla automatizada: `PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx` (Hoja 2).
 
 ```
-  [Bomba Peristáltica] ──► [Sensor Alimentación YF-S401] ──► [Probeta Graduada]
+  [Bomba Peristáltica] ──► [Sensor Alimentación YF-S401] ──► [Probeta Graduada 1000 mL]
 ```
 
 ### Procedimiento:
 1. Purgar completamente la línea de manguera hasta que no queden burbujas de aire atrapadas en el cuerpo de la turbina del caudalímetro.
-2. Realizar corridas de **$1\text{ minuto}$ ($60\text{ segundos}$)** a cinco velocidades de bomba:
-   - **Punto 1**: $20\text{ RPM}$ ($Q \approx 270\text{ mL/min}$)
-   - **Punto 2**: $40\text{ RPM}$ ($Q \approx 540\text{ mL/min}$)
-   - **Punto 3**: $50\text{ RPM}$ ($Q \approx 680\text{ mL/min}$)
-   - **Punto 4**: $70\text{ RPM}$ ($Q \approx 950\text{ mL/min}$)
-   - **Punto 5**: $90\text{ RPM}$ ($Q \approx 1220\text{ mL/min}$)
-3. Durante cada corrida, observar en el SCADA y registrar en la planilla:
-   - La frecuencia promedio en Hertz ($F_{\text{alim}}$).
-   - El volumen recolectado en la probeta en 1 minuto ($Q_{\text{real}}$ en $\text{mL/min}$).
-4. Calcular el factor puntual para cada escalón:
-   $$K_i = \frac{F_{\text{alim}, i}\ [\text{Hz}] \times 1000}{Q_{\text{real}, i}\ [\text{mL/min}]}\quad \left[\frac{\text{Hz}}{\text{L/min}}\right]$$
-5. En una planilla Excel, graficar $F_{\text{alim}}$ en el eje $Y$ vs. $Q_{\text{real}} / 1000$ en el eje $X$. La pendiente de la recta forzada por el origen ($y = m \cdot x$) es el **$K_{\text{alim}}$ definitivo**.
-6. Cargar el valor resultante en el SCADA (Modo Desarrollador $\rightarrow$ `Factor K Alimentación`) y presionar Guardar.
-7. **Prueba de Diagnóstico de Cable Cortado**:
-   - Con la bomba girando a 50 RPM y agua circulando, desconectar deliberadamente el cable de señal del sensor de alimentación de la bornera.
+2. Realizar corridas con probeta de $1000\text{ mL}$ a las velocidades programadas ($20, 30, 40, 50, 60, 70, 80, 90\text{ RPM}$):
+   - Para $\le 70\text{ RPM}$: tiempo de ensayo de $1.0\text{ min}$.
+   - Para $80$ y $90\text{ RPM}$: tiempo de ensayo de $0.5\text{ min}$.
+3. Durante cada corrida, observar en el SCADA y registrar en las celdas amarillas de la planilla:
+   - La frecuencia promedio en Hertz ($F_{\text{alim}}$) leída en la pantalla web.
+   - El volumen recolectado en la probeta ($V_{\text{probeta}}$ en $\text{mL}$).
+4. La planilla calcula automáticamente:
+   - Caudal en $\text{mL/min}$ y $\text{L/min}$.
+   - Factor $K_i$ puntual $[\text{Hz}/(\text{L/min})]$ y su equivalente en $\text{pulsos/Litro}$.
+   - Desviación porcentual respecto al valor de referencia previo ($154.62$).
+   - Pendiente de regresión lineal $F$ vs $Q\ [\text{L/min}]$ ($K_{\text{regresión}}$) y bondad de ajuste $R^2$.
+5. Cargar el valor resultante en el SCADA (Modo Desarrollador $\rightarrow$ `Factor K Alimentación`) y presionar Guardar.
+6. **Prueba de Diagnóstico de Cable Cortado**:
+   - Con la bomba girando a 50 RPM y agua circulando, desconectar deliberadamente el cable de señal del sensor de alimentación del borne 12.
    - Constatar que a los **5 segundos exactos** el indicador en pantalla cambia a color rojo con la leyenda **`SIN SEÑAL`** y el registro alerta de pérdida de flujo.
    - Reconectar el cable: verificar que el sensor recupera la lectura en menos de 1 segundo de forma automática.
 
@@ -138,11 +137,16 @@ Ajustar la constante de calibración $K_{\text{alim}}$ $[\text{Hz}/(\text{L/min}
 
 ## 🧪 ENSAYO 4: Calibración Gravimétrica del Caudalímetro de Permeado ($K_{\text{perm}}$)
 
-### Objetivo:
+> [!IMPORTANT]
+> **FASE POSTERGADA HASTA LA INSTALACIÓN DE SENSORES DE PRESIÓN / MANÓMETROS**:  
+> Este ensayo no debe realizarse todavía. Se ejecutará una vez que se encuentren instalados y calibrados los transductores de presión (ADS1115) o manómetros de referencia, ya que el caudal de permeado depende estrictamente de la Presión Transmembrana ($\text{TMP}$) aplicada y de la contrapresión capilar.
+
+### Objetivo (Para Fase Posterior con Instrumentación de Presión):
 Caracterizar el comportamiento del sensor YF-S401 de permeado a caudales bajos ($< 350\text{ mL/min}$) y contrastar contra el método patrón primario gravimétrico de laboratorio.
 
 ### Instrumental Requerido:
 - Balanza analítica o digital de precisión ($0.1\text{ g}$ o $0.01\text{ g}$).
+- Manómetros de glicerina o transmisores piezorresistivos de presión en alimentación ($P_1$) y retentado ($P_2$).
 - Recipiente colector de vidrio o plástico liviano tarado.
 - Filtro de ultrafiltración FX100 montado en el circuito con su válvula de contrapresión de retentado.
 
@@ -211,47 +215,54 @@ Validar que el datalogger integrado guarde las muestras cada 10 segundos en memo
 
 # 4. Planilla de Registro de Ensayos de Laboratorio
 
-*(Esta sección está diseñada para imprimirse o completarse en tablet en el laboratorio de la UNSa)*
+*(Nota: Todos estos cálculos están completamente automatizados con fórmulas y gráficos en el archivo Excel **[`PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx`](./PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx)**)*
 
 ### 📝 Registro del Ensayo 2: Cilindrada de la Bomba ($V_{\text{vuelta}}$)
 - **Fecha**: ____ / ____ / 2026
 - **Operadores**: Owen Cañizares / Antonella Guitián / Enzo
-- **Temperatura del Agua**: ________ $^\circ\text{C}$
+- **Instrumental**: Probeta Graduada de 1000 mL | Cronómetro | Agua a _____ °C
 
-| Corrida | Velocidad [RPM] | Tiempo [s] | Volumen Probeta [mL] | Cilindrada Calculada [mL/rev] |
-| :---: | :---: | :---: | :---: | :---: |
-| **A** | $30.0$ | $120$ | | |
-| **B** | $50.0$ | $120$ | | |
-| **C** | $70.0$ | $120$ | | |
-| **D** | $90.0$ | $120$ | | |
-| **PROMEDIO** | — | — | — | **$V_{\text{vuelta}} =$ ________________ mL/rev** |
+| Corrida | Velocidad [RPM] | Tiempo [min] | Volumen Probeta [mL] | Caudal Q [mL/min] | Cilindrada [mL/rev] | Desv vs 13.60 [%] |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | $20.0$ | $1.0$ | | | | |
+| **2** | $30.0$ | $1.0$ | | | | |
+| **3** | $40.0$ | $1.0$ | | | | |
+| **4** | $50.0$ | $1.0$ | | | | |
+| **5** | $60.0$ | $1.0$ | | | | |
+| **6** | $70.0$ | $1.0$ | | | | |
+| **7** | $80.0$ | $0.5$ | | | | |
+| **8** | $90.0$ | $0.5$ | | | | |
+| **REGRESIÓN** | — | — | — | **Pendiente Q vs RPM:** | **$V_{\text{vuelta}} =$ ____________ mL/rev** | **$R^2 =$ ________** |
 
 ---
 
 ### 📝 Registro del Ensayo 3: Calibración Sensor Alimentación ($K_{\text{alim}}$)
 - **Valor Inicial en Firmware**: $154.62\text{ Hz/(L/min)}$ ($9277.2\text{ pulsos/L}$)
+- **Instrumental**: Sensor YF-S401 en Borne 12 | Probeta de 1000 mL
 
-| Punto | RPM | Frecuencia SCADA [Hz] | Vol. Probeta en 1 min [mL] | Caudal Real [L/min] | Factor $K_i$ [Hz/(L/min)] |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **1** | $20.0$ | | | | |
-| **2** | $40.0$ | | | | |
-| **3** | $50.0$ | | | | |
-| **4** | $70.0$ | | | | |
-| **5** | $90.0$ | | | | |
-| **FINAL** | — | — | **Pendiente Regresión Lineal:** | — | **$K_{\text{alim}} =$ ________________ Hz/(L/min)** |
+| Punto | RPM | Frecuencia SCADA [Hz] | Tiempo [min] | Vol. Probeta [mL] | Caudal Real [L/min] | Factor $K_i$ [Hz/(L/min)] | Pulsos/Litro |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | $20.0$ | | $1.0$ | | | | |
+| **2** | $30.0$ | | $1.0$ | | | | |
+| **3** | $40.0$ | | $1.0$ | | | | |
+| **4** | $50.0$ | | $1.0$ | | | | |
+| **5** | $60.0$ | | $1.0$ | | | | |
+| **6** | $70.0$ | | $1.0$ | | | | |
+| **7** | $80.0$ | | $0.5$ | | | | |
+| **8** | $90.0$ | | $0.5$ | | | | |
+| **REGRESIÓN** | — | — | — | — | **Pendiente F vs Q:** | **$K_{\text{alim}} =$ __________ Hz/(L/min)** | **$R^2 =$ ________** |
 
 ---
 
 ### 📝 Registro del Ensayo 4: Calibración Gravimétrica Permeado ($K_{\text{perm}}$)
-- **Valor Inicial en Firmware**: $55.00\text{ Hz/(L/min)}$ ($3300.0\text{ pulsos/L}$)
-- **Tiempo de Cada Corrida**: $180\text{ segundos}$ ($3.0\text{ min}$)
+> [!NOTE]
+> **POSTERGADO**: Se ejecutará una vez instalados los sensores de presión / manómetros para conocer la Presión Transmembrana (TMP).
 
 | Nivel TMP | TMP Indicada [bar] | Masa Balanza $\Delta m$ [g] | Vol. Balanza [mL] | Vol. SCADA [mL] | Error Relativo [%] | $K_{\text{perm}}$ Corregido |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Bajo** | $\approx 0.15$ | | | | | |
-| **Medio** | $\approx 0.30$ | | | | | |
-| **Alto** | $\approx 0.45$ | | | | | |
-| **DEFINITIVO**| — | — | — | — | — | **$K_{\text{perm}} =$ ________________ Hz/(L/min)** |
+| **Bajo** | $\approx 0.15$ | *(Postergado)* | *(Postergado)* | *(Postergado)* | — | — |
+| **Medio** | $\approx 0.30$ | *(Postergado)* | *(Postergado)* | *(Postergado)* | — | — |
+| **Alto** | $\approx 0.45$ | *(Postergado)* | *(Postergado)* | *(Postergado)* | — | — |
 
 ---
 
