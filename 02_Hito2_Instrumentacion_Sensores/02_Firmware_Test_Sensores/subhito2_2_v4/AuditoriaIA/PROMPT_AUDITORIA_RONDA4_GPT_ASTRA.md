@@ -1328,9 +1328,46 @@ Hemos seleccionado para la compra en Mercado Libre el siguiente transductor:
 
 ---
 
+# 6. HOJA DE RUTA GENERAL: DE LA CALIBRACIÓN ACTUAL A LA DEFENSA DE LA TESIS
+
+Para que tengas la visión panorámica del proyecto y evalúes cómo encaja el código actual con el objetivo final, te compartimos la **secuencia de hitos de la tesis de Antonella Guitián y Owen Cañizares (Codir. Ing. Enzo)**:
+
+```
+  [HITO 2.2 ACTUAL]           [HITO 2.3 PRÓXIMO]          [HITO 3: CONTROL]          [HITO 4: ENSAYOS]           [HITO 5: CIERRE]
+┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐        ┌──────────────────┐
+│ Calibración de   │        │ Montaje Presión: │        │ Control en Lazo  │        │ Matriz Factorial │        │ Procesamiento    │
+│ Bomba y Caudal   │ ─────► │ 2x Transductores │ ─────► │ Cerrado (TMP/RPM)│ ─────► │ 3² (12 Corridas) │ ─────► │ en Python,       │
+│ de Alimentación  │        │ 30 PSI + ADS1115 │        │ + Interlock 50ms │        │ Flujo Crítico Jc │        │ Redacción Final  │
+│ (Probeta 1000 mL)│        │ + Manómetros "T" │        │ + Sonda DS18B20  │        │ y Ensuciamiento  │        │ y Defensa UNSa   │
+└──────────────────┘        └──────────────────┘        └──────────────────┘        └──────────────────┘        └──────────────────┘
+```
+
+1. **Hito 2.2 (ETAPA ACTUAL — ESTE LUNES EN BANCO):**
+   - Calibración volumétrica de la bomba peristáltica MBP-2000 ($\text{mL/rev}$) con probeta graduada de $1000\text{ mL}$ durante $1\text{ minuto}$ (y $0.5\text{ min}$ para $\ge 80\text{ RPM}$).
+   - Puesta a punto y ajuste fino del factor $K_{\text{alim}}$ $[\text{Hz}/(\text{L/min})]$ del sensor YF-S401 de impulsión a 8 niveles de RPM.
+   - Procesamiento inmediato en la planilla automatizada `PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx` con regresión lineal y carga de parámetros definitivos en la Flash NVS.
+2. **Hito 2.3 (Instrumentación de Presión y Permeado):**
+   - Llegada y montaje en derivación "T" de los 2 transductores de $30\text{ PSI}$ ($0.5-4.5\text{ V}$) + 2 manómetros mecánicos de glicerina ($0-1\text{ bar}$) para $P_1$ (alimentación) y $P_2$ (retentado).
+   - Lectura analógica diferencial/single-ended mediante conversor ADS1115 de 16 bits en bus $I^2C$.
+   - Activación del cálculo de Presión Transmembrana ($\text{TMP}$) y del modelo Darcy-Vogel en vivo.
+   - Ejecución del **Ensayo 4: Calibración gravimétrica del sensor de permeado** contrastando contra balanza analítica digital ($0.1\text{ g}$) a tres niveles de TMP ($0.15$, $0.30$ y $0.45\text{ bar}$).
+3. **Hito 3 (Control Automático e Interlocks de Seguridad):**
+   - Enclavamiento de parada dura (*hard stop*) a $50\text{ ms}$ ante sobrepresión ($P_1 > 0.60\text{ bar}$ o $\text{TMP} > 0.45\text{ bar}$) que corte la generación de pulsos LEDC y desacople el driver DM860.
+   - Sonda térmica DS18B20 (GPIO 4) para normalización automática de permeabilidad a $20^\circ\text{C}$ ($J_{20}$).
+   - Sensor de turbidez / TDS para medición de retención y calidad del permeado.
+4. **Hito 4 (Diseño Experimental de Tesis — Matriz Factorial $3^2$):**
+   - 12 corridas experimentales (9 combinaciones de velocidad tangencial y TMP + 3 réplicas en el punto central) con agua limpia y con efluente/sobrenadante coagulado.
+   - Determinación experimental del flujo crítico ($J_c$), permeabilidad hidráulica pura ($L_p$), resistencia intrínseca de membrana ($R_m$) y cinética de resistencia de capa de torta ($R_{\text{torta}}$).
+   - Ensayos de ensuciamiento progresivo (*fouling*) y protocolos de limpieza hidráulica y química.
+5. **Hito 5 (Procesamiento Científico de Datos y Defensa de Tesis):**
+   - Exportación de los archivos históricos `.CSV` del datalogger integrado hacia scripts en Python (Pandas/Matplotlib/Seaborn) para la generación de gráficas vectoriales y análisis estadístico ANOVA.
+   - Cierre de la memoria escrita y defensa oral pública de la tesis de Antonella y Owen en la Universidad Nacional de Salta.
+
+---
+
 # ❓ EJES DE AUDITORÍA REQUERIDOS PARA GPT ASTRA
 
-Por favor, estructura tu respuesta abordando rigurosamente los siguientes puntos:
+Por favor, estructura tu respuesta abordando rigurosamente los siguientes cinco ejes:
 
 ### EJE 1: Metrología de Caudal y Robustez de Software
 1. Evalúa el algoritmo de **período recíproco híbrido** ($n \ge 2$, $n = 1$, $n = 0$). ¿Hay algún *edge case* o condición de carrera remanente?
@@ -1347,6 +1384,11 @@ Por favor, estructura tu respuesta abordando rigurosamente los siguientes puntos
 1. ¿Es adecuado el protocolo de probeta de $1000\text{ mL}$ durante $1\text{ minuto}$ (y $0.5\text{ min}$ para $\ge 80\text{ RPM}$) para la bomba peristáltica y el sensor de impulsión?
 2. ¿Respaldas la decisión de postergar la calibración de permeado hasta tener la medición de presión montada?
 
-### EJE 4: Dictamen Final y Lista de Chequeo para el Lunes
+### EJE 4: Detección de Puntos Ciegos (*Blind Spots*) y Validación de la Hoja de Ruta
+1. **Puntos ciegos inmediatos:** Mirando el código fuente completo y el banco hidráulico, ¿ves algún **inconveniente oculto, riesgo no contemplado o detalle técnico que se nos esté pasando por alto** específicamente para este código, cuyo objetivo inmediato es **poner a punto y calibrar los caudalímetros en el banco este lunes**?
+2. **Validación de la Hoja de Ruta:** ¿Consideras lógica, viable y secuencialmente sólida la hoja de ruta planteada (Hito 2.2 Caudales $\rightarrow$ Hito 2.3 Presión $\rightarrow$ Hito 3 Control/Interlocks $\rightarrow$ Hito 4 Factorial $3^2$ $\rightarrow$ Hito 5 Cierre)?
+3. **Recomendaciones de transición:** ¿Qué precauciones nos sugieres tomar para que la transición entre el banco de caudales de este lunes y la incorporación de los transductores de presión y el diseño factorial sea lo más fluida posible sin tener que reescribir código?
+
+### EJE 5: Dictamen Final y Lista de Chequeo para el Lunes
 1. Emite tu veredicto: **APROBADO PARA BANCO DE ENSAYOS**, **APROBADO CONDICIONADO** o **RECHAZADO**.
 2. Proporciona una lista de chequeo (*checklist*) rápida de 5 pasos para que Owen y Antonella ejecuten el lunes en el laboratorio de la UNSa con la probeta y la planilla Excel.
