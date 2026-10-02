@@ -541,17 +541,23 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     function calibrarPorRpmYQ() {
       const rpm = parseFloat($('cal_rpm').value);
       const qa = parseFloat($('cal_q_alim').value);
-      const qp = parseFloat($('cal_q_perm').value);
+      let qp = parseFloat($('cal_q_perm').value);
+      if (isNaN(qp) || qp < 0) qp = 0;
 
-      if (isNaN(rpm) || isNaN(qa) || isNaN(qp) || rpm <= 0 || qa <= 0 || qp <= 0) {
-        alert("Ingresa valores numéricos válidos mayores a cero.");
+      if (isNaN(rpm) || isNaN(qa) || rpm <= 0 || qa <= 0) {
+        alert("Ingresa RPM y Caudal de Alimentación válidos mayores a cero.");
         return;
       }
 
-      fetch(`/calibrar_rpm_q?rpm=${rpm}&qa=${qa}&qp=${qp}`)
+      let url = `/calibrar_rpm_q?rpm=${rpm}&qa=${qa}`;
+      if (qp > 0) url += `&qp=${qp}`;
+
+      fetch(url)
         .then(r => r.json())
         .then(res => {
-          showToast(`🎯 Calibración completada: Cilindrada=${res.ml_rev} mL/rev | K_Alim=${res.k_alim} | K_Perm=${res.k_perm}`);
+          let msg = `🎯 Calibración completada: Cilindrada=${res.ml_rev} mL/rev | K_Alim=${res.k_alim}`;
+          if (res.k_perm) msg += ` | K_Perm=${res.k_perm}`;
+          showToast(msg);
           // Cerrar automáticamente el Modo Dev al guardar
           setTimeout(() => {
             devOpen = false;

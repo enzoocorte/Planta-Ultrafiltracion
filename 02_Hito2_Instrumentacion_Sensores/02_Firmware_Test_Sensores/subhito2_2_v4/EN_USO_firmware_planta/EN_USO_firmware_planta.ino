@@ -204,6 +204,11 @@ void handleStatus() {
     ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
   );
 
+  if (n >= (int)sizeof(buf)) {
+    n = sizeof(buf) - 1;
+    Serial.println("⚠️ [WARN] handleStatus buf[768] truncado");
+  }
+
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "application/json", "");
   server.sendContent(buf, n);
@@ -218,6 +223,7 @@ void handleStatus() {
       listaEnsayos[i].muestras,
       listaEnsayos[i].vol_alim, listaEnsayos[i].vol_perm
     );
+    if (itemLen >= (int)sizeof(item)) itemLen = sizeof(item) - 1;
     server.sendContent(item, itemLen);
   }
 
@@ -579,7 +585,7 @@ void loop() {
 
     // Balance Hidráulico Tangencial y Flujo Darcy en tiempo real
     qRet_mLmin   = fmaxf(0.0f, qAlim - qPerm);
-    recuperacion = (qAlim > 1.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
+    recuperacion = (qAlim > 50.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
     jLMH_actual  = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
     float qBomba = bomba.caudalTeorico_mLmin();
