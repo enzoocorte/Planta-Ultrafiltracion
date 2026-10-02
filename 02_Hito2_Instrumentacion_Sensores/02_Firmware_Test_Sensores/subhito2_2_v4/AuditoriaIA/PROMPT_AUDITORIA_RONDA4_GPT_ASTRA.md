@@ -70,11 +70,98 @@ En la auditoría de cierre de la Ronda 3, Claude 5.5 Opus estableció un veredic
 
 ---
 
-# 3. EL CÓDIGO FUENTE TEMPLADO EN AUDITORÍA (`caudalimetro.h` y `caudalimetro.cpp`)
+# 3. EL CÓDIGO FUENTE COMPLETO DEL FIRMWARE v4 (`EN_USO_firmware_planta`)
 
-Este es el código implementado y comiteado en la rama `main` de nuestro repositorio. Te solicitamos revisarlo exhaustivamente línea por línea:
+A continuación se presenta el **código fuente completo e íntegro** de todos los módulos del firmware que corren actualmente en el ESP32 NodeMCU-32S, sin omisiones ni esqueletos:
 
-### Archivo `caudalimetro.h`:
+---
+
+### 3.1. `config.h` (Parámetros Cinemáticos, Membrana FX100 y Asignación de Pines)
+```cpp
+#pragma once
+// ==============================================================================
+// CONFIGURACIÓN TÉCNICA — PLANTA DE ULTRAFILTRACIÓN (UNSa)
+// Parámetros Cinemáticos, Calibración y Asignación de Pines
+// ==============================================================================
+
+#include <Arduino.h>
+
+// ------------------------------------------------------------------------------
+// 1. ASIGNACIÓN DE PINES (PINOUT)
+// ------------------------------------------------------------------------------
+// Driver DM860 en CÁTODO COMÚN: GPIO envía HIGH -> Optoacoplador ON
+constexpr uint8_t PIN_PUL                = 18;  // DM860 PUL+ (PUL- a GND común)
+constexpr uint8_t PIN_DIR                = 19;  // DM860 DIR+ (DIR- a GND común)
+constexpr uint8_t PIN_LED_BOMBA          = 2;   // LED Azul Onboard (indicador de marcha)
+
+// Caudalímetros de Efecto Hall YF-S401
+constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Sensor de Alimentación (Borne 12 Sup)
+constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup, Pull-up 4.7k a 3.3V)
+
+// ------------------------------------------------------------------------------
+// 2. PARÁMETROS CINEMÁTICOS DE LA BOMBA (MOTOR NEMA 34 / DM860)
+// ------------------------------------------------------------------------------
+constexpr uint16_t PULSOS_POR_REV = 3200;     // DM860 configurado a 1/16 micropasos (3200 pulsos/rev)
+constexpr float ML_POR_VUELTA     = 13.6000f; // Calibrado: 680.0 mL/min / 50.0 RPM = 13.6000 mL/rev
+
+// Rango de Operación en RPM
+constexpr float RPM_MIN           = 15.0f;    // ~204 mL/min
+constexpr float RPM_MAX           = 100.0f;   // ~1360 mL/min (Habilitado para diseño factorial experimental en agua)
+constexpr float RPM_INICIO        = 25.0f;    // Consigna de arranque suave (~340 mL/min)
+constexpr float RPM_ALARMA_MEMBRANA = 44.0f;  // 44.12 RPM = 600 mL/min (Umbral clínico hemodiálisis / referencia)
+
+// ------------------------------------------------------------------------------
+// 3. ESPECIFICACIONES DE LA MEMBRANA FRESENIUS FX100 (HELIXONE®)
+// ------------------------------------------------------------------------------
+constexpr float AREA_MEMBRANA_M2       = 2.2f;    // Superficie interfacial efectiva (m²)
+constexpr float K_UF_NOMINAL           = 73.0f;   // mL / (h * mmHg)
+constexpr float DIAMETRO_CAPILAR_UM    = 185.0f;  // Diámetro interno capilar (μm)
+constexpr float ESPESOR_PARED_UM       = 35.0f;   // Grosor de pared capilar (μm)
+constexpr float TMP_MAX_SEGURA_BAR     = 0.50f;   // Límite máximo admisible de TMP (bar)
+constexpr float Q_CLINICO_SANGRE_MAX   = 600.0f;  // mL/min (límite en hemodiálisis clínica)
+
+// Rampas: Arranque Suave Confiable (LEDC Seguro) y Frenado Rápido (< 1.5s)
+constexpr float ACEL_ARRANQUE_RPM_S  = 2.0f;   // 2.0 RPM/s despegue inicial suave y confiable
+constexpr float ACEL_NOMINAL_RPM_S   = 3.5f;   // 3.5 RPM/s aceleración progresiva
+constexpr float DESACEL_AJUSTE_RPM_S = 8.0f;   // 8.0 RPM/s desaceleración en marcha
+constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al presionar STOP (< 1.5s)
+
+// ------------------------------------------------------------------------------
+// 4. CALIBRACIÓN DE FÁBRICA DE CAUDALÍMETROS YF-S401
+// ------------------------------------------------------------------------------
+// UNIDAD METROLÓGICA DE K: [Hz / (L/min)]
+// Relación matemática fundamental:
+//   F [Hz] = K * Q [L/min]  ===>  Q [mL/min] = (F [Hz] * 1000) / K
+//   Pulsos por Litro = K * 60
+// Nominal de fabricante YF-S401: F = 98 * Q (L/min) => K = 98.0 Hz/(L/min) (5880 pul/L)
+// Calibración experimental con probeta (Owen a 50 y 72 RPM):
+constexpr float K_ALIMENTACION = 154.62f; // Hz/(L/min) -> 9277.2 pulsos/L (105.14 Hz a 680.0 mL/min)
+constexpr float K_PERMEADO     = 55.00f;  // Hz/(L/min) -> 3300.0 pulsos/L (5.50 Hz a 100.0 mL/min)
+
+constexpr uint32_t FILTRO_RUIDO_US = 1500;    // 1.5 ms de blanking anti-rebote (hasta 666 Hz / ~4300 mL/min)
+constexpr float Q_MAX_FISICO_MLMIN = 6000.0f; // Límite de corte físico (6.0 L/min)
+
+// ------------------------------------------------------------------------------
+// 4. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN Y AUTO-CALIBRACIÓN
+// ------------------------------------------------------------------------------
+constexpr uint32_t INTERVALO_LOG_MS   = 10000;  // Muestreo y almacenamiento cada 10 segundos
+constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 1.66 horas de ensayo continuo
+constexpr size_t   MAX_ENSAYOS        = 20;     // Hasta 20 corridas/ensayos registrados en memoria
+constexpr uint8_t  MUESTRAS_AUTO_CAL  = 15;     // 15 muestras (15 seg) para auto-calibración en régimen permanente
+
+// ------------------------------------------------------------------------------
+// 5. CONFIGURACIÓN DE RED WI-FI Y SCADA
+// ------------------------------------------------------------------------------
+constexpr const char* SSID_AP  = "Bomba_Peristaltica_UF";
+constexpr const char* PASS_AP  = "plantapiloto2";
+constexpr const char* SSID_STA = "Box804";
+constexpr const char* PASS_STA = "plantapiloto2";
+
+```
+
+---
+
+### 3.2. `caudalimetro.h` (Declaración de la Clase Caudalímetro YF-S401)
 ```cpp
 #pragma once
 #include <Arduino.h>
@@ -132,9 +219,12 @@ private:
 
   portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
 };
+
 ```
 
-### Archivo `caudalimetro.cpp`:
+---
+
+### 3.3. `caudalimetro.cpp` (Implementación: Período Recíproco, Cota Física y Sección Crítica)
 ```cpp
 #include "caudalimetro.h"
 
@@ -254,6 +344,954 @@ void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
   }
   portEXIT_CRITICAL_ISR(&c->_mux);
 }
+
+```
+
+---
+
+### 3.4. `Bomba.h` (Declaración del Control Cinemático del Motor NEMA 34 / DM860)
+```cpp
+#pragma once
+#include <Arduino.h>
+#include <cmath>
+#include "config.h"
+
+// ==============================================================================
+// CLASE BOMBA PERISTÁLTICA — DECLARACIÓN
+// - Control de frecuencia por hardware LEDC PWM (Driver DM860)
+// - Rampa Cuadrática S-Curve de arranque suave (sin golpe de torque)
+// - Parada rápida en < 1.5s
+// ==============================================================================
+
+class Bomba {
+public:
+  void begin();
+  void arrancar();
+  void detener();
+  bool setRPM(float rpm);
+  void toggleSentido();
+
+  float rpmActual() const           { return _actual; }
+  float rpmObjetivo() const         { return _objetivo; }
+  bool  enMarcha() const            { return _enMarcha; }
+  bool  invirtiendo() const         { return _invirtiendo; }
+  bool  sentidoHorario() const      { return _horario; }
+  bool  enRegimenEstable() const    { return (_enMarcha && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
+  float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
+
+  void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
+  float getMlPorVuelta() const      { return _mlPorVuelta; }
+
+  void     setPulsosPorRev(uint16_t p) { if (p >= 200) _pulsosPorRev = p; }
+  uint16_t getPulsosPorRev() const     { return _pulsosPorRev; }
+
+  void tick(float dt);
+
+private:
+  void fijarSentido(bool horario);
+
+  bool _enMarcha = false;
+  bool _horario = true;
+  bool _invirtiendo = false;
+
+  float _objetivo = RPM_INICIO;
+  float _actual = 0.0f;
+  float _rpmGuardada = RPM_INICIO;
+  uint32_t _fActual = 0;
+
+  float    _mlPorVuelta  = ML_POR_VUELTA;
+  uint16_t _pulsosPorRev = PULSOS_POR_REV;
+};
+
+```
+
+---
+
+### 3.5. `Bomba.cpp` (Implementación: Rampa S-Curve, PWM Hardware LEDC y Cruce Seguro por Cero)
+```cpp
+#include "Bomba.h"
+
+// ==============================================================================
+// IMPLEMENTACIÓN DE LA CLASE BOMBA
+// Generación PWM por hardware LEDC con frecuencia mínima segura (>= 50 Hz)
+// ==============================================================================
+
+void Bomba::begin() {
+  pinMode(PIN_DIR, OUTPUT);
+  fijarSentido(true); // Sentido horario por defecto
+
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+  ledcAttach(PIN_PUL, 800, 10);
+  ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF (motor libre)
+#else
+  ledcSetup(0, 800, 10);
+  ledcAttachPin(PIN_PUL, 0);
+  ledcWrite(0, 0);
+#endif
+}
+
+void Bomba::arrancar() {
+  _enMarcha = true;
+  if (_objetivo < RPM_MIN) {
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+  }
+}
+
+void Bomba::detener() {
+  _enMarcha = false;
+  _invirtiendo = false;
+  if (_objetivo >= RPM_MIN) {
+    _rpmGuardada = _objetivo;
+  }
+}
+
+bool Bomba::setRPM(float rpm) {
+  if (!std::isfinite(rpm)) return false;
+  float r = constrain(rpm, RPM_MIN, RPM_MAX);
+  if (_invirtiendo) {
+    _rpmGuardada = r;   // Almacena consigna si el usuario mueve slider durante el frenado de inversión
+  } else {
+    _objetivo = r;
+    _rpmGuardada = r;
+  }
+  return true;
+}
+
+void Bomba::toggleSentido() {
+  if (_invirtiendo) return;
+  if (_actual < 1.0f) {
+    fijarSentido(!_horario);
+  } else {
+    _invirtiendo = true;
+    _rpmGuardada = (_objetivo >= RPM_MIN) ? _objetivo : RPM_INICIO;
+    _objetivo = 0.0f;
+  }
+}
+
+void Bomba::fijarSentido(bool horario) {
+  _horario = horario;
+  digitalWrite(PIN_DIR, horario ? LOW : HIGH);
+}
+
+void Bomba::tick(float dt) {
+  float objetivo = _enMarcha ? _objetivo : 0.0f;
+
+  if (_actual < objetivo) {
+    // Si la bomba está arrancando desde 0, iniciamos suavemente en 1.0 RPM (53 Hz LEDC)
+    if (_actual < 1.0f) {
+      _actual = 1.0f;
+    }
+    
+    // Rampa de aceleración progresiva
+    float tasaAcel = ACEL_NOMINAL_RPM_S;
+    if (_actual < 10.0f) {
+      tasaAcel = ACEL_ARRANQUE_RPM_S + (_actual / 10.0f) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
+    }
+    float delta = objetivo - _actual;
+    if (delta < 3.0f) {
+      tasaAcel = fmaxf(0.8f, tasaAcel * (delta / 3.0f));
+    }
+    _actual = fminf(objetivo, _actual + tasaAcel * dt);
+
+  } else if (_actual > objetivo) {
+    // Desaceleración / Frenado
+    if (!_enMarcha) {
+      // PARADA RÁPIDA: Frenado ágil en menos de 1.5s
+      _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
+      if (_actual < 1.0f) {
+        _actual = 0.0f;
+      }
+    } else {
+      // Reducción suave de velocidad en marcha
+      float tasaDecel = DESACEL_AJUSTE_RPM_S;
+      float delta = _actual - objetivo;
+      if (delta < 3.0f) {
+        tasaDecel = fmaxf(1.0f, tasaDecel * (delta / 3.0f));
+      }
+      _actual = fmaxf(objetivo, _actual - tasaDecel * dt);
+    }
+  }
+
+  // Al llegar a 0 RPM durante una inversión: cortar pulsos, conmutar DIR con margen de seguridad y re-acelerar
+  if (_invirtiendo && _actual <= 0.1f) {
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
+    _fActual = 0;
+    fijarSentido(!_horario);
+    _invirtiendo = false;
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+  }
+
+  // Generación de pulsos PWM por hardware LEDC
+  if (_actual >= 1.0f) {
+    uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
+    if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
+
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    if (f != _fActual) { 
+      ledcChangeFrequency(PIN_PUL, f, 10); 
+      _fActual = f; 
+    }
+    ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
+#else
+    if (f != _fActual) { 
+      ledcSetup(0, f, 10); 
+      _fActual = f; 
+    }
+    ledcWrite(0, 512);
+#endif
+  } else if (_fActual != 0) {
+    // Corte inmediato de pulsos al detenerse
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF
+#else
+    ledcWrite(0, 0);
+#endif
+    _fActual = 0;
+  }
+}
+
+```
+
+---
+
+### 3.6. `darcy.h` (Modelo de Transporte Darcy, Viscosidad de Vogel y Resistencias)
+```cpp
+#pragma once
+// ==============================================================================
+// MODELO DE TRANSPORTE Y RESISTENCIAS EN SERIE (LEY DE DARCY) — MEMBRANA FX100
+// Diseñado para la Tesis de Grado (Antonella Guitián & Owen Cañizares / Codir. Ing. Enzo)
+// ==============================================================================
+
+#include <Arduino.h>
+#include <cmath>
+#include "config.h"
+
+struct ResultadoDarcy {
+  float J_LMH;       // Flujo de permeado volumétrico específico [L / (m² · h)]
+  float J20_LMH;     // Flujo normalizado a 20 °C [LMH]
+  float mu_Pas;      // Viscosidad dinámica del agua a temperatura T [Pa · s]
+  float TCF;         // Factor de corrección por temperatura (mu(T) / mu_20)
+  float R_total;     // Resistencia hidráulica total [m^-1]
+  float R_torta;     // Resistencia por capa de torta / ensuciamiento [m^-1]
+  float TMP_bar;     // Presión transmembrana efectiva [bar]
+  bool  valido;      // Estado de cálculo válido
+};
+
+class ModeloDarcy {
+public:
+  static constexpr float MU20 = 1.002e-3f; // Pa · s (Agua destilada a 20.0 °C)
+
+  // Viscosidad dinámica del agua mediante ecuación de Vogel (válida 5 a 60 °C)
+  static float viscosidadAgua(float temp_C) {
+    const float T_K = temp_C + 273.15f;
+    return 2.414e-5f * powf(10.0f, 247.8f / (T_K - 140.0f));
+  }
+
+  void  setRm(float rm) { if (rm > 1e11f && rm < 1e16f) _Rm = rm; }
+  float Rm() const      { return _Rm; }
+
+  // Cálculo hidráulico en tiempo real
+  ResultadoDarcy calcular(float qPerm_mLmin, float tmp_bar, float temp_C = 20.0f) const {
+    ResultadoDarcy r{};
+    if (!std::isfinite(tmp_bar) || !std::isfinite(temp_C) || !std::isfinite(qPerm_mLmin)) {
+      return r;
+    }
+    if (tmp_bar < 0.01f || qPerm_mLmin < 0.5f) {
+      return r;
+    }
+
+    r.TMP_bar = tmp_bar;
+    r.mu_Pas  = viscosidadAgua(temp_C);
+    r.TCF     = r.mu_Pas / MU20;
+
+    // J [LMH] = Q [L/h] / Area [m²] = (qPerm [mL/min] * 0.06) / 2.2 m²
+    r.J_LMH   = (qPerm_mLmin * 0.06f) / AREA_MEMBRANA_M2;
+    r.J20_LMH = r.J_LMH * r.TCF;
+
+    // J en unidades SI [m/s]: 1 LMH = 1 / 3.6e6 m/s
+    const float J_SI   = r.J_LMH / 3.6e6f;
+    const float TMP_Pa = tmp_bar * 100000.0f;
+
+    // Ley de Darcy: J = TMP / (mu * R_total) => R_total = TMP / (mu * J)
+    r.R_total = TMP_Pa / (r.mu_Pas * J_SI);
+    r.R_torta = r.R_total - _Rm;
+    r.valido  = true;
+
+    return r;
+  }
+
+  // Calibración experimental de Rm con agua limpia (regresión lineal J vs TMP sin ordenada al origen)
+  void acumularPuntoAguaLimpia(float J_SI, float TMP_Pa) {
+    _sumJP += J_SI * TMP_Pa;
+    _sumPP += TMP_Pa * TMP_Pa;
+  }
+
+  bool finalizarCalibracionRm(float temp_C = 20.0f) {
+    if (_sumPP <= 0.0f || _sumJP <= 0.0f) return false;
+    const float Lp = _sumJP / _sumPP; // Permeabilidad hidráulica en m / (s · Pa)
+    const float mu = viscosidadAgua(temp_C);
+    _Rm = 1.0f / (mu * Lp);
+    _sumJP = 0.0f;
+    _sumPP = 0.0f;
+    return true;
+  }
+
+private:
+  // Resistencia intrínseca nominal de la membrana FX100 Helixone® (K_UF = 73 mL/h*mmHg, 2.2 m²)
+  float _Rm = 1.44e13f; 
+  float _sumJP = 0.0f;
+  float _sumPP = 0.0f;
+};
+
+```
+
+---
+
+### 3.7. `EN_USO_firmware_planta.ino` (Orquestador Principal, Lazos Temporizados, Datalogger y Servidor Web)
+*(Nota: El archivo `index_html.cpp` contiene la interfaz web HTML5/CSS/JS de 740 líneas almacenada en Flash `PROGMEM`)*
+```cpp
+/* ==============================================================================
+ * PLANTA PILOTO DE ULTRAFILTRACIÓN — TESIS INGENIERÍA INDUSTRIAL (UNSa 2026)
+ * Firmware de Control, Adquisición, Modo Desarrollador, Auto-Calibración y Datalogger
+ * Arquitectura C++ Optimizada y Wi-Fi SoftAP de Alta Estabilidad (Anti-Desconexión)
+ * ============================================================================== */
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+#include "config.h"
+#include "caudalimetro.h"
+#include "Bomba.h"
+#include "darcy.h"
+#include "index_html.h"
+
+// ------------------------------------------------------------------------------
+// ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y GESTIÓN DE ENSAYOS
+// ------------------------------------------------------------------------------
+struct RegistroCalibracion {
+  uint8_t  id_ensayo;
+  uint32_t t_relativo_s;
+  float    rpm;
+  float    q_bomba;
+  float    f_alim;
+  float    q_alim;
+  float    vol_alim;
+  float    f_perm;
+  float    q_perm;
+  float    vol_perm;
+  float    q_ret;
+  float    recov;
+  float    delta;
+  float    k_alim;
+  float    k_perm;
+  float    j_lmh;
+};
+
+struct EnsayoInfo {
+  uint8_t  id;
+  float    rpm_consigna;
+  uint32_t t_inicio_ms;
+  uint32_t duracion_s;
+  uint16_t muestras;
+  float    vol_alim;
+  float    vol_perm;
+};
+
+// Buffers de almacenamiento en RAM
+RegistroCalibracion bufferLog[MAX_REGISTROS];
+size_t numRegistros = 0;
+
+EnsayoInfo listaEnsayos[MAX_ENSAYOS];
+size_t numEnsayos = 0;
+uint8_t ensayoActualId = 1;
+
+// Variables de estado del ensayo actual
+uint32_t tInicioEnsayo_ms = 0;
+float volAlimInicioEnsayo = 0.0f;
+float volPermInicioEnsayo = 0.0f;
+bool  bombaEnMarchaAnterior = false;
+
+// Variables de Auto-Calibración en Marcha
+bool    autoCalibrando = false;
+uint8_t autoCalMuestras = 0;
+float   autoCalSumFrecAlim = 0.0f;
+float   autoCalSumFrecPerm = 0.0f;
+String  autoCalMensaje = "";
+
+// Instanciación de componentes (Alimentación con alarma de corte; Permeado sin alarma en reposo)
+Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION", true);
+Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO", false);
+Bomba bomba;
+WebServer server(80);
+Preferences prefs;
+
+// Variables hidráulicas y de control
+float qRet_mLmin = 0.0f;
+float recuperacion = 0.0f;
+float deltaBomba = 0.0f;
+float jLMH_actual = 0.0f;
+bool  flagCruceSensores = false;
+
+ModeloDarcy modeloDarcy;
+ResultadoDarcy resultadoDarcy;
+
+uint32_t tLoop = 0;
+uint32_t tCaudal = 0;
+uint32_t tDatalogger = 0;
+
+// ------------------------------------------------------------------------------
+// GESTIÓN DE PREFERENCES (MEMORIA FLASH NVS)
+// ------------------------------------------------------------------------------
+void cargarParametrosNVS() {
+  prefs.begin("planta_uf", false);
+  float ka = prefs.getFloat("k_alim", K_ALIMENTACION);
+  float kp = prefs.getFloat("k_perm", K_PERMEADO);
+  float ml = prefs.getFloat("ml_rev", ML_POR_VUELTA);
+  uint16_t pul = prefs.getUShort("pul_rev", PULSOS_POR_REV);
+
+  sensorAlimentacion.setK(ka);
+  sensorPermeado.setK(kp);
+  bomba.setMlPorVuelta(ml);
+  bomba.setPulsosPorRev(pul);
+
+  Serial.printf("\n[NVS] Parametros cargados: K_Alim=%.2f | K_Perm=%.2f | mL/rev=%.4f | Pul/Rev=%u\n",
+                ka, kp, ml, pul);
+}
+
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+  prefs.putFloat("k_alim", ka);
+  prefs.putFloat("k_perm", kp);
+  prefs.putFloat("ml_rev", ml);
+  prefs.putUShort("pul_rev", pul);
+  Serial.println("[NVS] Parametros guardados en memoria Flash con exito.");
+}
+
+// ------------------------------------------------------------------------------
+// FUNCIÓN PARA GUARDAR MUESTRA EN EL DATALOGGER (CADA 10 SEGUNDOS)
+// ------------------------------------------------------------------------------
+void guardarMuestraDatalogger() {
+  if (tInicioEnsayo_ms == 0) {
+    tInicioEnsayo_ms = millis();
+  }
+
+  uint32_t t_rel_s = (millis() - tInicioEnsayo_ms) / 1000;
+
+  // Desplazamiento FIFO circular si el buffer se llena
+  if (numRegistros >= MAX_REGISTROS) {
+    for (size_t i = 0; i < MAX_REGISTROS - 1; i++) {
+      bufferLog[i] = bufferLog[i + 1];
+    }
+    numRegistros = MAX_REGISTROS - 1;
+  }
+
+  RegistroCalibracion reg;
+  reg.id_ensayo    = ensayoActualId;
+  reg.t_relativo_s = t_rel_s;
+  reg.rpm          = bomba.rpmActual();
+  reg.q_bomba      = bomba.caudalTeorico_mLmin();
+  reg.f_alim       = sensorAlimentacion.frecuencia_Hz();
+  reg.q_alim       = sensorAlimentacion.caudal_mLmin();
+  reg.vol_alim     = sensorAlimentacion.volumen_L();
+  reg.f_perm       = sensorPermeado.frecuencia_Hz();
+  reg.q_perm       = sensorPermeado.caudal_mLmin();
+  reg.vol_perm     = sensorPermeado.volumen_L();
+  reg.q_ret        = qRet_mLmin;
+  reg.recov        = recuperacion;
+  reg.delta        = deltaBomba;
+  reg.k_alim       = sensorAlimentacion.getK();
+  reg.k_perm       = sensorPermeado.getK();
+  reg.j_lmh        = (reg.q_perm * 0.06f) / AREA_MEMBRANA_M2;
+
+  bufferLog[numRegistros++] = reg;
+
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f mL/min | Q_Perm=%.1f mL/min | J=%.2f LMH | Y=%.1f%%\n",
+                (unsigned int)numRegistros, ensayoActualId, t_rel_s, reg.rpm, reg.q_alim, reg.q_perm, reg.j_lmh, reg.recov);
+}
+
+// ------------------------------------------------------------------------------
+// MANEJADORES DE RUTAS DEL SERVIDOR WEB
+// ------------------------------------------------------------------------------
+void handleRoot() {
+  server.send_P(200, "text/html", INDEX_HTML);
+}
+
+void handleStatus() {
+  uint32_t t_act_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+  uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
+  if (prog > 100) prog = 100;
+
+  float qAlim = sensorAlimentacion.caudal_mLmin();
+  float qPerm = sensorPermeado.caudal_mLmin();
+  jLMH_actual = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
+
+  char buf[768];
+  int n = snprintf(buf, sizeof(buf),
+    "{"
+    "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,"
+    "\"ip\":\"%s\",\"alim_ok\":%s,\"perm_ok\":%s,\"f_alim\":%.2f,\"q_alim\":%.1f,\"vol_alim\":%.4f,"
+    "\"f_perm\":%.2f,\"q_perm\":%.1f,\"vol_perm\":%.4f,\"q_ret\":%.1f,\"recov\":%.2f,"
+    "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
+    "\"k_alim\":%.2f,\"k_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
+    "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
+    "\"n_logs\":%u,\"ensayo_act\":%u,\"t_ensayo_s\":%lu,"
+    "\"heap\":%u,\"maxblk\":%u,"
+    "\"ensayos\":[",
+    bomba.rpmActual(), bomba.rpmObjetivo(),
+    bomba.enMarcha() ? "true" : "false",
+    bomba.invirtiendo() ? "true" : "false",
+    bomba.sentidoHorario() ? "true" : "false",
+    bomba.enRegimenEstable() ? "true" : "false",
+    WiFi.softAPIP().toString().c_str(),
+    !sensorAlimentacion.sinSenal() ? "true" : "false",
+    !sensorPermeado.sinSenal() ? "true" : "false",
+    sensorAlimentacion.frecuencia_Hz(), qAlim, sensorAlimentacion.volumen_L(),
+    sensorPermeado.frecuencia_Hz(), qPerm, sensorPermeado.volumen_L(),
+    qRet_mLmin, recuperacion,
+    bomba.caudalTeorico_mLmin(), deltaBomba, jLMH_actual, flagCruceSensores ? "true" : "false",
+    sensorAlimentacion.getK(), sensorPermeado.getK(),
+    bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
+    autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
+    (unsigned)numRegistros, (unsigned)ensayoActualId, (unsigned long)t_act_s,
+    ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
+  );
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "application/json", "");
+  server.sendContent(buf, n);
+
+  char item[128];
+  for (size_t i = 0; i < numEnsayos; i++) {
+    int itemLen = snprintf(item, sizeof(item),
+      "%s{\"id\":%u,\"rpm\":%.1f,\"duracion_s\":%lu,\"muestras\":%u,\"vol_alim\":%.4f,\"vol_perm\":%.4f}",
+      (i > 0) ? "," : "",
+      listaEnsayos[i].id, listaEnsayos[i].rpm_consigna,
+      (unsigned long)listaEnsayos[i].duracion_s,
+      listaEnsayos[i].muestras,
+      listaEnsayos[i].vol_alim, listaEnsayos[i].vol_perm
+    );
+    server.sendContent(item, itemLen);
+  }
+
+  server.sendContent("]}");
+  server.sendContent(""); // Cierra el streaming chunked
+}
+
+void handleCmd() {
+  if (!server.hasArg("act")) {
+    server.send(400, "text/plain", "Falta argumento act");
+    return;
+  }
+  String act = server.arg("act");
+  if (act == "START") {
+    bomba.arrancar();
+  } else if (act == "STOP") {
+    bomba.detener();
+    if (autoCalibrando) {
+      autoCalibrando = false;
+      autoCalMensaje = "Auto-calibracion cancelada al apagar bomba.";
+    }
+  } else if (act == "DIR") {
+    bomba.toggleSentido();
+  } else if (act == "RESET_VOL") {
+    sensorAlimentacion.resetVolumen();
+    sensorPermeado.resetVolumen();
+  }
+  server.send(200, "text/plain", "OK");
+}
+
+void handleSetRPM() {
+  if (server.hasArg("rpm")) {
+    float rpm = server.arg("rpm").toFloat();
+    if (bomba.setRPM(rpm)) {
+      server.send(200, "text/plain", "OK");
+    } else {
+      server.send(400, "text/plain", "ERROR: RPM fuera de rango o invalido");
+    }
+  } else {
+    server.send(400, "text/plain", "Falta argumento rpm");
+  }
+}
+
+// Configuración en Modo Desarrollador
+void handleSetDev() {
+  if (server.hasArg("ka")) {
+    float ka = server.arg("ka").toFloat();
+    sensorAlimentacion.setK(ka);
+  }
+  if (server.hasArg("kp")) {
+    float kp = server.arg("kp").toFloat();
+    sensorPermeado.setK(kp);
+  }
+  if (server.hasArg("ml")) {
+    float ml = server.arg("ml").toFloat();
+    bomba.setMlPorVuelta(ml);
+  }
+  if (server.hasArg("pul")) {
+    uint16_t pul = (uint16_t)server.arg("pul").toInt();
+    bomba.setPulsosPorRev(pul);
+  }
+
+  bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
+  if (saveNvs) {
+    guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                         bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+  }
+
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+// Iniciar Auto-Calibración Inteligente en Régimen Permanente
+void handleIniciarAutoCal() {
+  if (!bomba.enMarcha()) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Enciende la bomba primero\"}");
+    return;
+  }
+  autoCalibrando = true;
+  autoCalMuestras = 0;
+  autoCalSumFrecAlim = 0.0f;
+  autoCalSumFrecPerm = 0.0f;
+  autoCalMensaje = "";
+  server.send(200, "application/json", "{\"status\":\"iniciada\"}");
+}
+
+void handleCancelarAutoCal() {
+  autoCalibrando = false;
+  autoCalMensaje = "Auto-calibracion cancelada.";
+  server.send(200, "application/json", "{\"status\":\"cancelada\"}");
+}
+
+// Calibrador Completo por RPM y Caudal de Probeta
+void handleCalibrarRpmQ() {
+  if (!server.hasArg("rpm") || !server.hasArg("qa") || !server.hasArg("qp")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos\"}");
+    return;
+  }
+
+  float rpm = server.arg("rpm").toFloat();
+  float qa  = server.arg("qa").toFloat();
+  float qp  = server.arg("qp").toFloat();
+
+  if (rpm <= 0.0f || qa <= 0.0f || qp <= 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores deben ser mayores a 0\"}");
+    return;
+  }
+
+  // 1. Cilindrada real de la bomba
+  float nuevaCilindrada = qa / rpm;
+  bomba.setMlPorVuelta(nuevaCilindrada);
+
+  // 2. Factores K basados en frecuencia actual
+  float fa = sensorAlimentacion.frecuencia_Hz();
+  float fp = sensorPermeado.frecuencia_Hz();
+
+  if (fa > 1.0f) {
+    float nuevoKa = (fa * 1000.0f) / qa;
+    sensorAlimentacion.setK(nuevoKa);
+  }
+  if (fp > 0.3f) {
+    float nuevoKp = (fp * 1000.0f) / qp;
+    sensorPermeado.setK(nuevoKp);
+  }
+
+  guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                       bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+  String json = "{";
+  json += "\"status\":\"ok\",";
+  json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
+  json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+// Restablecer parámetros de fábrica
+void handleResetDev() {
+  sensorAlimentacion.setK(K_ALIMENTACION);
+  sensorPermeado.setK(K_PERMEADO);
+  bomba.setMlPorVuelta(ML_POR_VUELTA);
+  bomba.setPulsosPorRev(PULSOS_POR_REV);
+  
+  guardarParametrosNVS(K_ALIMENTACION, K_PERMEADO, ML_POR_VUELTA, PULSOS_POR_REV);
+  server.send(200, "application/json", "{\"status\":\"reset_ok\"}");
+}
+
+// Exportación a Excel (.CSV) con filtrado por Ensayo o Histórico Completo
+void handleExportCSV() {
+  String targetEnsayo = server.hasArg("ensayo") ? server.arg("ensayo") : "all";
+  
+  String filename = "PlantaUF_Calibracion_";
+  if (targetEnsayo == "all") {
+    filename += "HistoricoCompleto.csv";
+  } else if (targetEnsayo == "actual") {
+    filename += "Ensayo_" + String(ensayoActualId) + "_EnVivo.csv";
+  } else {
+    filename += "Ensayo_" + targetEnsayo + ".csv";
+  }
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/csv; charset=UTF-8", "");
+  
+  // Encabezado CSV
+  server.sendContent("sep=;\n"
+                     "PLANTA DE ULTRAFILTRACION FX100 - REGISTRO DE ENSAYOS Y CALIBRACION\n"
+                     "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Q_Bomba_Teorico_mLmin;Frec_Alimentacion_Hz;Q_Alimentacion_mLmin;Vol_Alimentacion_L;Frec_PERMEADO_Hz;Q_PERMEADO_mLmin;Vol_PERMEADO_L;Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Alim_Pct;K_Alim;K_Perm;J_LMH\n");
+
+  uint8_t filtroId = 0;
+  if (targetEnsayo == "actual") {
+    filtroId = ensayoActualId;
+  } else if (targetEnsayo != "all") {
+    filtroId = (uint8_t)targetEnsayo.toInt();
+  }
+
+  char fila[200];
+  for (size_t i = 0; i < numRegistros; i++) {
+    const RegistroCalibracion& r = bufferLog[i];
+    
+    if (filtroId > 0 && r.id_ensayo != filtroId) {
+      continue;
+    }
+
+    uint32_t mins = r.t_relativo_s / 60;
+    uint32_t secs = r.t_relativo_s % 60;
+
+    int len = snprintf(fila, sizeof(fila),
+      "%u;%lu;%02u:%02u;%.1f;%.1f;%.2f;%.1f;%.4f;%.2f;%.1f;%.4f;%.1f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+      r.id_ensayo, (unsigned long)r.t_relativo_s, mins, secs,
+      r.rpm, r.q_bomba, r.f_alim, r.q_alim, r.vol_alim,
+      r.f_perm, r.q_perm, r.vol_perm, r.q_ret, r.recov,
+      r.delta, r.k_alim, r.k_perm, r.j_lmh
+    );
+
+    server.sendContent(fila, len);
+    if ((i & 31) == 0) yield();
+  }
+
+  server.sendContent(""); // Cierra el streaming chunked
+}
+
+void handleClearCSV() {
+  numRegistros = 0;
+  numEnsayos = 0;
+  ensayoActualId = 1;
+  tInicioEnsayo_ms = millis();
+  server.send(200, "text/plain", "LOGS_CLEARED");
+}
+
+// ------------------------------------------------------------------------------
+// SETUP DEL MICROCONTROLADOR ESP32
+// ------------------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Serial.println("\n==================================================");
+  Serial.println(" PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   ");
+  Serial.println(" Rampa S-Curve, Auto-Calibracion & Datalogger     ");
+  Serial.println("==================================================");
+
+  // 1. Cargar parámetros de calibración desde NVS Flash
+  cargarParametrosNVS();
+
+  // 2. Inicialización de Hardware
+  pinMode(PIN_LED_BOMBA, OUTPUT);
+  digitalWrite(PIN_LED_BOMBA, LOW);
+
+  sensorAlimentacion.begin();
+  sensorPermeado.begin();
+  bomba.begin();
+
+  // 3. Configuración Wi-Fi Robusta (AP Dedicado Anti-Desconexión)
+  WiFi.disconnect(true);           // Limpiar estados previos
+  delay(100);
+  WiFi.mode(WIFI_AP);              // Modo AP Puro (evita escaneos STA que botan clientes)
+  WiFi.setSleep(false);            // CRÍTICO: Desactiva ahorro de energía del módem
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Máxima potencia de transmisión RF
+
+  IPAddress local_IP(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4); // Canal 1 fijo, SSID visible, hasta 4 clientes
+
+  Serial.println("[WIFI] Punto de Acceso Estable Creado:");
+  Serial.printf("       SSID: %s | Pass: %s\n", SSID_AP, PASS_AP);
+  Serial.printf("       IP AP: http://%s\n", WiFi.softAPIP().toString().c_str());
+
+  if (MDNS.begin("bomba")) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("[mDNS] Servidor publicado en: http://bomba.local");
+  }
+
+  // 4. Enrutamiento del Servidor Web
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.on("/cmd", HTTP_GET, handleCmd);
+  server.on("/set", HTTP_GET, handleSetRPM);
+  server.on("/set_dev", HTTP_GET, handleSetDev);
+  server.on("/reset_dev", HTTP_GET, handleResetDev);
+  server.on("/iniciar_auto_cal", HTTP_GET, handleIniciarAutoCal);
+  server.on("/cancelar_auto_cal", HTTP_GET, handleCancelarAutoCal);
+  server.on("/calibrar_rpm_q", HTTP_GET, handleCalibrarRpmQ);
+  server.on("/export_csv", HTTP_GET, handleExportCSV);
+  server.on("/clear_csv", HTTP_GET, handleClearCSV);
+
+  server.begin();
+  Serial.println("[HTTP] Servidor Web SCADA iniciado con exito en puerto 80.\n");
+
+  tLoop = millis();
+  tCaudal = millis();
+  tDatalogger = millis();
+  tInicioEnsayo_ms = millis();
+}
+
+// ------------------------------------------------------------------------------
+// BUCLE PRINCIPAL (LOOP NO BLOQUEANTE)
+// ------------------------------------------------------------------------------
+void loop() {
+  server.handleClient();
+
+  uint32_t tAhora = millis();
+
+  // 1. Control cinemático de la bomba cada 50 ms (Rampa S-Curve Progresiva)
+  if (tAhora - tLoop >= 50) {
+    float dt = (tAhora - tLoop) / 1000.0f;
+    tLoop = tAhora;
+    bomba.tick(dt);
+
+    // Testigo LED onboard
+    digitalWrite(PIN_LED_BOMBA, (bomba.rpmActual() > 0.5f) ? HIGH : LOW);
+
+    // Detección de flancos de la bomba para registro de ensayos
+    bool enMarcha = bomba.enMarcha();
+    
+    // Flanco de subida: Iniciar sesión de ensayo
+    if (enMarcha && !bombaEnMarchaAnterior) {
+      uint16_t muestrasPrevias = 0;
+      for (size_t i = 0; i < numRegistros; i++) {
+        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+      }
+      if (muestrasPrevias > 0) {
+        ensayoActualId++;
+      }
+      tInicioEnsayo_ms = millis();
+      volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+      volPermInicioEnsayo = sensorPermeado.volumen_L();
+      Serial.printf("\n>>> [ENSAYO #%u INICIADO] Consigna: %.1f RPM <<<\n", ensayoActualId, bomba.rpmObjetivo());
+    }
+    
+    // Flanco de bajada: Finalizar sesión y registrar
+    if (!enMarcha && bombaEnMarchaAnterior) {
+      uint32_t duracion_s = (millis() - tInicioEnsayo_ms) / 1000;
+      uint16_t muestrasEnsayo = 0;
+      for (size_t i = 0; i < numRegistros; i++) {
+        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
+      }
+
+      if (muestrasEnsayo > 0 && numEnsayos < MAX_ENSAYOS) {
+        listaEnsayos[numEnsayos].id           = ensayoActualId;
+        listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
+        listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;
+        listaEnsayos[numEnsayos].duracion_s   = duracion_s;
+        listaEnsayos[numEnsayos].muestras     = muestrasEnsayo;
+        listaEnsayos[numEnsayos].vol_alim     = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
+        listaEnsayos[numEnsayos].vol_perm     = sensorPermeado.volumen_L() - volPermInicioEnsayo;
+        numEnsayos++;
+
+        Serial.printf("\n<<< [ENSAYO #%u FINALIZADO Y REGISTRADO] Duracion: %us | Muestras: %u | Vol Perm: %.3f L >>>\n\n",
+                      ensayoActualId, duracion_s, muestrasEnsayo, sensorPermeado.volumen_L() - volPermInicioEnsayo);
+      }
+    }
+
+    bombaEnMarchaAnterior = enMarcha;
+  }
+
+  // 2. Adquisición y cálculo de caudales cada 1000 ms (1 segundo)
+  if (tAhora - tCaudal >= 1000) {
+    float dt = (tAhora - tCaudal) / 1000.0f;
+    tCaudal = tAhora;
+
+    bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
+    sensorAlimentacion.actualizar(dt, bombaEmpuja);
+    sensorPermeado.actualizar(dt, bombaEmpuja);
+
+    float qAlim = sensorAlimentacion.caudal_mLmin();
+    float qPerm = sensorPermeado.caudal_mLmin();
+
+    // Sanity-check de cruce de sensores (el permeado no puede exceder físicamente al caudal de alimentación)
+    flagCruceSensores = (qPerm > qAlim + 50.0f) && (bomba.rpmActual() > 5.0f);
+    if (flagCruceSensores) {
+      Serial.printf("⚠️ [ALERTA] Cruce de cables o sensor invertido: Q_Perm (%.1f mL/min) > Q_Alim (%.1f mL/min)\n", qPerm, qAlim);
+    }
+
+    // Balance Hidráulico Tangencial y Flujo Darcy en tiempo real
+    qRet_mLmin   = fmaxf(0.0f, qAlim - qPerm);
+    recuperacion = (qAlim > 1.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
+    jLMH_actual  = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
+
+    float qBomba = bomba.caudalTeorico_mLmin();
+    deltaBomba   = (qBomba > 1.0f) ? (((qAlim - qBomba) / qBomba) * 100.0f) : 0.0f;
+
+    // Máquina de estados de Auto-Calibración en régimen permanente
+    if (autoCalibrando) {
+      if (bomba.enRegimenEstable()) {
+        autoCalSumFrecAlim += sensorAlimentacion.frecuencia_Hz();
+        autoCalSumFrecPerm += sensorPermeado.frecuencia_Hz();
+        autoCalMuestras++;
+
+        Serial.printf("[AUTO-CAL] Muestra %u/%u | F_Alim=%.2f Hz | F_Perm=%.2f Hz\n",
+                      autoCalMuestras, MUESTRAS_AUTO_CAL, sensorAlimentacion.frecuencia_Hz(), sensorPermeado.frecuencia_Hz());
+
+        if (autoCalMuestras >= MUESTRAS_AUTO_CAL) {
+          float fPromAlim = autoCalSumFrecAlim / (float)MUESTRAS_AUTO_CAL;
+          float fPromPerm = autoCalSumFrecPerm / (float)MUESTRAS_AUTO_CAL;
+          float qRefAlim  = bomba.rpmActual() * bomba.getMlPorVuelta();
+
+          if (qRefAlim > 10.0f && fPromAlim > 1.0f) {
+            float nuevoKa = (fPromAlim * 1000.0f) / qRefAlim;
+            sensorAlimentacion.setK(nuevoKa);
+          }
+          if (fPromPerm > 0.2f) {
+            float targetPerm = bomba.rpmActual() * 2.0f;
+            float nuevoKp = (fPromPerm * 1000.0f) / targetPerm;
+            sensorPermeado.setK(nuevoKp);
+          }
+
+          guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                               bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+          autoCalibrando = false;
+          autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " | K_Perm=" + String(sensorPermeado.getK(), 2);
+          Serial.printf("\n>>> %s <<<\n\n", autoCalMensaje.c_str());
+        }
+      } else {
+        Serial.println("[AUTO-CAL] Esperando estabilizacion de RPM...");
+      }
+    }
+
+    // Telemetría periódica por Serial
+    Serial.printf("[TELEMETRIA] RPM: %4.1f | Q_Alim: %5.1f mL/min | Q_Perm: %5.1f mL/min | J: %4.2f LMH | Q_Ret: %5.1f mL/min | Y: %4.1f%% | V_Perm: %.3f L\n",
+                  bomba.rpmActual(), qAlim, qPerm, jLMH_actual, qRet_mLmin, recuperacion, sensorPermeado.volumen_L());
+  }
+
+  // 3. Muestreo del Datalogger cada 10 segundos
+  if (tAhora - tDatalogger >= INTERVALO_LOG_MS) {
+    tDatalogger = tAhora;
+    if (bomba.enMarcha() || sensorAlimentacion.caudal_mLmin() > 10.0f || sensorPermeado.caudal_mLmin() > 5.0f) {
+      guardarMuestraDatalogger();
+    }
+  }
+}
+
 ```
 
 ---
