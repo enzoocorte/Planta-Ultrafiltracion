@@ -86,10 +86,10 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
       • En banco físico      • Cero fragmentación   • Transductores 0-1 bar    • Compresibilidad torta
 ```
 
-1. **Seguridad de Proceso y Desplazamiento Positivo:**
-   * **Protección Mecánica Obligatoria:** A 4.5 Nm de torque, la bomba peristáltica es de desplazamiento positivo y puede reventar mangueras si se ocluye la línea. Es obligatorio instalar una **válvula de alivio mecánica** (tarada a 1.0-1.2 bar) en la impulsión y un **hongo de parada de emergencia (E-Stop)** cortando la potencia del driver DM860.
-   * **Techo Dinámico (`_techo`):** La bomba opera autolimitada a **44 RPM** a menos que los transductores de presión estén conectados, calibrados y con telemetría viva (< 1.5 s de antigüedad).
-   * **Parada Dura Inmediata (`paradaDura()`):** Ante sobrepresión de pico ($P_1 > 1.0\text{ bar}$) o sobrepresión $\text{TMP} > 0.45\text{ bar}$, corte inmediato de pulsos en $<50\text{ ms}$ (sin rampa de 2.2 s que seguiría bombeando fluido bajo exceso de presión).
+1. **Seguridad de Proceso y Desplazamiento Positivo (Dictamen Opus):**
+   * **Protección Mecánica Calibrada a 0.70 bar:** A 4.5 Nm de torque, el motor revienta mangueras o fibras si se estrangula la aguja. Es obligatorio instalar una **válvula de alivio mecánica calibrada a $\approx 0.70\text{ bar}$** (contrastada con manómetro) y un **hongo de parada de emergencia (E-Stop)** cortando potencia al DM860. *(Se descartó calibrar a 1.0 bar porque la TMP alcanzaría 0.95 bar y destruiría la membrana).*
+   * **Techo Dinámico e Histéresis (`_techo`):** La bomba opera autolimitada a **44 RPM**. Solo se desbloquea hasta 100 RPM si hay transductores con telemetría viva ($<1.5\text{ s}$); tras una pérdida de señal, baja a 44 RPM de inmediato y requiere 5 a 10 s continuos para rearmar.
+   * **Parada Dura Inmediata (`paradaDura()`):** Disparo en $<50\text{ ms}$ si $P_1 \ge \mathbf{0.60\text{ bar}}$ (antes de saturar el sensor en 1.0 bar) o si $\text{TMP} \ge \mathbf{0.45\text{ bar}}$. El E-Stop queda enclavado de forma persistente y vacía la cola de comandos con `xQueueReset()`. Inversión de giro bloqueada con membrana conectada.
 
 2. **Instrumentación de Presión y ADS1115 (Hito 2.3):**
    * **Modo Single-Ended Unánime:** Canales A0 ($P_{\text{alim}}$), A1 ($P_{\text{ret}}$), A2 ($P_{\text{perm}}$) y A3 (Conductividad TDS) usando palabra de control `(4 + ch) << 12` (`0xC383, 0xD383, 0xE383, 0xF383`). Permite calcular $\text{TMP} = \frac{P_1 + P_2}{2} - P_3$, supervisar la caída luminal $\Delta P = P_1 - P_2$ y vigilar cavitación en succión.
@@ -99,16 +99,16 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
    * **Driver I2C No Bloqueante (250 SPS):** Muestreo en round-robin capturando $P_{1,\text{pico}}$ (pulsaciones de rodillos a 1.25–5 Hz), timeout de bus de $50\text{ ms}$, rutina de recuperación de 9 pulsos de reloj en SCL y dead-man a los $1.5\text{ s}$.
 
 3. **Arquitectura Concurrente FreeRTOS (Hito 2.3 / Hito 4):**
-   * **Core 1 (`tareaControl`, Prioridad 19):** Lazo de control determinista a **50 ms (20 Hz)** mediante `vTaskDelayUntil()`. Prioridad 19 por encima del stack Wi-Fi lwIP para garantizar cero jitter. Control cinemático de bomba, FSM de presiones y enclavamientos de seguridad física.
-   * **Core 0 (`tareaWeb`, Prioridad 2):** Servidor HTTP `WebServer`, Wi-Fi SoftAP y datalogging NVS.
+   * **Core 1 (`tareaControl`, Prioridad 19):** Lazo de control determinista a **50 ms (20 Hz)** mediante `vTaskDelayUntil()`. Prioridad 19 por encima del stack Wi-Fi lwIP para garantizar cero jitter. Control cinemático de bomba, FSM de presiones y **evaluación ininterrumpida de sobrepresión en cada ciclo de 50 ms (NUNCA a 1 Hz)**.
+   * **Core 0 (`tareaWeb`, Prioridad 2):** Servidor HTTP `WebServer`, Wi-Fi SoftAP y datalogging NVS. Prohibidas las escrituras en Flash durante ensayos activos para no congelar la caché.
    * **Sincronización Lock-Free:** Snapshot plano (`SnapshotPlanta_t` $\le 300\text{ B}$) copiado bajo spinlock liviano `portMUX` (~1 µs). Banderas atómicas directas (`std::atomic<bool>`) para STOP y EMERGENCIA independientes de la cola de consignas.
-   * **Caudalímetro:** Cota física continua $f \le 10^6 / \Delta t_{\text{sin\_pulso}}$, resta modular inmune al rollover de `micros()`, y alarma de falla por falta de pulsos exclusiva para el sensor de alimentación.
+   * **Metrología de Caudal y Permeado a Bajo Flujo:** El sensor YF-S401 opera por debajo de su rango útil ($<300\text{ mL/min}$) en permeado; se establece el uso de una **balanza de precisión en laboratorio como referencia primaria**, mientras el firmware calcula $\Delta\text{vol}/\Delta t$ en ventanas de 10 a 30 s con calibración poligonal $K(f)$.
 
 4. **Protocolo Experimental de Modelado Darcy y Ensuciamiento (Hito 5):**
-   * **Fase 0 (Línea Base Diaria $R_{m,0}$):** Ensayo previo obligatorio con agua destilada (5 escalones de TMP) para desacoplar el envejecimiento de la membrana. Criterio: $R^2 \ge 0.985$.
-   * **Fase 1 (Flujo Crítico $J_c$):** Determinación por método de flujo escalonado (*flux-step*) ascendente y descendente a alto cizallamiento ($\dot{\gamma}_w$ hasta $2700\text{ s}^{-1}$). La histéresis cuantifica el ensuciamiento irreversible y verifica la ley $J_c \propto (\dot{\gamma}_w)^n$.
-   * **Fase 2 (Diseño Factorial $3^2$):** 2 factores a 3 niveles: Caudal (25, 60, 95 RPM) $\times$ TMP (0.10, 0.25, 0.40 bar) con **3 réplicas en el punto central (60 RPM, 0.25 bar)** para análisis por Metodología de Superficie de Respuesta (RSM) (11 corridas en total).
-   * **Fase 3 (Compresibilidad Coloidal y Limpieza):** Resistencia específica de torta $\alpha = \alpha_0 (\Delta P)^s$ mediante balances gravimétricos ($0.45\ \mu\text{m}$, $105^\circ\text{C}$). Enjuague físico rápido (*forward flush* + *backwash* invertido suave $\le 0.2\text{ bar}$) con meta $R_{m,\text{post}} \le 1.05 R_{m,0}$ ($FRR \ge 95\%$), y regeneración química alcalina-oxidante con $\text{NaOCl}$ ($100-200\text{ ppm}$, pH 10) si la recuperación hidráulica es insuficiente.
+   * **Fase 0 (Línea Base Diaria $R_{m,0}$):** Ensayo previo obligatorio con agua destilada (5 escalones de TMP a $\ge 60\text{ RPM}$) para desacoplar el envejecimiento de la membrana. Criterios: $R^2 \ge 0.985$ e intercepto compatible con cero. $K_{\text{UF}} = 54750\text{ mL/(h}\cdot\text{bar)}$.
+   * **Fase 1 (Flujo Crítico $J_c$):** Determinación por método escalonado (*flux-step*) ascendente y descendente con **recirculación obligatoria del permeado al tanque** para evitar la concentración artificial de la alimentación. La histéresis cuantifica el ensuciamiento irreversible.
+   * **Fase 2 (Diseño Factorial $3^2$ Factible):** Caudal (40, 70, 95 RPM — *desplazado desde 25 RPM para evitar recuperación $>100\%$*) $\times$ TMP (0.10, 0.25, 0.40 bar) con **3 réplicas en el punto central (70 RPM, 0.25 bar)** sumando **12 corridas en total** analizadas por Metodología de Superficie de Respuesta (RSM).
+   * **Fase 3 (Compresibilidad Coloidal y Limpieza):** Resistencia específica de torta $\alpha = \alpha_0 (\Delta P)^s$ mediante balances gravimétricos ($0.45\ \mu\text{m}$, $105^\circ\text{C}$). Enjuague físico rápido (*forward flush* + *backwash* hidrostático suave con depósito elevado $\le 1.5\text{ m} \approx 0.15\text{ bar}$), con criterio $R_{m,\text{post}} \le 1.05 R_{m,0}$ ($FRR \ge 95\%$), y regeneración química con $\text{NaOCl}$ ($100-200\text{ ppm}$, pH 10) con registro acumulado de dosis ($\text{ppm}\cdot\text{h}$).
 
 ---
 

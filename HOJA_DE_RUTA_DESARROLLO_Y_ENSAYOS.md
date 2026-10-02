@@ -30,27 +30,36 @@ Esta hoja de ruta establece los pasos de ingeniería rigurosos y consensuados co
 ## 🛡️ 2. Seguridad de Proceso: Operación con Desplazamiento Positivo y RPM_MAX = 100
 
 > [!CAUTION]
-> **Riesgo Físico Mayor:** Una bomba peristáltica acoplada a un NEMA 34 con torque nominal de $4.5\text{ Nm}$ es una **bomba de desplazamiento positivo**.  
-> Si la válvula de aguja de retentado se estrangula o se ocluye la línea, la presión hidráulica no se autorregula: se incrementa exponencialmente hasta el límite mecánico del motor, superando ampliamente la resistencia de las mangueras, los conectores Luer-Lock y las fibras capilares de la membrana Fresenius FX100. **La seguridad física no puede descansar únicamente en el microcontrolador.**
+> **Riesgo Físico Mayor y Resolución de Bloqueante:** Una bomba peristáltica acoplada a un NEMA 34 con torque nominal de $4.5\text{ Nm}$ es una **bomba de desplazamiento positivo**.  
+> Si la válvula de aguja de retentado se estrangula o se ocluye la línea, la presión hidráulica no se autorregula: se incrementa exponencialmente hasta el límite mecánico del motor, superando ampliamente la resistencia de las mangueras, los conectores Luer-Lock y las fibras capilares de la membrana Fresenius FX100 (límite de rotura/delaminación $\approx 0.67\text{ bar}$). **La seguridad física no puede descansar únicamente en el microcontrolador.**
 
 ### 2.1. Protección Mecánica e Independiente del Firmware (Mandatoria)
-1. **Válvula de Alivio Mecánica / Válvula de Seguridad de Presión:** Instalar en la línea de impulsión (a la salida inmediata del cabezal peristáltico) una válvula de alivio calibrada a un tarado máximo de **$1.0\text{ a }1.2\text{ bar}$**. Si la presión excede este umbral por estrangulamiento accidental, el flujo recircula directamente al tanque de alimentación sin pasar por el módulo capilar.
-2. **Hongo de Parada de Emergencia Físico (E-Stop):** Instalar un pulsador tipo hongo con retención mecánica accesible al operador, conectado directamente al circuito de corte de alimentación de potencia del driver Leadshine DM860 o actuando sobre sus bornes de habilitación `ENA+ / ENA-`.
+1. **Válvula de Alivio Mecánica Calibrada a $\approx 0.70\text{ bar}$ (70 kPa):** 
+   - *Corrección Crítica de Auditoría Opus:* La propuesta inicial de calibrar el alivio a $1.0 - 1.2\text{ bar}$ fue **vetada**, ya que con $P_1, P_2 \approx 1.0\text{ bar}$ la TMP alcanzaría $\approx 0.95\text{ bar}$, destruyendo los capilares. Además, un sensor de $0-1\text{ bar}$ satura en 1.0 bar, haciendo inútil un disparo de software en ese valor.
+   - *Solución:* Instalar en la impulsión una válvula de alivio mecánico calibrada rigurosamente a **$\approx 0.70\text{ bar}$** (contrastada con manómetro patrón). Si la presión sube, el líquido recircula al tanque sin entrar al cartucho.
+2. **Presostato Electromecánico Autónomo:** Interponer un presostato tarado a $0.70\text{ bar}$ cableado directamente a los bornes `ENA+ / ENA-` del driver Leadshine DM860 o en serie con su contactor de potencia, cortando el motor ante fallo del microcontrolador.
+3. **Hongo de Parada de Emergencia Físico (E-Stop):** Pulsador con retención mecánica accesible al operador, cortando potencia al DM860.
 
 ### 2.2. Estrategia de Seguridad en Firmware
 1. **Techo Dinámico de RPM (`_techo`):**
-   * Por defecto, la bomba opera con `_techo = RPM_ALARMA_MEMBRANA` ($44.0\text{ RPM} \approx 600\text{ mL/min}$).
+   * Por defecto, la bomba opera autolimitada con `_techo = RPM_ALARMA_MEMBRANA` ($44.0\text{ RPM} \approx 600\text{ mL/min}$).
    * El rango de **44 a 100 RPM solo se desbloquea** si se cumplen simultáneamente tres condiciones:
      a) Conversor ADS1115 y transductores de presión detectados y respondiendo en el bus I2C.
-     b) Telemetría de presión fresca (antigüedad del último dato de presión $< 1.5\text{ s}$).
-     c) Presión de entrada $P_1$ y Presión Transmembrana ($\text{TMP}$) dentro de los rangos seguros de operación.
-   * Si los transductores no están instalados (estado actual de banco), la operación por encima de 44 RPM requerirá confirmación explícita en la UI web bajo protocolo de válvula abierta.
-2. **Doble Tipo de Parada:**
-   * **Parada por Rampa (`detener()`):** Utilizada en condiciones operativas normales o falla de caudalímetro. Desacelera a $45\text{ RPM/s}$ cuidando la manguera y la vida útil del cabezal.
-   * **Parada Dura Inmediata (`paradaDura()`):** Utilizada exclusivamente ante **sobrepresión de pico ($P_1 > 1.0\text{ bar}$)**, sobrepresión transmembrana ($\text{TMP} > 0.45\text{ bar}$) o pulsador de emergencia. Corta de inmediato la generación de pulsos LEDC (`ledcWrite(PIN_PUL, 0)`) en $< 50\text{ ms}$. En un motor paso a paso con carga peristáltica, el frenado abrupto no causa daño mecánico y evita bombear $\approx 50\text{ mL}$ adicionales durante los $2.2\text{ s}$ que tomaría una rampa desde 100 RPM.
-3. **Monitoreo de Deriva Cinemática ($Q_{\text{medido}}$ vs $Q_{\text{teórico}}$):**
-   * En régimen estacionario, el firmware compara el caudal medido por el YF-S401 de alimentación contra el caudal teórico de desplazamiento ($Q = \text{RPM} \times 13.6\text{ mL/rev}$).
-   * Una desviación $> 15\%$ sostenida durante más de $10\text{ s}$ alerta al operador sobre ingreso de aire en la succión, desgaste por fatiga de la manguera de silicona o pérdida de calibración.
+     b) Telemetría de presión fresca (antigüedad $< 1.5\text{ s}$).
+     c) Histéresis de seguridad: tras una pérdida transitoria de telemetría, el techo baja instantáneamente a 44 RPM, y solo vuelve a habilitar 100 RPM tras **5 a 10 segundos** de lecturas continuas estables.
+2. **Doble Tipo de Parada y Umbrales Corregidos:**
+   * **Parada por Rampa (`detener()`):** Desacelera a $45\text{ RPM/s}$ en paradas normales.
+   * **Parada Dura Inmediata (`paradaDura()`):** Disparada en $< 50\text{ ms}$ (sin rampa) ante:
+     - Presión de entrada $P_1 \ge \mathbf{0.60\text{ bar}}$ (antes del fondo de escala del sensor).
+     - Presión Transmembrana $\text{TMP} \ge \mathbf{0.45\text{ bar}}$ (antes del límite estructural de $0.50\text{ bar}$).
+     - Pulsador de emergencia (E-Stop).
+3. **Enclavamiento Persistente de ESTOP y Purga de Cola:**
+   - La bandera `g_estop` enclava el estado `_bloqueada = true` de la bomba y **vacía inmediatamente la cola de comandos con `xQueueReset(g_colaComandos)`**. Esto evita el bug crítico detectado por Opus donde un comando `CMD_ARRANCAR` huérfano reiniciaba el motor en el mismo tick.
+   - La bomba solo puede volver a arrancar tras un comando manual explícito de rearmado (`CMD_REARMAR`).
+4. **Bloqueo Físico de Inversión con Membrana Conectada:**
+   - Al invertir el giro, la válvula de alivio quedaría del lado de succión y la membrana podría recibir presión negativa/vacío indeseado. El firmware bloquea la orden de inversión si el sistema se encuentra en modo "Membrana FX100".
+5. **Monitoreo de Deriva Cinemática ($Q_{\text{medido}}$ vs $Q_{\text{teórico}}$):**
+   - Comparación continua entre $Q_{\text{alim}}$ y el flujo cinemático teórico ($Q = \text{RPM} \times 13.6\text{ mL/rev}$). Desviaciones $> 15\%$ sostenidas por 10 s disparan alarma de pasos perdidos o aire en línea.
 
 ---
 
@@ -175,23 +184,30 @@ Si el lazo de control comparte el bucle con `server.handleClient()`, una ráfaga
   - Período estricto de **50 ms (20 Hz)** mediante `vTaskDelayUntil()`.
   - Al asignarse prioridad 19, se ubica por encima del tráfico de red lwIP, garantizando determinismo estricto (< 100 µs de jitter) con un consumo de CPU inferior al $1\%$.
   - Manejo cinemático exclusivo de la instancia `Bomba`.
-  - Muestreo analógico no bloqueante de presiones y actualización de caudalímetros.
-  - Evaluación ininterrumpida de enclavamientos: parada dura inmediata si $\text{TMP} > 0.45\text{ bar}$ o si la boya de nivel indica vaciamiento de tanque.
+  - **Enclavamientos en Cada Ciclo (20 Hz):** *Corrección Crítica de Opus:* La evaluación de $P_1 \ge 0.60\text{ bar}$ y $\text{TMP} \ge 0.45\text{ bar}$ se ejecuta **en cada ciclo de 50 ms**, NUNCA en el bucle lento de 1 Hz. Con $4.5\text{ Nm}$ de torque, 1 segundo es letal ante el cierre accidental de una válvula.
+  - Muestreo analógico no bloqueante de presiones mediante FSM de ADS1115 (4 canales a 250 SPS $\approx 20\text{ ms}$).
+  - Enclavamiento de parada dura inmediata ante sobrepresión o vaciamiento de tanque por boya.
 * **Core 0 — `tareaWeb` (Prioridad 2):**
   - Servidor HTTP `WebServer`, resolución DNS y entrega de interfaz gráfica web.
   - Generación de telemetría JSON y descarga de archivos CSV en bloques.
 * **Sincronización Thread-Safe sin Bloqueo:**
-  1. **Lectura de Estado (Core 1 $\rightarrow$ Core 0):** Estructura plana POD `SnapshotPlanta_t` ($\le 300\text{ bytes}$) copiada bajo spinlock liviano `portMUX_TYPE` (duración de copia $\approx 1\ \mu\text{s}$, atómica, sin asignación dinámica y sin riesgo de inversión de prioridades).
+  1. **Lectura de Estado (Core 1 $\rightarrow$ Core 0):** Estructura plana POD `SnapshotPlanta_t` ($\le 300\text{ bytes}$) copiada bajo spinlock liviano `portMUX_TYPE` (duración de copia $\approx 1\ \mu\text{s}$, atómica, sin asignación dinámica y sin riesgo de inversión de prioridades). El buffer local `sLocal` se asigna por completo antes de publicar.
   2. **Comandos de Marcha/Consigna (Core 0 $\rightarrow$ Core 1):** Despachados mediante cola de mensajes FreeRTOS `xQueueSend(g_cola, &cmd, 0)` (para `ARRANCAR`, `SET_RPM`, `CAMBIAR_MODO`).
-  3. **Comandos de Parada de Emergencia (STOP / ESTOP):** Se desacoplan de la cola y se transmiten mediante **banderas atómicas directas** (`std::atomic<bool> g_stop`, `g_estop`), garantizando respuesta instantánea en el siguiente tick del control aun si la cola de comandos estuviese saturada.
+  3. **Comandos de Parada de Emergencia (STOP / ESTOP):** Se desacoplan de la cola y se transmiten mediante **banderas atómicas directas** (`std::atomic<bool> g_stop`, `g_estop`), garantizando respuesta instantánea en el siguiente tick del control. Al dispararse `g_estop`, se vacía la cola con `xQueueReset()`.
+  4. **Protección de Caché Flash:** Las escrituras en Flash NVS (`Preferences.h`) o LittleFS suspenden la caché en ambos núcleos; por ello, **se prohíbe escribir en Flash durante un ensayo activo**. Los datos se transmiten a la PC por streaming Wi-Fi o se acumulan en RAM / SD.
 
-### 4.3. Algoritmo de Caudalímetro Mejorado (Inmunidad y Cota Física Continua)
-Para subsanar las 4 limitaciones del conteo de pulsos analizadas por la auditoría:
+### 4.3. Metrología de Caudalímetro y Resolución de Permeado a Bajo Flujo
 1. **Resta Modular Segura ante Desborde de `micros()`:** El cálculo de tiempo entre flancos utiliza sustracción no signada de 32 bits directa `(t_ult - t_prim)`, la cual es matemáticamente exacta a través del rollover de `micros()` (que ocurre cada 71.6 minutos).
-2. **Referencia Persistente entre Ventanas:** Se preserva el último flanco de la ventana anterior como referencia temporal (`_tRef`), contabilizando períodos exactos y evitando descartar pulsos entre ventanas de 1 segundo.
+2. **Referencia Persistente entre Ventanas:** Se preserva el último flanco de la ventana anterior como referencia temporal (`_tRef`), contabilizando períodos exactos y evitando descartar pulsos entre ventanas.
 3. **Cota Física Continua en Reposo:** Para evitar lecturas fantasmas prolongadas tras la detención de la bomba, si transcurre un tiempo $\Delta t$ sin registrar flancos, el caudal se acota de forma continua según el límite físico superior:
    $$f \le \frac{10^6}{\Delta t_{\text{sin\_pulso}}} \quad [\text{Hz}]$$
-4. **Discriminación de Falla:** La alarma de falla por ausencia de pulsos (`sinSenal()`) se aplica **exclusivamente al caudalímetro de alimentación**. En el caudalímetro de permeado, la ausencia de pulsos es una condición física normal cuando la membrana opera a baja TMP, se encuentra colmatada o la bomba está en reposo.
+4. **Discriminación de Falla:** La alarma de falla por ausencia de pulsos (`sinSenal()`) se aplica **exclusivamente al caudalímetro de alimentación**.
+5. **Resolución Crítica de Permeado Fuera de Rango (Alerta Opus):**
+   * El sensor YF-S401 tiene un rango útil de fábrica de $0.3\text{ a }6.0\text{ L/min}$ ($300\text{ a }6000\text{ mL/min}$).
+   * El flujo permeado de la membrana FX100 opera entre **$45\text{ y }365\text{ mL/min}$**, cayendo por debajo de $50\text{ mL/min}$ a medida que progresa el ensuciamiento. A $10\text{ mL/min}$, la frecuencia es de apenas $0.55\text{ Hz}$ (menos de 1 pulso por segundo), donde la fricción de la turbina introduce no-linealidades severas.
+   * **Estrategia Metrológica Dual:**
+     a) **Referencia Primaria Gravimétrica:** Utilizar una balanza de precisión de laboratorio con salida serie/USB conectada a la PC de captura como estándar maestro de $J$ en los balances de masa.
+     b) **Integración Temporal en Firmware:** Para el YF-S401 de permeado, calcular $Q_{\text{perm}}$ mediante ventanas de integración extendidas ($\Delta \text{vol} / \Delta t$ en $10\text{ a }30\text{ s}$) y aplicar una curva de calibración poligonal $K(f)$ por tramos calibrada con balanza (5 a 8 puntos).
 
 ---
 
@@ -208,12 +224,14 @@ Donde:
 * $J$: Flujo permeado volumétrico específico $[\text{L}/(\text{m}^2\cdot\text{h})]$ o $[\text{m}^3/(\text{m}^2\cdot\text{s})]$.
 * $Q_p$: Caudal volumétrico medido por el caudalímetro de permeado $[\text{L}/\text{h}]$.
 * $A_m$: Área efectiva de transferencia superficial del cartucho FX100 (**$2.2\text{ m}^2$**).
+* $K_{\text{UF}}$ Nominal de Membrana Limpia: **$54750\text{ mL/(h}\cdot\text{bar)}$** ($73\text{ mL/(h}\cdot\text{mmHg)} \times 750\text{ mmHg/bar} = 912.5\text{ mL/(min}\cdot\text{bar)}$). Resistencia intrínseca nominal: $R_{m,\text{fab}} \approx 1.4 \times 10^{13}\text{ m}^{-1}$.
 * $\mu(T)$: Viscosidad dinámica del agua $[\text{Pa}\cdot\text{s}]$, calculada mediante la ecuación de Vogel:
   $$\mu(T) = 0.00002414 \times 10^{\frac{247.8}{T(K) - 140}}$$
 * $J_{20}$: Flujo volumétrico normalizado a $20^\circ\text{C}$ (eliminando variaciones estacionales de temperatura en Salta):
   $$J_{20} = J_T \cdot \text{TCF}(T) = J_T \cdot \frac{\mu(T)}{\mu(20^\circ\text{C})}$$
 * $R_m$: Resistencia hidráulica propia de la membrana limpia $[\text{m}^{-1}]$.
 * $R_{\text{foul}}$: Resistencia total de ensuciamiento ($R_{\text{torta}} + R_{\text{irrev}}$).
+* **Unidades de Factor $K$:** Los factores $K$ se calibran en **$\text{Hz}/(\text{L/min})$** ($K_{\text{alim}} = 154.62$, $K_{\text{perm}} = 55.00$), de modo que $Q\,[\text{mL/min}] = f\,[\text{Hz}] \times 1000 / K$.
 * **Esfuerzo de Corte Luminal ($\dot{\gamma}_w$):** En los 13500 capilares paralelos de radio interno $r_i = 92.5\ \mu\text{m}$, la velocidad de corte en pared generada por el flujo cruzado es:
   $$\dot{\gamma}_w = \frac{4 \cdot Q_{\text{feed}}}{\pi \cdot N_{\text{fibras}} \cdot r_i^3} \quad \left[\text{s}^{-1}\right]$$
   Para caudales de $200\text{ a }1360\text{ mL/min}$, $\dot{\gamma}_w$ varía entre **$397\text{ s}^{-1}$ y $2700\text{ s}^{-1}$**, cubriendo el rango hidrodinámico exacto donde la retrodifusión inducida por corte previene la deposición de sólidos.
@@ -222,9 +240,10 @@ Donde:
 
 ### 5.2. Espacio Operativo Real $(Q, \text{TMP})$ y Restricciones Físicas
 > [!NOTE]
-> **El espacio experimental $(Q, \text{TMP})$ no es rectangular.**  
-> * A caudales altos ($1360\text{ mL/min}$), la pérdida de carga axial por fricción a lo largo de las fibras capilares ($\Delta P_{\text{lumen}} \approx 0.16\text{ bar}$) fija una $\text{TMP}$ mínima inevitable de $\approx \Delta P/2 \approx 0.08\text{ bar}$. Una TMP inferior a 0.08 bar a máximo caudal produciría retrodifusión / contrapresión negativa en el extremo de retentado.
-> * A caudales bajos ($200\text{ mL/min}$), una TMP alta ($0.40\text{ bar}$) exigiría una tasa de permeación teórica superior al caudal total de alimentación (recuperación $> 100\%$), secando el lumen.
+> **El espacio experimental $(Q, \text{TMP})$ no es rectangular y requiere recirculación:**  
+> 1. A caudales altos ($1360\text{ mL/min}$), la pérdida de carga axial por fricción a lo largo de las fibras capilares ($\Delta P_{\text{lumen}} \approx 0.16\text{ bar}$) fija una $\text{TMP}$ mínima inevitable de $\approx \Delta P/2 \approx 0.08\text{ bar}$.
+> 2. A caudales bajos ($25\text{ RPM} \approx 340\text{ mL/min}$), una TMP alta ($0.40\text{ bar}$) requeriría $\approx 365\text{ mL/min}$ de permeado con agua limpia, superando el $100\%$ del caudal de alimentación (infactible). Por ello, el nivel bajo del diseño factorial se desplaza a **$40\text{ RPM}$ ($544\text{ mL/min}$)**.
+> 3. **Recirculación Obligatoria del Permeado:** Durante los ensayos a concentración constante, la manguera de permeado debe retornar obligatoriamente al tanque de alimentación. De lo contrario, en 60 minutos se extraerían 10 a 20 Litros, concentrando artificialmente la alimentación y falseando las cinéticas de ensuciamiento.
 
 Por esta razón, la experimentación se estructura en **tres fases secuenciales de alta eficiencia**.
 
@@ -273,24 +292,24 @@ El Flujo Crítico delimita el régimen donde la fuerza convectiva hacia la membr
 ---
 
 ### 5.5. Fase 2: Matriz Experimental Factorial Completa ($3^2$ con Puntos Centrales)
-Para optimizar el esfuerzo de laboratorio y preservar las membranas:
+Para optimizar el esfuerzo de laboratorio, evitar esquinas infactibles y preservar las membranas:
 
 * **Factor A: Caudal de Impulsión / Esfuerzo de Corte ($Q_{\text{feed}}$)**
-  - Nivel Bajo ($-1$): $25\text{ RPM}$ ($340\text{ mL/min}$, corte laminar suave).
-  - Nivel Medio ($0$): $60\text{ RPM}$ ($816\text{ mL/min}$, condición nominal).
-  - Nivel Alto ($+1$): $95\text{ RPM}$ ($1292\text{ mL/min}$, alto cizallamiento).
+  - Nivel Bajo ($-1$): **$40\text{ RPM}$** ($544\text{ mL/min}$, $\dot{\gamma}_w \approx 1060\text{ s}^{-1}$ — *desplazado desde 25 RPM para evitar recuperación $>100\%$ a alta TMP*).
+  - Nivel Medio ($0$): **$70\text{ RPM}$** ($952\text{ mL/min}$, $\dot{\gamma}_w \approx 1850\text{ s}^{-1}$).
+  - Nivel Alto ($+1$): **$95\text{ RPM}$** ($1292\text{ mL/min}$, $\dot{\gamma}_w \approx 2560\text{ s}^{-1}$).
 * **Factor B: Presión Transmembrana ($\text{TMP}$)**
   - Nivel Bajo ($-1$): $0.10\text{ bar}$ ($100\text{ mbar}$).
   - Nivel Medio ($0$): $0.25\text{ bar}$ ($250\text{ mbar}$).
   - Nivel Alto ($+1$): $0.40\text{ bar}$ ($400\text{ mbar}$).
 
-#### Plan de Ejecución (11 Ensayos Aleatorizados):
+#### Plan de Ejecución (12 Ensayos Aleatorizados con Recirculación Total):
 * 9 tratamientos de la matriz $3 \times 3$.
-* **3 réplicas en el punto central (60 RPM, 0.25 bar)** distribuidas al inicio, mitad y final para estimar el error experimental puro y evaluar curvatura cuadrática mediante Metodología de Superficie de Respuesta (RSM).
-* Duración de cada corrida: **45 a 60 minutos**.
+* **3 réplicas en el punto central (70 RPM, 0.25 bar)** distribuidas al inicio, mitad y final (Total = **12 corridas**) para estimar el error experimental puro y evaluar curvatura cuadrática mediante Metodología de Superficie de Respuesta (RSM).
+* **Condición Operativa Mandatoria:** Manguera de permeado retornando al tanque de alimentación (recirculación total de permeado) para garantizar concentración constante durante los 45 a 60 minutos de cada ensayo.
 
-#### Respuestas Primarias Registradas en CSV:
-1. Declinación temporal de flujo: $J(t)$ y $J_{20}(t)$.
+#### Respuestas Primarias Registradas en CSV y Balanza:
+1. Declinación temporal de flujo: $J(t)$ y $J_{20}(t)$ (registrados por balanza de precisión y corroborados por YF-S401).
 2. Velocidad de ensuciamiento hidráulico: $\frac{dR_{\text{total}}}{dt}$.
 3. Resistencia reversible: $R_{\text{torta}}$ post-ensayo.
 4. Resistencia irreversible: $R_{\text{irrev}}$.
@@ -316,18 +335,20 @@ Donde:
 ### 5.7. Protocolo de Limpieza y Clarificación del Retrolavado
 
 > [!IMPORTANT]
-> **Aclaración Mecánica sobre el Retrolavado:**  
+> **Aclaración Mecánica sobre el Retrolavado (Dictamen Opus):**  
 > Invertir el sentido de giro de la bomba peristáltica en la línea de impulsión **no efectúa retrolavado a través de la pared capilar**. Solo invierte la dirección del flujo a lo largo del lumen o drena el módulo.  
-> Un retrolavado (*backwash*) real requiere introducir líquido limpio desde el puerto exterior de permeado hacia el lumen mediante una **sobrepresión invertida suave ($\text{TMP}_{\text{inv}} \le 0.1 - 0.2\text{ bar}$)** utilizando una columna hidrostática o depósito auxiliar presurizado.
+> Un retrolavado (*backwash*) real requiere introducir líquido limpio desde el puerto exterior de permeado hacia el lumen. El método más seguro y reproducible en laboratorio es utilizar una **columna o depósito hidrostático elevado ($\le 1.5\text{ m} \approx 0.15\text{ bar}$)** con el lumen abierto al drenaje, aplicando pulsos suaves de **$30\text{ a }60\text{ segundos}$**. Esto garantiza que la contrapresión jamás exceda el límite del potting ni colapse las fibras.
 
 #### Ciclo de Limpieza entre Ensayos:
 1. **Enjuague Frontal Rápido (*Forward Flush*):** Circular agua limpia a caudal alto ($95\text{ RPM}$) con la válvula de permeado cerrada y la válvula de retentado 100% abierta durante $5\text{ minutos}$ para barrer la torta suelta por cizallamiento superficial.
-2. **Retrolavado Suave (*Backwash*):** Inyectar agua pura por el puerto de permeado a presión controlada ($\le 0.2\text{ bar}$) durante $60\text{ segundos}$.
-3. **Comprobación de Aceptación:** Medir $R_{m,\text{post}}$. Si $R_{m,\text{post}} \le 1.05 \cdot R_{m,0}$ ($FRR \ge 95\%$), el cartucho se declara apto para la siguiente corrida.
+2. **Retrolavado Hidrostático Suave (*Backwash*):** Conectar el depósito elevado de agua destilada al puerto de permeado ($\le 0.15\text{ bar}$) durante $60\text{ segundos}$ con drenaje luminal abierto.
+3. **Comprobación de Aceptación:** Medir $R_{m,\text{post}}$ con agua limpia a $\text{TMP} \ge 0.20\text{ bar}$. Si $R_{m,\text{post}} \le 1.05 \cdot R_{m,0}$ ($FRR \ge 95\%$), el cartucho se declara apto para la siguiente corrida.
 4. **Limpieza Química Oxidante (CIP):** Si $FRR < 95\%$ debido a fouling orgánico/coloidal persistente:
    - Preparar solución de Hipoclorito de Sodio ($\text{NaOCl}$) a **$100\text{ a } 200\text{ ppm}$** de cloro libre activo.
    - Ajustar pH a **$9.5 - 10.5$** con $\text{NaOH}$ diluido (evitar degradación ácida de la polisulfona/PVP).
    - Recircular a baja presión durante $20\text{ minutos}$ a temperatura ambiente ($< 35^\circ\text{C}$).
+   - **Registro Acumulado de Dosis:** Llevar una bitácora estricta de exposición en $\text{ppm}\cdot\text{h}$ para no exceder la vida útil de la membrana.
+   - Para flóculos inorgánicos (aluminio/hierro), realizar un paso separado con **ácido cítrico al 1-2%** (pH 2-3), **NUNCA mezclado con cloro**.
    - Enjuagar exhaustivamente con agua pura hasta alcanzar neutralidad en pH y conductividad TDS basal.
 
 ---
@@ -336,15 +357,17 @@ Donde:
 
 * **Ing. Enzo (Codirector — Tesis Doctoral):**
   - Supervisión de la arquitectura FreeRTOS determinista y seguridad de control en Core 1.
-  - Aprobación de especificaciones de compras de transductores 0-1 bar y válvula de alivio mecánica.
+  - Aprobación de especificaciones de compras de transductores 0-1 bar y válvula de alivio mecánica calibrada a 0.70 bar.
   - Modelado avanzado de transporte, regresión no lineal y ANOVA del diseño factorial.
 * **Owen Cañizares (Tesista de Grado):**
   - Montaje de transductores de presión y divisores resistivos ($10\text{ k}\Omega / 20\text{ k}\Omega$) en bornera Placa 2.
-  - Conexión del bus I2C al ADS1115 y calibración/tara hidrostática en banco.
-  - Instalación del pulsador de emergencia (E-Stop) sobre la etapa de potencia DM860.
+  - Conexión del bus I2C al ADS1115 y calibración/tara hidrostática en banco con columna de agua.
+  - Instalación de la válvula de alivio a 0.7 bar y pulsador de emergencia (E-Stop) sobre la etapa de potencia DM860.
+  - Calibración gravimétrica de la curva $K(f)$ del caudalímetro de permeado (5 a 8 puntos con balanza).
   - Compilación y mantenimiento del firmware mediante PlatformIO CLI.
 * **Antonella Guitián (Tesista de Grado):**
   - Preparación de suspensiones turbias de ensayo y optimización de dosis de coagulante en Jar Test (Hito 3).
+  - Configuración del circuito en recirculación total de permeado para los ensayos a concentración constante.
   - Ejecución de balances gravimétricos en laboratorio (filtración $0.45\ \mu\text{m}$, secado $105^\circ\text{C}$ y pesaje de torta $M_s$).
   - Monitoreo de calidad de agua: turbidez de entrada/salida (CAA Art. 982), conductividad TDS y registro en planillas experimentales.
 
@@ -354,12 +377,12 @@ Donde:
 
 | Semana | Hito / Fase | Actividad Técnica | Responsable | Entregable Clave |
 | :---: | :---: | :--- | :---: | :--- |
-| **Semana 1** | **Seguridad & Compras** | Compra de transductores 0-1 bar e instalación de válvula de alivio mecánica / E-Stop. | Owen / Enzo | Circuito hidráulico protegido contra sobrepresión. |
-| **Semana 1** | **Hito 2.3 (Firmware)** | Implementación FreeRTOS dual-core (Core 1 a prio 19), Seqlock POD y FSM ADS1115 (250 SPS). | Enzo / Antigravity | Firmware compilado sin warnings en PlatformIO. |
-| **Semana 2** | **Hito 2.3 (Banco)** | Calibración de transductores P1, P2, P3, tara hidrostática y prueba de `paradaDura()`. | Owen / Antonella | Curvas manométricas y validación de parada en $<50\text{ ms}$. |
-| **Semana 2** | **Hito 5 (Fase 0)** | Ensayo de agua limpia CWF, determinación de $R_{m,0}$ y validación $R^2 \ge 0.985$. | Todo el equipo | Curva $J_{20}$ vs TMP y valor basal de resistencia. |
-| **Semana 3** | **Hito 5 (Fase 1)** | Ensayo de Flujo Escalonado con histéresis para determinar Flujo Crítico $J_c$. | Antonella / Owen | Curva $J$ vs TMP con punto de quiebre y ley de corte. |
-| **Semana 3-4**| **Hito 5 (Fase 2)** | Ejecución de Matriz Factorial $3^2$ (11 ensayos con 3 puntos centrales y balances gravimétricos). | Antonella / Owen | Planillas de datos completos y balances de masa. |
+| **Semana 1** | **Seguridad & Compras** | Compra de transductores 0-1 bar e instalación de válvula de alivio a 0.7 bar / E-Stop. | Owen / Enzo | Circuito hidráulico protegido contra sobrepresión. |
+| **Semana 1** | **Hito 2.3 (Firmware)** | Implementación FreeRTOS dual-core (Core 1 a prio 19), enclavamientos a 50 ms y FSM ADS1115. | Enzo / Antigravity | Firmware compilado sin warnings en PlatformIO. |
+| **Semana 2** | **Hito 2.3 (Banco)** | Calibración de transductores P1, P2, P3 con columna de agua, tara hidrostática y parada dura. | Owen / Antonella | Curvas manométricas y validación de parada en $<50\text{ ms}$. |
+| **Semana 2** | **Hito 5 (Fase 0)** | Ensayo de agua limpia CWF, determinación de $R_{m,0}$ y validación $R^2 \ge 0.985$ e intercepto ≈ 0. | Todo el equipo | Curva $J_{20}$ vs TMP y valor basal de resistencia. |
+| **Semana 3** | **Hito 5 (Fase 1)** | Ensayo de Flujo Escalonado con histéresis para determinar Flujo Crítico $J_c$ (recirculación total). | Antonella / Owen | Curva $J$ vs TMP con punto de quiebre y ley de corte. |
+| **Semana 3-4**| **Hito 5 (Fase 2)** | Ejecución de Matriz Factorial $3^2$ (12 ensayos con 3 puntos centrales y balances gravimétricos). | Antonella / Owen | Planillas de datos completos y balances de masa. |
 | **Semana 5** | **Hito 5 (Fase 3)** | Modelado de compresibilidad $\alpha = \alpha_0 (\Delta P)^s$, ajuste de Hermia y redacción final. | Todo el equipo | Gráficas vectoriales a 300 DPI y borrador de tesis. |
 
 ---
@@ -367,7 +390,8 @@ Donde:
 ## 🔗 8. Trazabilidad de Archivos y Enlaces Directos en el Repositorio
 
 * 💻 **Firmware Blindado Activo (v4):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/)
-* 🤖 **Auditorías Externas de IA (Ronda 2):**
+* 🤖 **Auditorías Externas de IA (Rondas 1, 2 y 3):**
+  - **Ronda 3 (Cierre Maestro - Claude 5.5 Opus):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda3_claude_opus.md`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda3_claude_opus.md)
   - Astra: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/Ronda2_Astra.md`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/Ronda2_Astra.md)
   - GLM 5.3: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_glm5.3.txt`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_glm5.3.txt)
   - Claude Sonnet 5: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_claudesonet5.txt`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_claudesonet5.txt)
