@@ -311,17 +311,17 @@ void handleCancelarAutoCal() {
 
 // Calibrador Completo por RPM y Caudal de Probeta
 void handleCalibrarRpmQ() {
-  if (!server.hasArg("rpm") || !server.hasArg("qa") || !server.hasArg("qp")) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos\"}");
+  if (!server.hasArg("rpm") || !server.hasArg("qa")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos (requiere rpm y qa)\"}");
     return;
   }
 
   float rpm = server.arg("rpm").toFloat();
   float qa  = server.arg("qa").toFloat();
-  float qp  = server.arg("qp").toFloat();
+  float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
 
-  if (rpm <= 0.0f || qa <= 0.0f || qp <= 0.0f) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores deben ser mayores a 0\"}");
+  if (rpm <= 0.0f || qa <= 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"RPM y Caudal de Alimentacion deben ser > 0\"}");
     return;
   }
 
@@ -337,7 +337,7 @@ void handleCalibrarRpmQ() {
     float nuevoKa = (fa * 1000.0f) / qa;
     sensorAlimentacion.setK(nuevoKa);
   }
-  if (fp > 0.3f) {
+  if (qp > 0.0f && fp > 0.3f) {
     float nuevoKp = (fp * 1000.0f) / qp;
     sensorPermeado.setK(nuevoKp);
   }
@@ -603,18 +603,17 @@ void loop() {
           if (qRefAlim > 10.0f && fPromAlim > 1.0f) {
             float nuevoKa = (fPromAlim * 1000.0f) / qRefAlim;
             sensorAlimentacion.setK(nuevoKa);
+            Serial.printf("[AUTO-CAL] K_Alim ajustado: %.2f Hz/(L/min)\n", nuevoKa);
           }
-          if (fPromPerm > 0.2f) {
-            float targetPerm = bomba.rpmActual() * 2.0f;
-            float nuevoKp = (fPromPerm * 1000.0f) / targetPerm;
-            sensorPermeado.setK(nuevoKp);
-          }
+          // NOTA METROLÓGICA (Auditoría Ronda 4): Permeado depende de Darcy y ensuciamiento,
+          // no de RPM de la bomba. NUNCA se auto-calibra con target ficticio. Se calibra con balanza gravimétrica.
+          float kpActual = sensorPermeado.getK();
 
-          guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+          guardarParametrosNVS(sensorAlimentacion.getK(), kpActual,
                                bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
 
           autoCalibrando = false;
-          autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " | K_Perm=" + String(sensorPermeado.getK(), 2);
+          autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " (K_Perm intacto=" + String(kpActual, 2) + ")";
           Serial.printf("\n>>> %s <<<\n\n", autoCalMensaje.c_str());
         }
       } else {
@@ -627,10 +626,11 @@ void loop() {
                   bomba.rpmActual(), qAlim, qPerm, jLMH_actual, qRet_mLmin, recuperacion, sensorPermeado.volumen_L());
   }
 
-  // 3. Muestreo del Datalogger cada 10 segundos
+  // 3. Muestreo del Datalogger cada 10 segundos (SOLO mientras la bomba está en marcha)
+  // Al presionar STOP, se corta el registro para evitar muestras espurias por flujo residual
   if (tAhora - tDatalogger >= INTERVALO_LOG_MS) {
     tDatalogger = tAhora;
-    if (bomba.enMarcha() || sensorAlimentacion.caudal_mLmin() > 10.0f || sensorPermeado.caudal_mLmin() > 5.0f) {
+    if (bomba.enMarcha()) {
       guardarMuestraDatalogger();
     }
   }

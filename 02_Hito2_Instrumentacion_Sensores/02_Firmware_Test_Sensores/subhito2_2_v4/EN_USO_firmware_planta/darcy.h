@@ -79,8 +79,11 @@ public:
   }
 
 private:
-  // Resistencia intrínseca nominal de la membrana FX100 Helixone® (K_UF = 73 mL/h*mmHg, 2.2 m²)
-  float _Rm = 1.44e13f; 
+  // Resistencia intrínseca nominal de la membrana FX100 Helixone® (K_UF = 73 mL/h*mmHg, 2.2 m²).
+  // Según ISO 8637, K_UF se especifica a 37 °C (mu_37 = 0.6915 mPa·s).
+  // Lp = (73 mL/h/mmHg) / (2.2 m² * 3600 s/h * 133.322 Pa/mmHg) = 6.9135e-11 m/(s·Pa)
+  // Rm_nominal = 1 / (mu_37 * Lp) = 2.09e13 m^-1 (a 20 °C daría 1.44e13 m^-1, subestimado 31%).
+  float _Rm = 2.09e13f; 
   float _sumJP = 0.0f;
   float _sumPP = 0.0f;
 };

@@ -4,7 +4,9 @@ Caudalimetro::Caudalimetro(uint8_t pin, float k, const char* nombre, bool esAlim
   : _pin(pin), _k(k), _nombre(nombre), _esAlimentacion(esAlimentacion) {}
 
 void Caudalimetro::begin() {
-  pinMode(_pin, INPUT_PULLUP);
+  // Placa 2 ya dispone de pull-up externo de 4.7 kΩ a 3.3V y capacitor de 100 nF.
+  // Se configura como INPUT de alta impedancia para respetar los niveles del front-end.
+  pinMode(_pin, INPUT);
   attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, FALLING);
 }
 

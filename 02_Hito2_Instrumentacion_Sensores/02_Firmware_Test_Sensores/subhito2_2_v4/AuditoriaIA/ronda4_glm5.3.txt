@@ -1,0 +1,112 @@
+auditoria ronda 4 glm 5.3 flash
+🏛️ AUDITORÍA RONDA 4 (FINAL) — Verificación de Código, Metrología y Dictamen de Certificación
+Veredicto ejecutivo (adelanto)
+APROBADO CONDICIONADO para la sesión del lunes — con 5 condiciones, todas operativas/protocolarias, ninguna bloqueante de código. El firmware de caudalímetros es, tras verificarlo línea por línea, correcto y elegante. Pero debo ser honesto en un punto que afecta directamente la pregunta "¿100% blindado?": el enclavamiento de presión declarado como "Resuelto" en la sección 2 no existe en el código fuente provisto — el .ino no contiene lectura del ADS1115 ni máquina de estados de presión. La protección de sobrepresión real hoy es solo la válvula de alivio mecánico a 0.70 bar. Esto no impide el lunes (los Ensayos 2–3 son de calibración de caudal), pero define el alcance del certificado.
+
+1. Auditoría de caudalimetro.h/.cpp — los 3 puntos solicitados
+1.1 Método de período recíproco — ✅ CORRECTO
+Verifiqué las tres ramas: n≥2 usa el span ventana (t_ult−t_prim) con resolución de reloj (elimina la cuantización ±18% a 5.5 Hz ✓); n==1 usa el período del último par de pulsos, que cruza ventanas por diseño — estadísticamente correcto ✓; la resolución resultante a 5.5 Hz es ~0.002%, un salto de 4 órdenes de magnitud.
+
+1.2 Cota física superior continua — ✅ CORRECTA, con un matiz que conviene documentar
+El clamp f ≤ 1e6/tSinFlanco es físicamente impecable: si el último flanco fue hace t, la frecuencia no puede superar 1/t. Crea un decaimiento natural en envolvente hacia cero, y el corte duro a los 3 s garantiza convergencia. Matiz: existe una carrera benigna — un pulso puede llegar entre la lectura de t_ult y el cálculo de tSinFlanco, subestimando _f un instante. Efecto: corrección en la ventana siguiente, magnitud despreciable. No requiere fix; anotarlo como comportamiento conocido.
+
+1.3 Inmunidad al rollover — ✅ CORRECTA Y COMPLETA (verifiqué el caso que preocupaba en Ronda 2)
+Mi objeción de Ronda 2 era el primer flanco tras parada >71.6 min con _t_ultimo rancio. La guardia dt < 5000000UL que implementaron lo cubre: descarta el período espurio (_periodo_us=0) sin perder el conteo de volumen ni los timestamps frescos. Recorrí las secuencias: parada larga → primer pulso (per=0, t_primero=t) → segundo pulso (per=dt real) → span correcto. Y la aritmética unsigned de t_ult−t_prim y tAhora−t_ult es genuinamente inmune al wrap modular. Certificado.
+
+1.4 Hallazgos menores (no bloqueantes)
+#
+Hallazgo
+Acción
+1	INPUT_PULLUP en begin()	Con el front-end de 4.7k a 3.3V instalado es inofensivo (resistencias en paralelo al mismo riel: nodo en reposo ≈3.49 V, LOW ≈0.15 V). Pero es incoherente con la documentación del front-end. → cambiar a INPUT por trazabilidad, y verifica físicamente que las 4.7k estén pobladas (medir 3.4–3.5 V en P14/P27 en reposo)
+2	Guardia Q_MAX=6000 es vestigial	Con blanking de 1.5 ms el techo contable es 666 Hz → 4306 mL/min < 6000: la guardia nunca dispara. Como el caudal real máximo es 1360, sugiero Q_MAX_FISICO_MLMIN = 2500 — convierte la guardia en detector real de ráfagas EMI (386 Hz+) sin afectar operación alguna
+3	Narrativa vs config: 2000 µs vs 1500 µs	Alinear el documento (el config manda: 1500)
+4	Diagnóstico asimétrico (alarma solo en alimentación)	✅ Decisión correcta — el permeado legítimamente puede ser cero
+
+2. Metrología de K — unidades coherentes, y un hallazgo numérico que quiero que verifiquen
+2.1 Consistencia de unidades — ✅ CERTIFICADO
+La cadena en código es consistente: q = f·1000/K [mL/min] con K en Hz/(L/min) ✓ · pul/L = K·60 ✓ · vol = n/(K·60) [L] ✓. Con K_ALIM=154.62: 9277 pul/L; el volumen integrado es exacto por conteo. Sin errores de factor 60 (los verifiqué uno a uno — esta vez sí).
+
+2.2 La anomalía K_ALIM=154.62 — hay una hipótesis que explica el +58% y es verificable en 15 minutos
+Con K nominal 98, a 680 mL/min el sensor debería emitir 66.6 Hz. Emitió 105.14 Hz — demasiados pulsos para ese caudal. Pero miren esta cuenta: si el caudal real en el momento de la calibración fue el de descarga libre que midieron históricamente a regímenes similares (~1200 mL/min a 72 RPM → a 50 RPM ≈ 830 mL/min):
+
+K 
+real
+​
+ ≈ 
+830
+105.14⋅1000
+​
+ ≈126— mucho m 
+a
+ˊ
+ s cerca de 98 que de 154.6
+
+La hipótesis: el qa=680 ingresado en /calibrar_rpm_q no coincidió con lo que la probeta recogió en ese mismo minuto (diferencia de condición hidráulica entre la calibración de ML y la del K, o ventanas de tiempo distintas). No lo afirmo — lo propongo con un test que lo cierra:
+
+Test de no-linealidad (3 puntos, 15 min, lunes): calibrar K_ALIM por probeta a 25, 50 y 72 RPM (mismo protocolo, tres consignas). Si los tres K coinciden ±5% → el sensor es lineal y el K único vale. Si divergen → hay no-linealidad o error de procedimiento, y el K único queda invalidado como medición absoluta (queda como indicador, igual que el permeado). La planilla ya registra K por fila (excelente trazabilidad, aplicada) — este test es el complemento natural.
+
+2.3 K_PERM=55 como indicador secundario — ✅ decisión metrológica correcta
+Declarar la balanza gravimétrica (0.1 g) como patrón primario para J y Rm es la resolución correcta del bloqueante de Opus: a 600 g recolectados, la resolución es 0.017% — imbatible. K_PERM calibrado a 100 mL/min (bajo el mínimo de spec de 300) es un K de zona sub-espec válido solo cerca de su punto de calibración: como tendencia en SCADA está bien; como medición primaria no, y así quedó declarado. Endosado sin reservas.
+
+3. Sensor de presión 30 PSI (0–2.07 bar) — presupuesto de error completo
+Mi Ronda 2 pedía 0–1 bar. Conseguir 30 PSI en vez de 6 bar mejora el escenario a la mitad. Presupuesto honesto:
+
+Término de error
+Valor típico
+En TMP=250 mBar
+¿Mitigable?
+Resolución ADS1115 (PGA ±6.144V, 0.1875 mV/LSB, ×16 oversampling)	~0.1 mBar	despreciable	—
+Offset de cero (deriva térmica ~1% FS/10 °C)	±20 mBar	±8%	✅ Trim a atmósfera antes de cada sesión (procedimiento de 30 s)
+Span (±1% FS)	±2% de lectura	±2%	Parcial — ver abajo
+No-linealidad + histéresis	±0.25–0.5% FS	±2–5 mBar	Se promedia en la regresión multi-punto
+
+El punto clave que favorece la decisión: el error de span escala proporcionalmente con la lectura → en la regresión de Rm (Rm = TMP/(μ·J)), un error de span de ±1% produce exactamente ±1% en Rm — no se amplifica. El término peligroso era el offset absoluto (dependiente del FS), y ese se elimina con el trim a cero. Veredicto: el 30 PSI es aceptable para la tesis con protocolo de zero-trim por sesión y barras de error ±5% en Rm declaradas. No es el ideal (1 bar habría dado ±4%), pero con J gravimétrico como primario, el resultado científico queda defendible.
+
+Tres condiciones de integración (para cuando monte el ADS):
+
+Niveles lógicos I2C: sensor a 5V ratiométrico → salida hasta 4.5V → el ADS1115 debe alimentarse a 5V (con entradas tolerantes), y entonces el bus I2C a 5V no es tolerado por el ESP32 → level shifter BSS138 obligatorio. La alternativa (ADS a 3.3V) exige divisor en las analógicas y tira resolución. Decidan la topología antes de comprar el shifter (~0.50 USD).
+Ratiométrico vs ADC absoluto: el sensor escala con su alimentación; el ADS1115 referencia interna. Un riel 5V que baile ±1% entra directo al TMP. Verificar estabilidad del riel (<±20 mV) o medir el 5V en un canal libre para corrección por software.
+P3: el permeado está abierto a atmósfera → P3≈0 siempre. Si compraron 3 transductores, perfecto (TMP=(P1+P2)/2−P3 con P3 como centinela); si solo 2, la fórmula se reduce válidamente a (P1+P2)/2 con P3=0 documentado.
+4. El hallazgo principal del dictamen: enclavamiento declarado vs código real
+La sección 2 afirma: "Enclavamiento a 1 Hz: Resuelto. Se evalúa en cada ciclo de 50 ms". En el .ino provisto no existe ninguna línea de lectura de presión, ni ADS1115, ni máquina de estados de enclavamiento. Los umbrales (parada dura 0.60 bar, TMP 0.45 bar) existen como números en un plan, no como código.
+
+Consecuencia para la pregunta "¿100% blindado?": Hoy la única protección real contra sobrepresión es la válvula de alivio a 0.70 bar. Y noten la aritmética del peor caso: con membrana ocluida y P1→0.70 (alivio), P2≈P1 estático → TMP≈0.70 > 0.50 límite (aunque bajo el burst de las fibras, ~0.8). El alivio protege contra rotura catastrófica, no contra superar el límite de diseño.
+
+Esto NO bloquea el lunes — siempre que el alcance sea el correcto:
+
+Los Ensayos 2–3 (calibración K/ML por probeta-balanza) deben ejecutarse con la membrana FUERA del circuito (bypass con puente de manguera) o, si está montada, con retentado totalmente abierto y RPM ≤ 44. Así el lunes es una sesión de riesgo hidráulico nulo: sin membrana no hay TMP que proteger. El Ensayo 4 (permeado/J/Rm) queda correctamente postergado hasta que el ADS1115 esté en el firmware con su enclavamiento — la secuenciación que declararon es la correcta.
+
+5. Protocolo del lunes — 3 ajustes concretos
+#
+Ajuste
+Motivo
+1	Ventana de captura: 1 min solo hasta ~65 RPM. A 100 RPM el teórico es 1360 mL > 1000 mL de la probeta → desborde. Sobre 65 RPM: ventana de 30 s o balanza con vaso de 2 L	Física del volumen
+2	Balanza como registro primario, probeta de respaldo — ya lo declararon; en la planilla, anotar masa, tara, hora y RPM de cada captura	0.017% de resolución vs 0.5–1% volumétrico
+3	Exportar el CSV antes de acumular 600 muestras (100 min): el FIFO desplaza y pierde lo más viejo silenciosamente	El buffer no avisa
+
+Y el test de 3 puntos para K (§2.2) encaja naturalmente en el mismo lunes: ya que estarán haciendo capturas a distintas RPM, los tres K salen gratis.
+
+6. Notas menores de código (registradas, no bloqueantes)
+handleCalibrarRpmQ usa String += — pero es un endpoint de calibración invocado raramente, no el polling de 500 ms: aceptable. El handleStatus ya está con snprintf+streaming ✓.
+recuperacion con guardia qAlim > 1.0f — umbral muy bajo: con 2 mL/min de ruido y 0.5 de permeado mostraría Y=25% sin sentido. Sugerencia: >50 mL/min para mostrar Y significativo (el dato serio es gravimétrico igualmente).
+FIFO con desplazamiento O(n) cada 10 s (~36 KB copiados): ~1 ms, inofensivo. Un ring-buffer con índice cabeza sería más limpio — nota de estilo, no urgencia.
+buf[768] del status: el JSON fijo ronda 500–550 caracteres con IP y mensajes acotados — margen correcto pero no holgado; sugiero loguear si snprintf devuelve ≥768 (detección de truncamiento).
+El comentario "5.50 Hz = 100 mL/min en régimen laminar" — el laminar es del capilar, no del sensor; etiqueta a corregir.
+El mecanismo del front-end sigue documentado como "filtro pasabajos fc≈338 Hz" — reitero la corrección de Ronda 2: a 100 Hz ese filtro atenúa solo 4%. El mecanismo real es la reducción de impedancia (4.7k dominan los ~35k internos: la tensión inducida se divide ~8×) y el C absorbe transitorios de µs. La evidencia empírica los respalda (el hum de 81 Hz desapareció con el front-end), pero la explicación física en el manual debe corregirse antes de la defensa — es exactamente la pregunta trampa que un jurado haría.
+7. 📜 DICTAMEN FINAL DE CERTIFICACIÓN
+Subsistema
+Estado
+Condición
+Caudalímetros (método recíproco, cota física, rollover)	✅ CERTIFICADO	Cambiar a INPUT + verificar front-end poblado (3.4–3.5 V en reposo)
+Metrología de volumen (pul/L, K·60)	✅ CERTIFICADO	—
+Bomba (S-curve, inversión, LEDC, NVS)	✅ CERTIFICADO	—
+Heap / streaming HTTP	✅ CERTIFICADO	String residual solo en endpoints raros — aceptable
+Calibración K_ALIM	⚠️ CONDICIONADO	Test de 3 puntos (25/50/72 RPM) el lunes; si divergen → K como indicador, gravimetría manda
+Protección de sobrepresión	⚠️ NO IMPLEMENTADA	Solo alivio 0.70 bar. Lunes: sin membrana en circuito (bypass) o RPM ≤44 con retentado abierto
+ADS1115 / TMP / Darcy en tiempo real	🔜 PRÓXIMA FASE	Topología I2C (shifter) + zero-trim por sesión, antes del Ensayo 4
+
+RESPUESTA A LA PREGUNTA DIRECTA: ¿Está el sistema 100% blindado para que Owen y Antonella enciendan la bomba el lunes? Sí, para el alcance declarado del lunes (Ensayos 2–3, calibración de caudal por gravimetría), con las condiciones de la tabla — que son de procedimiento, no de código. No para operar la membrana presurizada: eso requiere el ADS1115 integrado con su enclavamiento, y correctamente postergaron el Ensayo 4 hasta entonces.
+
+El firmware v4 es la primera versión de todo el proyecto que yo firmaría sin salvedades de código. Lo que queda ya no es software: es disciplina de banco (zero-trim, 3 puntos de K, bypass de membrana) y la integración de presión. El camino al Hito 5 está despejado.
+
+Nota final: el .ino llegó truncado en el bloque de 1 s ("bool bombaE…"). Lo auditado cubre todo lo listado en la sección 3 del documento; si la parte truncada contiene la lógica de auto-calibración y el sanity-check de cruce, pégenla y la verifico — no espero hallazgos allí dado el patrón del resto, pero el dictamen formal la excluye por no haberla visto.

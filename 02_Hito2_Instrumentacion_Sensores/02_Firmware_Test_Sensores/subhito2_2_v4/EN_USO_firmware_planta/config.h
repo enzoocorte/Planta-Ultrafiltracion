@@ -44,7 +44,7 @@ constexpr float Q_CLINICO_SANGRE_MAX   = 600.0f;  // mL/min (límite en hemodiá
 constexpr float ACEL_ARRANQUE_RPM_S  = 2.0f;   // 2.0 RPM/s despegue inicial suave y confiable
 constexpr float ACEL_NOMINAL_RPM_S   = 3.5f;   // 3.5 RPM/s aceleración progresiva
 constexpr float DESACEL_AJUSTE_RPM_S = 8.0f;   // 8.0 RPM/s desaceleración en marcha
-constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al presionar STOP (< 1.5s)
+constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al presionar STOP (~2.2s desde 100 RPM, <1.5s desde 65 RPM)
 
 // ------------------------------------------------------------------------------
 // 4. CALIBRACIÓN DE FÁBRICA DE CAUDALÍMETROS YF-S401
@@ -59,7 +59,9 @@ constexpr float K_ALIMENTACION = 154.62f; // Hz/(L/min) -> 9277.2 pulsos/L (105.
 constexpr float K_PERMEADO     = 55.00f;  // Hz/(L/min) -> 3300.0 pulsos/L (5.50 Hz a 100.0 mL/min)
 
 constexpr uint32_t FILTRO_RUIDO_US = 1500;    // 1.5 ms de blanking anti-rebote (hasta 666 Hz / ~4300 mL/min)
-constexpr float Q_MAX_FISICO_MLMIN = 6000.0f; // Límite de corte físico (6.0 L/min)
+// Auditoría Ronda 4: A 100 RPM el caudal máximo de bomba es 1360 mL/min.
+// Un límite de 2500 mL/min actúa como filtro activo anti-ruido EMI sin limitar el flujo real.
+constexpr float Q_MAX_FISICO_MLMIN = 2500.0f; // Límite físico de plausibilidad (2.5 L/min)
 
 // ------------------------------------------------------------------------------
 // 4. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN Y AUTO-CALIBRACIÓN
