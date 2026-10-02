@@ -67,9 +67,9 @@ float   autoCalSumFrecAlim = 0.0f;
 float   autoCalSumFrecPerm = 0.0f;
 String  autoCalMensaje = "";
 
-// Instanciación de componentes
-Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION");
-Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO");
+// Instanciación de componentes (Alimentación con alarma de corte; Permeado sin alarma en reposo)
+Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION", true);
+Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO", false);
 Bomba bomba;
 WebServer server(80);
 Preferences prefs;

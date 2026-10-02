@@ -306,7 +306,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           </div>
           <div class="info-row">
             <span>Frecuencia: <b id="fa" style="color:#e2e8f0">0.0 Hz</b></span>
-            <span>Factor K: <b id="lbl_ka" style="color:var(--alim)">154.62</b> pulsos/L</span>
+            <span>Factor K: <b id="lbl_ka" style="color:var(--alim)">154.62</b> Hz/(L/min)</span>
           </div>
         </div>
 
@@ -412,11 +412,11 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       <!-- SECCIÓN C: EDICIÓN DIRECTA DE PARÁMETROS -->
       <div class="input-grid">
         <div class="input-group">
-          <label>Factor K Alimentación:</label>
+          <label>Factor K Alimentación [Hz/(L/min)]:</label>
           <input type="number" id="inp_ka" step="0.01" value="154.62">
         </div>
         <div class="input-group">
-          <label>Factor K PERMEADO:</label>
+          <label>Factor K PERMEADO [Hz/(L/min)]:</label>
           <input type="number" id="inp_kp" step="0.01" value="55.00">
         </div>
         <div class="input-group">

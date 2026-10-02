@@ -49,8 +49,14 @@ constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al 
 // ------------------------------------------------------------------------------
 // 4. CALIBRACIÓN DE FÁBRICA DE CAUDALÍMETROS YF-S401
 // ------------------------------------------------------------------------------
-constexpr float K_ALIMENTACION = 154.62f; // Factor K Alimentación (105.14 Hz = 680.0 mL/min)
-constexpr float K_PERMEADO     = 55.00f;  // Factor K Permeado (5.50 Hz = 100.0 mL/min)
+// UNIDAD METROLÓGICA DE K: [Hz / (L/min)]
+// Relación matemática fundamental:
+//   F [Hz] = K * Q [L/min]  ===>  Q [mL/min] = (F [Hz] * 1000) / K
+//   Pulsos por Litro = K * 60
+// Nominal de fabricante YF-S401: F = 98 * Q (L/min) => K = 98.0 Hz/(L/min) (5880 pul/L)
+// Calibración experimental con probeta (Owen a 50 y 72 RPM):
+constexpr float K_ALIMENTACION = 154.62f; // Hz/(L/min) -> 9277.2 pulsos/L (105.14 Hz a 680.0 mL/min)
+constexpr float K_PERMEADO     = 55.00f;  // Hz/(L/min) -> 3300.0 pulsos/L (5.50 Hz a 100.0 mL/min)
 
 constexpr uint32_t FILTRO_RUIDO_US = 1500;    // 1.5 ms de blanking anti-rebote (hasta 666 Hz / ~4300 mL/min)
 constexpr float Q_MAX_FISICO_MLMIN = 6000.0f; // Límite de corte físico (6.0 L/min)
