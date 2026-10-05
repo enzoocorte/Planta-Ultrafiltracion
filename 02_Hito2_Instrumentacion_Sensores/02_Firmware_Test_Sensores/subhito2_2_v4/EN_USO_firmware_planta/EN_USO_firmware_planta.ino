@@ -7,12 +7,17 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <DNSServer.h>
 #include <Preferences.h>
 #include "config.h"
 #include "caudalimetro.h"
 #include "Bomba.h"
 #include "darcy.h"
 #include "index_html.h"
+
+// Servidor DNS para Portal Cautivo Anti-Desconexión en Android / iOS / Windows
+DNSServer dnsServer;
+constexpr uint16_t DNS_PORT = 53;
 
 // ------------------------------------------------------------------------------
 // ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y GESTIÓN DE ENSAYOS
@@ -482,7 +487,18 @@ void setup() {
     Serial.println("[mDNS] Servidor publicado en: http://bomba.local");
   }
 
-  // 4. Enrutamiento del Servidor Web
+  // 4. Servidor DNS para Portal Cautivo Anti-Desconexión
+  // ¿POR QUÉ SE HACE ESTO?
+  // Sistemas operativos modernos (Android, iOS, Windows) envían consultas DNS ocultas
+  // (p. ej. connectivitycheck.gstatic.com, msftconnecttest.com) para verificar si la red tiene Internet.
+  // Al no haber conexión externa, el teléfono/PC asume que el Wi-Fi está roto y se desconecta solo.
+  // Este servidor DNS responde a cualquier dominio ("*") con la IP local 192.168.4.1.
+  // El sistema operativo reconoce la red como "Portal Cautivo" (estilo hotel/aeropuerto),
+  // ANULA el descarte automático y mantiene la conexión Wi-Fi fija y permanente al SCADA.
+  dnsServer.start(DNS_PORT, "*", local_IP);
+  Serial.println("[DNS] Servidor DNS Captive Portal activo en puerto 53 (Anti-Desconexion)");
+
+  // 5. Enrutamiento del Servidor Web
   server.on("/", HTTP_GET, handleRoot);
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/cmd", HTTP_GET, handleCmd);
@@ -494,6 +510,14 @@ void setup() {
   server.on("/calibrar_rpm_q", HTTP_GET, handleCalibrarRpmQ);
   server.on("/export_csv", HTTP_GET, handleExportCSV);
   server.on("/clear_csv", HTTP_GET, handleClearCSV);
+
+  // Rutas de sondeo de conectividad de sistemas operativos para Portal Cautivo
+  server.on("/generate_204", HTTP_GET, handleRoot);        // Android Captive Portal Check
+  server.on("/gen_204", HTTP_GET, handleRoot);             // Android alternativo
+  server.on("/ncsi.txt", HTTP_GET, handleRoot);            // Windows Network Connectivity Status
+  server.on("/connecttest.txt", HTTP_GET, handleRoot);     // Windows alternativo
+  server.on("/hotspot-detect.html", HTTP_GET, handleRoot); // Apple iOS / macOS
+  server.onNotFound(handleRoot);                           // Cualquier otra URL no registrada abre el SCADA
 
   server.begin();
   Serial.println("[HTTP] Servidor Web SCADA iniciado con exito en puerto 80.\n");
@@ -508,6 +532,7 @@ void setup() {
 // BUCLE PRINCIPAL (LOOP NO BLOQUEANTE)
 // ------------------------------------------------------------------------------
 void loop() {
+  dnsServer.processNextRequest(); // Atiende consultas DNS en < 2 us sin bloquear la ejecucion
   server.handleClient();
 
   uint32_t tAhora = millis();
