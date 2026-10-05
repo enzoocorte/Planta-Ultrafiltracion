@@ -572,7 +572,13 @@ void loop() {
         if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
       }
 
-      if (muestrasEnsayo > 0 && numEnsayos < MAX_ENSAYOS) {
+      // Si duró al menos 1s o no hubo muestras periódicas aún, registrar muestra de cierre
+      if (muestrasEnsayo == 0) {
+        guardarMuestraDatalogger();
+        muestrasEnsayo = 1;
+      }
+
+      if (numEnsayos < MAX_ENSAYOS) {
         listaEnsayos[numEnsayos].id           = ensayoActualId;
         listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
         listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;

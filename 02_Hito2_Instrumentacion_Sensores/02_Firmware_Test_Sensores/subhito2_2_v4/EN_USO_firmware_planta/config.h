@@ -66,8 +66,8 @@ constexpr float Q_MAX_FISICO_MLMIN = 2500.0f; // Límite físico de plausibilida
 // ------------------------------------------------------------------------------
 // 4. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN Y AUTO-CALIBRACIÓN
 // ------------------------------------------------------------------------------
-constexpr uint32_t INTERVALO_LOG_MS   = 10000;  // Muestreo y almacenamiento cada 10 segundos
-constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 1.66 horas de ensayo continuo
+constexpr uint32_t INTERVALO_LOG_MS   = 1000;   // Muestreo y almacenamiento cada 1 segundo (1 Hz)
+constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 10 minutos de ensayo continuo
 constexpr size_t   MAX_ENSAYOS        = 20;     // Hasta 20 corridas/ensayos registrados en memoria
 constexpr uint8_t  MUESTRAS_AUTO_CAL  = 15;     // 15 muestras (15 seg) para auto-calibración en régimen permanente
 
