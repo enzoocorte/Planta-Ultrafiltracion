@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guía Técnica y Visual: Estructura Planta Piloto de Ultrafiltración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <!-- Three.js + OrbitControls for 3D visualization -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #24344d;
+      --border-color: #334155;
+      --accent-blue: #38bdf8;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .badge-thesis {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(6, 182, 212, 0.1));
+      border: 1px solid var(--accent-blue);
+      color: var(--accent-blue);
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: inline-block;
+      margin-bottom: 0.25rem;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(30, 41, 59, 0.6);
+      padding: 0.35rem;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+      box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+    }
+
+    /* MAIN CONTAINER */
+    main {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 1.5rem 2rem;
+    }
+
+    /* 3D VIEWER CONTAINER */
+    .viewer-layout {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 1200px) {
+      .viewer-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .viewport-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .viewport-header {
+      padding: 0.85rem 1.25rem;
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .canvas-container {
+      width: 100%;
+      height: 600px;
+      position: relative;
+      background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    }
+
+    #three-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    #three-canvas:active {
+      cursor: grabbing;
+    }
+
+    .canvas-overlay-controls {
+      position: absolute;
+      bottom: 1rem;
+      left: 1rem;
+      right: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 0.4rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .control-btn {
+      background: #1e293b;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.4rem 0.8rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 0.35rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .control-btn.active-view {
+      background: var(--accent-cyan);
+      color: #0f172a;
+    }
+
+    /* INSPECTOR PANEL */
+    .inspector-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      height: 670px;
+      overflow: hidden;
+    }
+
+    .inspector-header {
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border-color);
+      background: rgba(15, 23, 42, 0.4);
+    }
+
+    .inspector-content {
+      padding: 1.25rem;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .module-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .module-tab-btn {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.6rem 0.4rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 0.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .module-tab-btn:hover {
+      border-color: var(--accent-blue);
+      color: var(--text-main);
+    }
+
+    .module-tab-btn.selected {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(6, 182, 212, 0.15));
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .tech-spec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .spec-item {
+      background: #0f172a;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .spec-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .spec-value {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #ffffff;
+      font-family: var(--font-mono);
+    }
+
+    .alert-box {
+      padding: 0.85rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      border-left: 4px solid;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: var(--accent-amber);
+      color: #fde68a;
+    }
+
+    .alert-critical {
+      background: rgba(244, 63, 94, 0.1);
+      border-color: var(--accent-rose);
+      color: #fecdd3;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: var(--accent-emerald);
+      color: #a7f3d0;
+    }
+
+    /* BLUEPRINTS & 2D SCHEMATICS SECTION */
+    .section-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #fff;
+    }
+
+    .blueprint-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .blueprint-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .schematic-svg-container {
+      background: #090d16;
+      border: 1px dashed var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 320px;
+    }
+
+    /* TABLES */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--accent-blue);
+      padding: 0.85rem 1rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-color);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #cbd5e1;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge-material {
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.35rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+
+    .badge-win {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      border: 1px solid #10b981;
+    }
+
+    .badge-alt {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+      border: 1px solid #f59e0b;
+    }
+
+    .badge-discard {
+      background: rgba(244, 63, 94, 0.2);
+      color: #fb7185;
+      border: 1px solid #f43f5e;
+    }
+
+    /* P&ID FLOWCHART */
+    .pid-container {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      border-radius: 1rem;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      position: relative;
+    }
+
+    /* TAB CONTENT TOGGLING */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .legend-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <span class="badge-thesis">Tesis de Grado — Ingeniería Industrial</span>
+      <h1>Guía Visual & Técnica: Planta Piloto de Ultrafiltración</h1>
+    </div>
+    
+    <nav class="nav-tabs">
+      <button class="tab-btn active" onclick="switchMainTab('3d-view', this)">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"/></svg>
+        Maqueta 3D Interactiva
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('blueprints', this)">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Planos y Cotas 2D
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('pid', this)">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Diagrama de Flujo (P&ID)
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('materials', this)">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Materiales y Costos
+      </button>
+      <button class="tab-btn" onclick="switchMainTab('thesis-defense', this)">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Defensa de Tesis
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    
+    <!-- TAB 1: 3D VIEWER -->
+    <section id="tab-3d-view" class="tab-content active">
+      <div class="viewer-layout">
+        
+        <!-- Left 3D Viewport -->
+        <div class="viewport-card">
+          <div class="viewport-header">
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+              <span class="legend-indicator" style="background:var(--accent-emerald);"></span>
+              <strong style="font-size:0.9rem;">Visualizador CAD 3D Tridimensional</strong>
+              <span style="font-size:0.75rem; color:var(--text-muted);">(Arrastra para rotar | Rueda para zoom | Click derecho para desplazar)</span>
+            </div>
+            <div class="btn-group">
+              <button class="control-btn" id="btn-explode" onclick="toggleExplodedView()">Despiece / Ensamblado</button>
+              <button class="control-btn" onclick="resetCamera()">Isométrica</button>
+            </div>
+          </div>
+
+          <div class="canvas-container">
+            <div id="three-canvas"></div>
+            
+            <div class="canvas-overlay-controls">
+              <div class="btn-group">
+                <button class="control-btn" onclick="setPresetView('front')">Frente</button>
+                <button class="control-btn" onclick="setPresetView('side')">Lateral</button>
+                <button class="control-btn" onclick="setPresetView('top')">Superior</button>
+              </div>
+              <div class="btn-group">
+                <button class="control-btn" id="btn-wireframe" onclick="toggleWireframe()">Modo Estructura</button>
+                <button class="control-btn" id="btn-hoses" onclick="toggleHoses()">Tuberías Fluidos</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Component Inspector -->
+        <div class="inspector-panel">
+          <div class="inspector-header">
+            <h3 style="font-size: 1rem; font-weight:700; margin-bottom:0.5rem; color:#fff;">Inspector de Componentes</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted);">Selecciona un módulo para visualizar análisis técnico, cotas y recomendaciones de manufactura:</p>
+            <div class="module-selector" style="margin-top:0.75rem;">
+              <button class="module-tab-btn selected" id="tab-btn-mod1" onclick="selectModule(1)">1. Sedimentador</button>
+              <button class="module-tab-btn" id="tab-btn-mod2" onclick="selectModule(2)">2. Caja Filtro</button>
+              <button class="module-tab-btn" id="tab-btn-mod3" onclick="selectModule(3)">3. Carro Permeado</button>
+            </div>
+          </div>
+
+          <div class="inspector-content" id="inspector-content-body">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: BLUEPRINTS 2D & DIMENSIONS -->
+    <section id="tab-blueprints" class="tab-content">
+      <h2 class="section-title">
+        <svg width="22" height="22" fill="none" stroke="var(--accent-blue)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+        Planos y Acotaciones Normalizadas de Ensamble
+      </h2>
+
+      <div class="blueprint-grid">
+        
+        <!-- Blueprint 1: Sedimentador -->
+        <div class="blueprint-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:1rem; font-weight:700; color:var(--accent-blue);">MÓDULO 1: Tanque Sedimentador y Agitador</h3>
+            <span class="badge-material badge-win">Inox AISI 304</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Vaso cilíndrico-cónico existente con trípode de 4 patas. Detalle de modificaciones mecánicas mandatorias en tapa y eje.
+          </p>
+          <div class="schematic-svg-container">
+            <svg viewBox="0 0 360 400" width="100%" height="320">
+              <!-- Lines & Dimensions Blueprint Style -->
+              <defs>
+                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                </pattern>
+                <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
+                </marker>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#grid)"/>
+
+              <!-- Central Axis -->
+              <line x1="180" y1="20" x2="180" y2="380" stroke="#f43f5e" stroke-dasharray="6,4" stroke-width="1"/>
+
+              <!-- Tank Body -->
+              <!-- Cylinder -->
+              <rect x="90" y="80" width="180" height="130" fill="rgba(56, 189, 248, 0.08)" stroke="#38bdf8" stroke-width="2"/>
+              <!-- Conical Bottom -->
+              <polygon points="90,210 270,210 200,290 160,290" fill="rgba(56, 189, 248, 0.08)" stroke="#38bdf8" stroke-width="2"/>
+              
+              <!-- Drain Valve -->
+              <rect x="170" y="290" width="20" height="30" fill="#64748b" stroke="#cbd5e1" stroke-width="1.5"/>
+              <line x1="190" y1="305" x2="215" y2="305" stroke="#f59e0b" stroke-width="3"/>
+
+              <!-- Stand Legs -->
+              <line x1="90" y1="180" x2="50" y2="370" stroke="#94a3b8" stroke-width="4"/>
+              <line x1="270" y1="180" x2="310" y2="370" stroke="#94a3b8" stroke-width="4"/>
+              <!-- Leveling feet (Regatones M10) -->
+              <rect x="40" y="370" width="20" height="8" rx="2" fill="#10b981"/>
+              <rect x="300" y="370" width="20" height="8" rx="2" fill="#10b981"/>
+
+              <!-- Agitator Shaft & Motor -->
+              <!-- Elevated Motor Support -->
+              <path d="M 140 80 L 140 50 L 220 50 L 220 80" fill="none" stroke="#f8fafc" stroke-width="2"/>
+              <!-- Geared Motor Box -->
+              <rect x="160" y="25" width="40" height="35" rx="3" fill="#f59e0b" stroke="#fff" stroke-width="1"/>
+              <text x="180" y="46" font-size="8" fill="#000" font-weight="bold" text-anchor="middle">MOTOR 12V</text>
+
+              <!-- Central Shaft -->
+              <line x1="180" y1="60" x2="180" y2="230" stroke="#f8fafc" stroke-width="3"/>
+              <!-- Paddle Impeller at 230 -->
+              <path d="M 140 220 C 160 230, 200 230, 220 220 L 210 240 L 150 240 Z" fill="#94a3b8" stroke="#fff" stroke-width="1.5"/>
+
+              <!-- Lateral Nipple (5 cm from base) -->
+              <rect x="270" y="190" width="25" height="15" fill="#38bdf8" stroke="#fff" stroke-width="1"/>
+              <text x="305" y="202" font-size="9" fill="#38bdf8">Toma Clarificado (h=5cm)</text>
+
+              <!-- Dimension Annotations -->
+              <!-- Height 43 cm -->
+              <line x1="330" y1="80" x2="330" y2="290" stroke="#38bdf8" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+              <text x="345" y="190" font-size="11" fill="#38bdf8" font-family="'JetBrains Mono', monospace" font-weight="bold">H = 43 cm</text>
+
+              <!-- Shaft length 32 cm -->
+              <line x1="125" y1="60" x2="125" y2="240" stroke="#10b981" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+              <text x="80" y="150" font-size="10" fill="#10b981" font-family="'JetBrains Mono', monospace">Eje = 32 cm</text>
+
+              <!-- Leg Height 29-34 cm -->
+              <line x1="25" y1="180" x2="25" y2="370" stroke="#f59e0b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+              <text x="10" y="275" font-size="9" fill="#f59e0b" transform="rotate(-90 20 275)">Patas: 29 a 34 cm</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Blueprint 2: Caja de Filtro Maletín -->
+        <div class="blueprint-card">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:1rem; font-weight:700; color:var(--accent-cyan);">MÓDULO 2: Caja de Filtración (Tipo Maletín)</h3>
+            <span class="badge-material badge-win">Tubo 20×20 + Chapa Perf.</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Cubo de 450 × 450 × 450 mm. Vista frontal con puerta rebatible y segregación de zonas eléctrica/hidráulica.
+          </p>
+          <div class="schematic-svg-container">
+            <svg viewBox="0 0 380 400" width="100%" height="320">
+              <rect width="100%" height="100%" fill="url(#grid)"/>
+
+              <!-- Outer Frame 45x45 cm -->
+              <rect x="60" y="60" width="260" height="260" fill="rgba(15, 23, 42, 0.7)" stroke="#06b6d4" stroke-width="3"/>
+              
+              <!-- Trunk Handle on Top -->
+              <path d="M 155 60 L 155 35 L 225 35 L 225 60" fill="none" stroke="#f8fafc" stroke-width="5" stroke-linecap="round"/>
+              <rect x="170" y="30" width="40" height="10" rx="3" fill="#38bdf8"/>
+
+              <!-- Inner Components Layout -->
+              <!-- Left Peristaltic Pump -->
+              <rect x="75" y="190" width="65" height="100" rx="4" fill="rgba(56, 189, 248, 0.2)" stroke="#38bdf8" stroke-width="1.5"/>
+              <circle cx="107" cy="235" r="22" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text x="107" y="275" font-size="9" fill="#38bdf8" text-anchor="middle" font-weight="bold">Bomba Perist.</text>
+
+              <!-- Sealed IP65 Electrical Box (Left Top) -->
+              <rect x="75" y="75" width="65" height="85" rx="4" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" stroke-width="1.5"/>
+              <text x="107" y="115" font-size="9" fill="#10b981" text-anchor="middle" font-weight="bold">CAJA IP65</text>
+              <text x="107" y="130" font-size="8" fill="#a7f3d0" text-anchor="middle">ESP32/Driver</text>
+
+              <!-- Central/Back: Pre-filter & Membrane -->
+              <!-- 5um Filter -->
+              <rect x="160" y="90" width="40" height="150" rx="6" fill="#334155" stroke="#cbd5e1" stroke-width="2"/>
+              <text x="180" y="170" font-size="8" fill="#fff" text-anchor="middle" transform="rotate(-90 180 170)">PREFILTRO 5µm</text>
+              
+              <!-- UF Membrane -->
+              <rect x="220" y="80" width="40" height="180" rx="6" fill="#1e3a8a" stroke="#60a5fa" stroke-width="2"/>
+              <text x="240" y="170" font-size="8" fill="#fff" text-anchor="middle" transform="rotate(-90 240 170)">MEMBRANA UF</text>
+
+              <!-- Right: Power Supply -->
+              <rect x="275" y="80" width="35" height="90" rx="3" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" stroke-width="1.5"/>
+              <text x="292" y="130" font-size="8" fill="#f59e0b" text-anchor="middle" transform="rotate(-90 292 130)">FUENTE 12V</text>
+
+              <!-- Front Door Acrylic Outline -->
+              <rect x="65" y="65" width="250" height="250" fill="none" stroke="rgba(255,255,255,0.2)" stroke-dasharray="4,4"/>
+
+              <!-- Dimension Annotations -->
+              <!-- Width 45 cm -->
+              <line x1="60" y1="340" x2="320" y2="340" stroke="#06b6d4" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+              <text x="190" y="360" font-size="11" fill="#06b6d4" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-weight="bold">Ancho = 45 cm (450 mm)</text>
+
+              <!-- Height 45 cm -->
+              <line x1="340" y1="60" x2="340" y2="320" stroke="#06b6d4" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+              <text x="355" y="195" font-size="11" fill="#06b6d4" font-family="'JetBrains Mono', monospace" font-weight="bold" transform="rotate(90 355 195)">Alto = 45 cm</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Blueprint 3: Carro de Permeado y Montaje -->
+        <div class="blueprint-card" style="grid-column: 1 / -1;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:1rem; font-weight:700; color:var(--accent-emerald);">MÓDULO 3 + 2: Ensamble Carro de Permeado con Caja Encastrada</h3>
+            <span class="badge-material badge-win">Estructura Integral Encastrable</span>
+          </div>
+          <p style="font-size:0.8rem; color:var(--text-muted);">
+            Elevación frontal y lateral que verifica la altura operativa total (1150 mm) y el centro de gravedad estable.
+          </p>
+          <div class="schematic-svg-container" style="min-height:380px;">
+            <svg viewBox="0 0 900 420" width="100%" height="360">
+              <rect width="100%" height="100%" fill="url(#grid)"/>
+
+              <!-- VISTA ELEVACION FRONTAL (IZQ) -->
+              <g transform="translate(40, 20)">
+                <!-- Title -->
+                <text x="140" y="20" font-size="12" fill="#fff" font-weight="bold" text-anchor="middle">ELEVACIÓN FRONTAL</text>
+
+                <!-- Box Mod 2 (45x45 cm) on top -->
+                <rect x="40" y="40" width="200" height="150" fill="rgba(6, 182, 212, 0.2)" stroke="#06b6d4" stroke-width="2"/>
+                <text x="140" y="115" font-size="11" fill="#06b6d4" text-anchor="middle" font-weight="bold">MÓDULO 2: CAJA FILTRO</text>
+                <text x="140" y="130" font-size="9" fill="#94a3b8" text-anchor="middle">450 × 450 mm</text>
+                <!-- Quick release knobs -->
+                <circle cx="55" cy="190" r="5" fill="#f59e0b"/>
+                <circle cx="225" cy="190" r="5" fill="#f59e0b"/>
+
+                <!-- Carriage Mod 3 -->
+                <!-- Two top arms -->
+                <rect x="35" y="190" width="210" height="10" fill="#334155" stroke="#cbd5e1"/>
+
+                <!-- Vertical columns 70 cm -->
+                <rect x="50" y="200" width="15" height="150" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                <rect x="215" y="200" width="15" height="150" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                <!-- Solid back panel (dashed) -->
+                <rect x="65" y="205" width="150" height="140" fill="rgba(255,255,255,0.03)" stroke="#475569" stroke-dasharray="4,4"/>
+
+                <!-- Jerrycan (Bidon PEAD 25L) -->
+                <rect x="80" y="215" width="120" height="130" rx="12" fill="rgba(255, 255, 255, 0.85)" stroke="#94a3b8" stroke-width="2"/>
+                <rect x="120" y="205" width="40" height="10" rx="3" fill="#e2e8f0" stroke="#64748b"/>
+                <text x="140" y="285" font-size="11" fill="#0f172a" text-anchor="middle" font-weight="bold">BIDÓN PEAD</text>
+                <text x="140" y="300" font-size="9" fill="#475569" text-anchor="middle">PERMEADO (25 L)</text>
+
+                <!-- Base Tray -->
+                <rect x="35" y="350" width="210" height="12" fill="#334155" stroke="#cbd5e1"/>
+
+                <!-- Wheels -->
+                <circle cx="60" cy="375" r="12" fill="#475569" stroke="#cbd5e1" stroke-width="2"/>
+                <circle cx="220" cy="375" r="12" fill="#475569" stroke="#cbd5e1" stroke-width="2"/>
+                <!-- Wheel locks -->
+                <rect x="70" y="365" width="8" height="12" fill="#f43f5e"/>
+
+                <!-- Cotas Altura -->
+                <line x1="265" y1="40" x2="265" y2="190" stroke="#06b6d4" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+                <text x="275" y="120" font-size="10" fill="#06b6d4" font-family="'JetBrains Mono', monospace">Caja: 45 cm</text>
+
+                <line x1="265" y1="190" x2="265" y2="350" stroke="#10b981" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+                <text x="275" y="275" font-size="10" fill="#10b981" font-family="'JetBrains Mono', monospace">Carro: 70 cm</text>
+
+                <line x1="320" y1="40" x2="320" y2="385" stroke="#f8fafc" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+                <text x="330" y="220" font-size="12" fill="#f8fafc" font-family="'JetBrains Mono', monospace" font-weight="bold">TOTAL = 115 cm</text>
+              </g>
+
+              <!-- VISTA LATERAL / ARREGLO DE PLANTA (DER) -->
+              <g transform="translate(480, 20)">
+                <text x="180" y="20" font-size="12" fill="#fff" font-weight="bold" text-anchor="middle">DISPOSICIÓN EN PLANTA (3 MÓDULOS)</text>
+
+                <!-- Floor line -->
+                <line x1="20" y1="387" x2="360" y2="387" stroke="#475569" stroke-width="2"/>
+
+                <!-- Module 1: Sedimenter at the side -->
+                <g transform="translate(20, 100)">
+                  <rect x="10" y="50" width="80" height="90" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2"/>
+                  <polygon points="10,140 90,140 60,180 40,180" fill="rgba(56, 189, 248, 0.15)" stroke="#38bdf8" stroke-width="2"/>
+                  <line x1="10" y1="130" x2="0" y2="287" stroke="#94a3b8" stroke-width="3"/>
+                  <line x1="90" y1="130" x2="100" y2="287" stroke="#94a3b8" stroke-width="3"/>
+                  <text x="50" y="100" font-size="9" fill="#38bdf8" text-anchor="middle" font-weight="bold">MOD. 1</text>
+                  <text x="50" y="115" font-size="7" fill="#cbd5e1" text-anchor="middle">Sedimentador</text>
+                </g>
+
+                <!-- Connecting flexible hose -->
+                <path d="M 110 240 C 140 240, 140 90, 170 90" fill="none" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,3"/>
+                <text x="135" y="180" font-size="8" fill="#38bdf8" font-weight="bold">Manguera</text>
+
+                <!-- Module 2 + 3 Stack -->
+                <g transform="translate(170, 0)">
+                  <rect x="0" y="60" width="160" height="130" fill="rgba(6, 182, 212, 0.15)" stroke="#06b6d4" stroke-width="2"/>
+                  <text x="80" y="125" font-size="10" fill="#06b6d4" text-anchor="middle" font-weight="bold">MOD. 2: FILTRO</text>
+                  
+                  <!-- Column -->
+                  <rect x="10" y="190" width="15" height="185" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                  <rect x="135" y="190" width="15" height="185" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+                  
+                  <!-- Permeate tank -->
+                  <rect x="35" y="235" width="90" height="130" rx="10" fill="rgba(255,255,255,0.8)" stroke="#94a3b8" stroke-width="1.5"/>
+                  <text x="80" y="305" font-size="9" fill="#0f172a" text-anchor="middle" font-weight="bold">MOD. 3: PERMEADO</text>
+                  
+                  <!-- Wheels -->
+                  <circle cx="20" cy="380" r="7" fill="#475569"/>
+                  <circle cx="140" cy="380" r="7" fill="#475569"/>
+                </g>
+
+                <!-- Ergonomics callout -->
+                <rect x="190" y="20" width="120" height="30" rx="4" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981"/>
+                <text x="250" y="38" font-size="8" fill="#a7f3d0" text-anchor="middle" font-weight="bold">ZONA DE MANDO</text>
+                <text x="250" y="47" font-size="7" fill="#a7f3d0" text-anchor="middle">700 - 1150 mm (Ergonómica)</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 3: P&ID FLOW DIAGRAM -->
+    <section id="tab-pid" class="tab-content">
+      <h2 class="section-title">
+        <svg width="22" height="22" fill="none" stroke="var(--accent-cyan)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+        Diagrama de Tuberías e Instrumentación (P&ID Industrial)
+      </h2>
+
+      <div class="pid-container">
+        <svg viewBox="0 0 960 420" width="100%" height="380">
+          <!-- Flow Lines -->
+          <!-- Feed line: Sedimenter -> Pump -->
+          <path d="M 180 230 L 260 230" fill="none" stroke="#38bdf8" stroke-width="4"/>
+          <!-- Pump -> Pre-filter -->
+          <path d="M 320 230 L 400 230" fill="none" stroke="#38bdf8" stroke-width="4"/>
+          <!-- Pre-filter -> UF Membrane -->
+          <path d="M 460 230 L 540 230" fill="none" stroke="#38bdf8" stroke-width="4"/>
+          <!-- UF Membrane -> Permeate Tank -->
+          <path d="M 640 210 L 780 210 L 780 250" fill="none" stroke="#10b981" stroke-width="4"/>
+          <!-- Backwash / Concentrate Return to Sedimenter -->
+          <path d="M 640 250 L 700 250 L 700 350 L 130 350 L 130 110 L 130 130" fill="none" stroke="#f43f5e" stroke-width="2.5" stroke-dasharray="6,4"/>
+
+          <!-- UNITS BLOCKS -->
+          
+          <!-- UNIT 1: SEDIMENTADOR -->
+          <g transform="translate(60, 110)">
+            <rect x="0" y="0" width="120" height="110" rx="6" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <polygon points="0,110 120,110 80,160 40,160" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <text x="60" y="45" font-size="11" fill="#fff" font-weight="bold" text-anchor="middle">SEDIMENTADOR</text>
+            <text x="60" y="60" font-size="8" fill="#94a3b8" text-anchor="middle">COAGULACIÓN</text>
+            <!-- Stirrer -->
+            <line x1="60" y1="10" x2="60" y2="100" stroke="#f59e0b" stroke-width="2"/>
+            <line x1="40" y1="100" x2="80" y2="100" stroke="#f59e0b" stroke-width="4"/>
+            <circle cx="60" cy="10" r="8" fill="#f59e0b"/>
+            <text x="60" y="13" font-size="7" fill="#000" font-weight="bold" text-anchor="middle">M</text>
+            <!-- Purge -->
+            <rect x="50" y="160" width="20" height="20" fill="#64748b"/>
+            <text x="60" y="195" font-size="8" fill="#f43f5e" text-anchor="middle">Purga de Lodos</text>
+          </g>
+
+          <!-- UNIT 2: PERISTALTIC PUMP -->
+          <g transform="translate(260, 195)">
+            <circle cx="30" cy="35" r="30" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <path d="M 15 20 L 45 35 L 15 50 Z" fill="#38bdf8"/>
+            <text x="30" y="80" font-size="9" fill="#38bdf8" font-weight="bold" text-anchor="middle">BOMBA P-101</text>
+            <text x="30" y="92" font-size="8" fill="#94a3b8" text-anchor="middle">Peristáltica</text>
+          </g>
+
+          <!-- SENSOR PT-1 (Pressure In) -->
+          <g transform="translate(345, 150)">
+            <circle cx="15" cy="15" r="15" fill="#0f172a" stroke="#f59e0b" stroke-width="2"/>
+            <text x="15" y="19" font-size="8" fill="#f59e0b" font-weight="bold" text-anchor="middle">PT-1</text>
+            <line x1="15" y1="30" x2="15" y2="80" stroke="#f59e0b" stroke-width="1.5"/>
+          </g>
+
+          <!-- UNIT 3: PRE-FILTER -->
+          <g transform="translate(400, 175)">
+            <rect x="0" y="0" width="60" height="110" rx="6" fill="#1e293b" stroke="#cbd5e1" stroke-width="2"/>
+            <line x1="15" y1="10" x2="45" y2="100" stroke="#64748b" stroke-dasharray="4,2"/>
+            <text x="30" y="50" font-size="9" fill="#fff" font-weight="bold" text-anchor="middle">PREFILTRO</text>
+            <text x="30" y="65" font-size="8" fill="#94a3b8" text-anchor="middle">5 µm PP</text>
+          </g>
+
+          <!-- UNIT 4: ULTRAFILTRATION MODULE -->
+          <g transform="translate(540, 160)">
+            <rect x="0" y="0" width="100" height="135" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="3"/>
+            <line x1="20" y1="10" x2="20" y2="125" stroke="#38bdf8" stroke-dasharray="2,2"/>
+            <line x1="40" y1="10" x2="40" y2="125" stroke="#38bdf8" stroke-dasharray="2,2"/>
+            <line x1="60" y1="10" x2="60" y2="125" stroke="#38bdf8" stroke-dasharray="2,2"/>
+            <line x1="80" y1="10" x2="80" y2="125" stroke="#38bdf8" stroke-dasharray="2,2"/>
+            <text x="50" y="60" font-size="10" fill="#38bdf8" font-weight="bold" text-anchor="middle">MÓDULO UF</text>
+            <text x="50" y="75" font-size="8" fill="#fff" text-anchor="middle">Fibra Hueca</text>
+            <text x="105" y="20" font-size="8" fill="#10b981" font-weight="bold">Permeado</text>
+            <text x="105" y="100" font-size="8" fill="#f43f5e" font-weight="bold">Concentrado</text>
+          </g>
+
+          <!-- SENSOR PT-2 (Pressure Out / TMP) -->
+          <g transform="translate(680, 130)">
+            <circle cx="15" cy="15" r="15" fill="#0f172a" stroke="#10b981" stroke-width="2"/>
+            <text x="15" y="19" font-size="8" fill="#10b981" font-weight="bold" text-anchor="middle">PT-2</text>
+            <line x1="15" y1="30" x2="15" y2="80" stroke="#10b981" stroke-width="1.5"/>
+          </g>
+
+          <!-- UNIT 5: TANQUE PERMEADO -->
+          <g transform="translate(730, 240)">
+            <rect x="0" y="0" width="100" height="120" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+            <text x="50" y="55" font-size="10" fill="#0f172a" font-weight="bold" text-anchor="middle">PERMEADO</text>
+            <text x="50" y="70" font-size="8" fill="#475569" text-anchor="middle">Bidón PEAD 25L</text>
+            <text x="50" y="85" font-size="8" fill="#10b981" font-weight="bold" text-anchor="middle">Agua Filtrada</text>
+          </g>
+
+          <!-- ESP32 CONTROLLER BOX -->
+          <g transform="translate(370, 20)">
+            <rect x="0" y="0" width="220" height="65" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+            <text x="110" y="25" font-size="10" fill="#10b981" font-weight="bold" text-anchor="middle">SISTEMA CONTROL ESP32 (IP65)</text>
+            <text x="110" y="40" font-size="8" fill="#cbd5e1" text-anchor="middle">Cálculo en vivo de TMP = PT1 - PT2</text>
+            <text x="110" y="53" font-size="7" fill="#94a3b8" text-anchor="middle">Modulación PWM Bomba + Alarma Fouling</text>
+          </g>
+        </svg>
+
+        <div style="margin-top:1.5rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+          <div class="alert-box alert-success">
+            <strong>Cálculo de TMP (Presión Transmembrana):</strong>
+            <p>El ESP32 monitoriza $\Delta P = P_{\text{in}} - P_{\text{out}}$. Un incremento progresivo por encima de 0.8 bar alerta ensuciamiento de membrana (*fouling*) e indica la necesidad de ciclo de retrolavado.</p>
+          </div>
+          <div class="alert-box alert-warning">
+            <strong>Ciclo de Recirculación / Lavado:</strong>
+            <p>La línea roja punteada retorna el concentrado al Módulo 1 a través de la perforación excéntrica de la tapa para operar en ciclo cerrado durante pruebas hidráulicas.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: MATERIALS & BOM TABLE -->
+    <section id="tab-materials" class="tab-content">
+      <h2 class="section-title">
+        <svg width="22" height="22" fill="none" stroke="var(--accent-amber)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        Matriz de Decisión de Materiales y Lista de Compra (BOM)
+      </h2>
+
+      <!-- Comparative Table -->
+      <h3 style="font-size:1rem; font-weight:700; margin-bottom:0.75rem; color:#fff;">Matriz Multicriterio de Materiales para el Chasis y Gabinete</h3>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Material Estructural</th>
+              <th>Costo Relativo</th>
+              <th>Resistencia Mecánica</th>
+              <th>Resistencia a Corrosión</th>
+              <th>Facilidad de Fabricación</th>
+              <th>Dictamen para Tesis</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Acero al Carbono SAE 1010 + Pintura Epoxi / Electrostática</strong></td>
+              <td><span style="color:#10b981; font-weight:bold;">Bajo (1.0×) — ~40 USD</span></td>
+              <td>Excelente (Módulo E = 210 GPa)</td>
+              <td>Muy Buena (Película epoxi 80 µm)</td>
+              <td>Corte sensitiva, soldadura MIG/MAG universal</td>
+              <td><span class="badge-material badge-win">SELECCIÓN GANADORA</span></td>
+            </tr>
+            <tr>
+              <td><strong>Perfilería Aluminio Ranurado (Tipo Bosch 2020)</strong></td>
+              <td>Medio-Alto (2.8×) — ~110 USD</td>
+              <td>Buena</td>
+              <td>Excelente (Anodizado natural)</td>
+              <td>Ensamble por tuercas T (sin soldar, pero escuadras caras)</td>
+              <td><span class="badge-material badge-alt">ALTERNATIVA PROTOTIPADO</span></td>
+            </tr>
+            <tr>
+              <td><strong>Acero Inoxidable AISI 304 (Tubo y Chapa)</strong></td>
+              <td>Muy Alto (4.5×) — ~200+ USD</td>
+              <td>Excelente</td>
+              <td>Excelente (Pasivado natural)</td>
+              <td>Requiere soldadura TIG con argón, electrodos caros</td>
+              <td><span class="badge-material badge-discard">NO JUSTIFICADO ECONÓMICAMENTE</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Itemized BOM -->
+      <h3 style="font-size:1rem; font-weight:700; margin-bottom:0.75rem; color:#fff;">Lista de Materiales Estandarizada (BOM Industrial)</h3>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Ítem</th>
+              <th>Denominación Comercial</th>
+              <th>Cantidad</th>
+              <th>Destino en la Planta</th>
+              <th>Operación Requerida</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Caño estructural cuadrado 20 × 20 × 1.2 mm</td>
+              <td>2 barras (12 m)</td>
+              <td>Bastidor Módulo 2 y Columnas Módulo 3</td>
+              <td>Corte a escuadra a 45°/90°, soldadura MIG</td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Chapa perforada SAE 1010 N°18 (Ø4 mm, tresbolillo)</td>
+              <td>0.8 m²</td>
+              <td>Laterales izquierdo, posterior y derecho de Caja 2</td>
+              <td>Cizalla / Guillotina y puntos de soldadura</td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Chapa lisa negra SAE 1010 N°16 (1.6 mm)</td>
+              <td>0.6 m²</td>
+              <td>Bandeja piso Caja 2 y Batea piso Carro 3</td>
+              <td>Plegado de pestañas 15 mm en plegadora</td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Chapa lisa negra SAE 1010 N°18 (1.2 mm)</td>
+              <td>0.5 m²</td>
+              <td>Techo maletín Caja 2 y Panel trasero Carro 3</td>
+              <td>Plegado y perforado para manija</td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Motorreductor DC 12V Metálico (30-60 RPM, 2-3 kg·cm)</td>
+              <td>1 unidad</td>
+              <td>Agitación Módulo 1 (Reemplaza motor CD)</td>
+              <td>Fijación a soporte sobre tapa con tornillos M3</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td>Acople flexible mandíbula 4 mm a 4/6 mm aluminio</td>
+              <td>1 unidad</td>
+              <td>Unión motorreductor con vástago de 32 cm</td>
+              <td>Ajuste con prisioneros Allen</td>
+            </tr>
+            <tr>
+              <td>7</td>
+              <td>Buje de Delrin / Bronce sinterizado Ø int 4 mm</td>
+              <td>1 unidad</td>
+              <td>Centro de tapa Módulo 1 (Cojinete de eje)</td>
+              <td>Alojamiento a presión en tapa</td>
+            </tr>
+            <tr>
+              <td>8</td>
+              <td>Regatones niveladores basculantes con espárrago M10</td>
+              <td>4 unidades</td>
+              <td>Patas del soporte de sedimentador</td>
+              <td>Soldar tuercas M10 en extremos de patas</td>
+            </tr>
+            <tr>
+              <td>9</td>
+              <td>Ruedas industriales Ø50 mm (2 giratorias c/freno + 2 fijas)</td>
+              <td>4 unidades</td>
+              <td>Base rodante Módulo 3</td>
+              <td>Fijación abulonada con bulones M6</td>
+            </tr>
+            <tr>
+              <td>10</td>
+              <td>Caja estanca plástica IP65 (160 × 120 × 75 mm)</td>
+              <td>1 unidad</td>
+              <td>Montaje sobre chapa perforada izquierda Caja 2</td>
+              <td>Aislación estricta de circuitos eléctricos</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+    <!-- TAB 5: THESIS DEFENSE GUIDE -->
+    <section id="tab-thesis-defense" class="tab-content">
+      <h2 class="section-title">
+        <svg width="22" height="22" fill="none" stroke="var(--accent-emerald)" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Puntos Clave y Criterio de Ingeniería Industrial para la Defensa
+      </h2>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:1.5rem; margin-bottom:2rem;">
+        
+        <div class="blueprint-card">
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--accent-blue);">1. Ergonomía y Antropometría Laboral</h3>
+          <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+            La combinación de una torre de permeado de <strong>700 mm</strong> y una caja de filtración superior de <strong>450 mm</strong> ubica el plano de control y apertura de puerta entre los <strong>700 mm y 1150 mm</strong> del suelo.
+            <br><br>
+            Según normas de ergonomía (IRAM 3753 / ISO 14738), este rango coincide con el área de confort del operario de pie (entre caderas y codos), evitando fatiga postural por flexión de columna y permitiendo lectura ocular directa sin escalones ni banquetas.
+          </p>
+        </div>
+
+        <div class="blueprint-card">
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--accent-emerald);">2. Mantenibilidad y SMED (Single-Minute Exchange of Die)</h3>
+          <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+            El desacople de la Caja de Filtración respecto al Carro de Permeado se realiza mediante perillas roscadas M8 tipo mariposa sin requerir herramientas.
+            <br><br>
+            Esto reduce drásticamente el <strong>MTTR (Mean Time to Repair)</strong>: en caso de falla electrónica o recambio de membranas, un solo operario puede retirar la caja en menos de 30 segundos y llevarla al banco de taller, manteniendo la base y el sedimentador en su sitio.
+          </p>
+        </div>
+
+        <div class="blueprint-card">
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--accent-amber);">3. Seguridad e Higiene: Segregación IP65</h3>
+          <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+            En plantas de tratamiento de agua a presión, la proximidad de agua y 220V/12V genera un riesgo crítico de electrocución o cortocircuito.
+            <br><br>
+            Se implementa una <strong>barrera física estricta</strong>: la bomba peristáltica (parte húmeda) queda exterior a la electrónica, y los componentes de control (ESP32, puente H, borneras) van encapsulados en una caja plástica estanca con pasacables con prensaestopa IP65, cumpliendo la reglamentación electrotécnica AEA / IEC 60529.
+          </p>
+        </div>
+
+        <div class="blueprint-card">
+          <h3 style="font-size:1.05rem; font-weight:700; color:var(--accent-rose);">4. Justificación Técnica del Reemplazo del Motor</h3>
+          <p style="font-size:0.85rem; color:#cbd5e1; line-height:1.6;">
+            El motor de CD/DVD descartado carece de potencia y par torsor ($\tau < 2 \text{ mN}\cdot\text{m}$). El agua opone resistencia hidrodinámica que exige un par superior a $1.5 \text{ kg}\cdot\text{cm}$ a bajas vueltas.
+            <br><br>
+            El empleo de un motorreductor DC de 12V con engranajes metálicos a 30-60 RPM responde a los principios de floculación química de Camp-Stein (gradiente de velocidad $G = 20 \text{ a } 50 \text{ s}^{-1}$), garantizando la integridad de los flóculos antes de ingresar a la ultrafiltración.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    Proyecto de Tesis de Ingeniería Industrial — Estructura y Módulos de Ultrafiltración &copy; 2026
+  </footer>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // Global 3D & State Variables
+    let scene, camera, renderer, controls;
+    let groupMod1, groupMod2, groupMod3, hosesGroup;
+    let isExploded = false;
+    let wireframeMode = false;
+    let showHoses = true;
+
+    // Tab Switching Logic
+    function switchMainTab(tabId, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+      if (btn) {
+        btn.classList.add('active');
+      }
+      const target = document.getElementById('tab-' + tabId);
+      if (target) {
+        target.classList.add('active');
+      }
+
+      if (tabId === '3d-view' && renderer) {
+        setTimeout(onWindowResize, 50);
+      }
+    }
+
+    // Module Inspector Data
+    const moduleData = {
+      1: {
+        title: "Módulo 1: Sedimentador / Coagulador",
+        status: "Existente con Modificaciones Críticas",
+        specs: [
+          { label: "Altura Cuerpo", val: "430 mm (43 cm)" },
+          { label: "Longitud Vástago", val: "320 mm (Ø 4 mm)" },
+          { label: "Toma Salida Clarificado", val: "h = 50 mm sobre base" },
+          { label: "Patas Soporte Medidas", val: "34 / 30 / 29.5 / 33 cm" },
+          { label: "Material Tanque", val: "Acero Inox AISI 304" },
+          { label: "Agitador Motor", val: "Motorreductor 12V (30-60 RPM)" }
+        ],
+        alerts: [
+          { type: "critical", title: "¡ALERTA CRÍTICA: MOTOR DE CD DESCARTADO!", desc: "El motor de disquetera/CD no tiene torque suficiente para mover fluidos viscosos con sólidos. Se quema en segundos. Usar motorreductor metálico 12V." },
+          { type: "warning", title: "Nivelación de Patas Obligatoria", desc: "La diferencia de 4-5 cm entre patas inclina el cono e impide la purga simétrica de lodos. Se deben soldar tuercas M10 e instalar regatones regulables." },
+          { type: "success", title: "Solución para el Extremo Roscado del Eje", desc: "No es necesario cortar la rosca del vástago. Se usa un acople elástico mandíbula de aluminio que ajusta por prisionero o tuerca tope." }
+        ]
+      },
+      2: {
+        title: "Módulo 2: Caja de Filtración (Tipo Maletín)",
+        status: "Fabricación Nueva a Medida",
+        specs: [
+          { label: "Dimensiones Exteriores", val: "450 × 450 × 450 mm" },
+          { label: "Estructura Bastidor", val: "Tubo cuadrado 20×20×1.2 mm" },
+          { label: "Laterales (3 caras)", val: "Chapa perforada SAE 1010 N°18" },
+          { label: "Frente", val: "Puerta batiente c/ visor acrílico" },
+          { label: "Base y Techo", val: "Chapa maciza N°16 y N°18" },
+          { label: "Manija Superior", val: "Tipo baúl reforzada con planchuela" }
+        ],
+        alerts: [
+          { type: "warning", title: "Segregación Eléctrico / Hidráulica", desc: "Montar el ESP32 y drivers en una caja estanca plástica IP65 sobre la chapa perforada para evitar cortocircuitos por salpicaduras." },
+          { type: "success", title: "Diseño para Mantenimiento (DFM)", desc: "La puerta frontal y las caras perforadas permiten cambiar cartuchos de prefiltro y mangueras de la bomba peristáltica sin desmontar el chasis." }
+        ]
+      },
+      3: {
+        title: "Módulo 3: Carro de Permeado y Soporte",
+        status: "Fabricación Nueva a Medida",
+        specs: [
+          { label: "Altura Libre Columnas", val: "700 mm (70 cm)" },
+          { label: "Ancho Frontal", val: "400 mm (40 cm)" },
+          { label: "Profundidad Base", val: "450 mm (coincide con Caja)" },
+          { label: "Tanque Almacenamiento", val: "Bidón PEAD 20-25 Litros" },
+          { label: "Ruedas de Traslado", val: "4 × Ø50 mm (2 c/ doble freno)" },
+          { label: "Fijación Superior", val: "2 Brazos c/ tuercas mariposa M8" }
+        ],
+        alerts: [
+          { type: "success", title: "Centro de Gravedad Estable", desc: "El bidón de 25 kg en la base inferior otorga máxima estabilidad antivuelco al conjunto rodante." },
+          { type: "success", title: "Encastre Rápido (Quick-Release)", desc: "La caja de filtro apoya sobre los brazos superiores y se sujeta con 4 perillas M8, permitiendo retirarla en segundos para transporte o taller." }
+        ]
+      }
+    };
+
+    function selectModule(modNum) {
+      document.querySelectorAll('.module-tab-btn').forEach(b => b.classList.remove('selected'));
+      const activeBtn = document.getElementById('tab-btn-mod' + modNum);
+      if (activeBtn) activeBtn.classList.add('selected');
+
+      const data = moduleData[modNum];
+      const container = document.getElementById('inspector-content-body');
+      
+      let html = `
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem;">
+            <h4 style="font-size:1.05rem; font-weight:700; color:var(--accent-blue);">${data.title}</h4>
+          </div>
+          <span class="badge-thesis" style="font-size:0.65rem;">${data.status}</span>
+        </div>
+
+        <div class="tech-spec-grid">
+          ${data.specs.map(s => `
+            <div class="spec-item">
+              <div class="spec-label">${s.label}</div>
+              <div class="spec-value">${s.val}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:0.6rem;">
+          ${data.alerts.map(a => `
+            <div class="alert-box alert-${a.type}">
+              <strong style="display:block; margin-bottom:0.2rem;">${a.title}</strong>
+              ${a.desc}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      container.innerHTML = html;
+
+      // Highlight in 3D scene if available
+      highlight3DModule(modNum);
+    }
+
+    function initThree() {
+      const container = document.getElementById('three-canvas');
+      const width = container.clientWidth || 800;
+      const height = container.clientHeight || 600;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a101f);
+      scene.fog = new THREE.FogExp2(0x0a101f, 0.0008);
+
+      camera = new THREE.PerspectiveCamera(40, width / height, 1, 5000);
+      camera.position.set(1600, 1300, 1700);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(-100, 480, 0);
+
+      // Grid Floor
+      const gridHelper = new THREE.GridHelper(2400, 48, 0x38bdf8, 0x334155);
+      gridHelper.position.y = 0;
+      scene.add(gridHelper);
+
+      // Enhanced Lighting System
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+      scene.add(ambientLight);
+
+      const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 0.65);
+      scene.add(hemiLight);
+
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.1);
+      dirLight1.position.set(1000, 2200, 1200);
+      dirLight1.castShadow = true;
+      scene.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.65);
+      dirLight2.position.set(-1000, 800, -1000);
+      scene.add(dirLight2);
+
+      // Build 3D Models
+      buildModels();
+
+      window.addEventListener('resize', onWindowResize, false);
+      animate();
+    }
+
+    function buildModels() {
+      // Materials
+      const steelMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.8, roughness: 0.25 });
+      const darkFrameMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.45, metalness: 0.35 });
+      const blueMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.5, roughness: 0.35 });
+      const yellowMotorMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.25 });
+      const plasticWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
+      const perfSheetMat = new THREE.MeshStandardMaterial({ color: 0x475569, wireframe: true });
+      const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2, roughness: 0.1 });
+
+      // ==========================================
+      // GROUP 1: SEDIMENTADOR (Sitting on the side, X = -450)
+      // ==========================================
+      groupMod1 = new THREE.Group();
+      groupMod1.position.set(-500, 0, 0);
+
+      // Stand Legs (4 legs, height approx 320 mm)
+      const legGeom = new THREE.CylinderGeometry(10, 10, 320, 8);
+      const legMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.6 });
+
+      const legPositions = [
+        { x: 120, z: 120, rotZ: -0.15, rotX: 0.15 },
+        { x: -120, z: 120, rotZ: 0.15, rotX: 0.15 },
+        { x: 120, z: -120, rotZ: -0.15, rotX: -0.15 },
+        { x: -120, z: -120, rotZ: 0.15, rotX: -0.15 }
+      ];
+
+      legPositions.forEach(pos => {
+        const leg = new THREE.Mesh(legGeom, legMat);
+        leg.position.set(pos.x, 160, pos.z);
+        leg.rotation.z = pos.rotZ;
+        leg.rotation.x = pos.rotX;
+        groupMod1.add(leg);
+
+        // Leveling foot (M10)
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(18, 18, 12, 16), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
+        foot.position.set(pos.x * 1.35, 6, pos.z * 1.35);
+        groupMod1.add(foot);
+      });
+
+      // Tank Support Rings
+      const ringGeom = new THREE.TorusGeometry(150, 8, 8, 32);
+      const ring = new THREE.Mesh(ringGeom, legMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = 300;
+      groupMod1.add(ring);
+
+      // Tank Cone Bottom (Apex down at Y = 280, Base at Y = 370)
+      const coneGeom = new THREE.ConeGeometry(150, 120, 32, 1, true);
+      const cone = new THREE.Mesh(coneGeom, steelMat);
+      cone.rotation.x = Math.PI;
+      cone.position.y = 330;
+      groupMod1.add(cone);
+
+      // Drain Valve
+      const valve = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 45, 12), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
+      valve.position.y = 250;
+      groupMod1.add(valve);
+
+      // Tank Cylinder Body (H = 310, Y from 370 to 680)
+      const cylGeom = new THREE.CylinderGeometry(150, 150, 310, 32);
+      const tankCyl = new THREE.Mesh(cylGeom, steelMat);
+      tankCyl.position.y = 525;
+      groupMod1.add(tankCyl);
+
+      // Tank Lid (Y = 685)
+      const lidGeom = new THREE.CylinderGeometry(155, 155, 10, 32);
+      const lid = new THREE.Mesh(lidGeom, steelMat);
+      lid.position.y = 685;
+      groupMod1.add(lid);
+
+      // Elevated Motor Mount Bridge on Lid
+      const bridgeGeom = new THREE.BoxGeometry(100, 45, 30);
+      const bridge = new THREE.Mesh(bridgeGeom, new THREE.MeshStandardMaterial({ color: 0x334155 }));
+      bridge.position.set(0, 715, 0);
+      groupMod1.add(bridge);
+
+      // Geared Motor on Top
+      const motorGeom = new THREE.CylinderGeometry(20, 20, 50, 16);
+      const motor = new THREE.Mesh(motorGeom, yellowMotorMat);
+      motor.position.set(0, 755, 0);
+      groupMod1.add(motor);
+
+      // Agitator Shaft (32 cm = 320 mm)
+      const shaftGeom = new THREE.CylinderGeometry(3, 3, 320, 12);
+      const shaft = new THREE.Mesh(shaftGeom, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9 }));
+      shaft.position.set(0, 530, 0);
+      groupMod1.add(shaft);
+
+      // Impeller Fan Blades at Y = 390
+      const bladeGeom = new THREE.BoxGeometry(160, 4, 30);
+      const blades = new THREE.Mesh(bladeGeom, steelMat);
+      blades.position.set(0, 390, 0);
+      groupMod1.add(blades);
+
+      scene.add(groupMod1);
+
+      // ==========================================
+      // GROUP 3: CARRO DE PERMEADO (Y = 0 to 700, at X = 150)
+      // ==========================================
+      groupMod3 = new THREE.Group();
+      groupMod3.position.set(150, 0, 0);
+
+      // 4 Wheels (Ø50 mm)
+      const wheelGeom = new THREE.CylinderGeometry(25, 25, 16, 16);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8 });
+      const wheelPos = [
+        { x: 160, z: 180 }, { x: -160, z: 180 },
+        { x: 160, z: -180 }, { x: -160, z: -180 }
+      ];
+      wheelPos.forEach(p => {
+        const w = new THREE.Mesh(wheelGeom, wheelMat);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(p.x, 25, p.z);
+        groupMod3.add(w);
+      });
+
+      // Bottom Drip Pan (400 mm W x 450 mm D)
+      const trayGeom = new THREE.BoxGeometry(400, 16, 450);
+      const tray = new THREE.Mesh(trayGeom, darkFrameMat);
+      tray.position.set(0, 50, 0);
+      groupMod3.add(tray);
+
+      // Vertical Columns (H = 650 mm)
+      const colGeom = new THREE.BoxGeometry(20, 650, 20);
+      const col1 = new THREE.Mesh(colGeom, darkFrameMat);
+      col1.position.set(-180, 375, -200);
+      const col2 = new THREE.Mesh(colGeom, darkFrameMat);
+      col2.position.set(180, 375, -200);
+      groupMod3.add(col1);
+      groupMod3.add(col2);
+
+      // Solid Back Panel (400 x 600 mm)
+      const backPanelGeom = new THREE.BoxGeometry(380, 600, 4);
+      const backPanel = new THREE.Mesh(backPanelGeom, new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 }));
+      backPanel.position.set(0, 375, -205);
+      groupMod3.add(backPanel);
+
+      // Top Cantilever Arms (receiving the filter box)
+      const armGeom = new THREE.BoxGeometry(20, 20, 430);
+      const arm1 = new THREE.Mesh(armGeom, darkFrameMat);
+      arm1.position.set(-180, 700, 0);
+      const arm2 = new THREE.Mesh(armGeom, darkFrameMat);
+      arm2.position.set(180, 700, 0);
+      groupMod3.add(arm1);
+      groupMod3.add(arm2);
+
+      // HDPE Jerrycan Tank (25 Liters) sitting inside
+      const jerryGeom = new THREE.BoxGeometry(260, 420, 320);
+      const jerrycan = new THREE.Mesh(jerryGeom, plasticWhiteMat);
+      jerrycan.position.set(0, 270, 0);
+      groupMod3.add(jerrycan);
+
+      // Jerrycan Cap & Handle
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(25, 25, 20, 16), blueMat);
+      cap.position.set(80, 490, 80);
+      groupMod3.add(cap);
+
+      scene.add(groupMod3);
+
+      // ==========================================
+      // GROUP 2: CAJA DE FILTRACIÓN (450 x 450 x 450 mm)
+      // Sitting on top of carriage arms at Y = 710
+      // ==========================================
+      groupMod2 = new THREE.Group();
+      groupMod2.position.set(150, 710, 0);
+
+      // Cubic Wireframe / Tube Structure (450 mm)
+      const boxEdgesGeom = new THREE.BoxGeometry(450, 450, 450);
+      const boxEdges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(boxEdgesGeom),
+        new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 })
+      );
+      boxEdges.position.set(0, 225, 0);
+      groupMod2.add(boxEdges);
+
+      // Perforated sides (Left, Right, Back)
+      const sideGeom = new THREE.PlaneGeometry(440, 440);
+      const leftSide = new THREE.Mesh(sideGeom, perfSheetMat);
+      leftSide.rotation.y = Math.PI / 2;
+      leftSide.position.set(-220, 225, 0);
+      groupMod2.add(leftSide);
+
+      const rightSide = new THREE.Mesh(sideGeom, perfSheetMat);
+      rightSide.rotation.y = -Math.PI / 2;
+      rightSide.position.set(220, 225, 0);
+      groupMod2.add(rightSide);
+
+      const backSide = new THREE.Mesh(sideGeom, perfSheetMat);
+      backSide.position.set(0, 225, -220);
+      groupMod2.add(backSide);
+
+      // Solid Bottom Base
+      const basePlate = new THREE.Mesh(new THREE.BoxGeometry(445, 6, 445), darkFrameMat);
+      basePlate.position.set(0, 3, 0);
+      groupMod2.add(basePlate);
+
+      // Solid Top Roof
+      const roofPlate = new THREE.Mesh(new THREE.BoxGeometry(445, 6, 445), darkFrameMat);
+      roofPlate.position.set(0, 447, 0);
+      groupMod2.add(roofPlate);
+
+      // Top Trunk Handle
+      const handleGeom = new THREE.BoxGeometry(140, 18, 25);
+      const handle = new THREE.Mesh(handleGeom, steelMat);
+      handle.position.set(0, 465, 0);
+      groupMod2.add(handle);
+
+      // Front Acrylic Transparent Door
+      const frontDoor = new THREE.Mesh(new THREE.PlaneGeometry(440, 440), glassMat);
+      frontDoor.position.set(0, 225, 222);
+      groupMod2.add(frontDoor);
+
+      // Internal Components:
+      // 1. Peristaltic Pump (Left side)
+      const pumpBody = new THREE.Mesh(new THREE.BoxGeometry(80, 100, 100), darkFrameMat);
+      pumpBody.position.set(-140, 120, 80);
+      const pumpHead = new THREE.Mesh(new THREE.CylinderGeometry(35, 35, 30, 16), blueMat);
+      pumpHead.rotation.x = Math.PI / 2;
+      pumpHead.position.set(-140, 120, 140);
+      groupMod2.add(pumpBody);
+      groupMod2.add(pumpHead);
+
+      // 2. IP65 Sealed Electrical Box (Left Top)
+      const ip65Box = new THREE.Mesh(new THREE.BoxGeometry(70, 120, 150), new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.4 }));
+      ip65Box.position.set(-140, 320, 0);
+      groupMod2.add(ip65Box);
+
+      // 3. Pre-filter Cartridge (Back/Center)
+      const preFilter = new THREE.Mesh(new THREE.CylinderGeometry(30, 30, 200, 16), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+      preFilter.position.set(0, 200, -120);
+      groupMod2.add(preFilter);
+
+      // 4. UF Membrane Module (Back/Right)
+      const ufVessel = new THREE.Mesh(new THREE.CylinderGeometry(35, 35, 300, 16), new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.3 }));
+      ufVessel.position.set(100, 220, -120);
+      groupMod2.add(ufVessel);
+
+      // 5. Power Supply (Right side)
+      const powerSupply = new THREE.Mesh(new THREE.BoxGeometry(50, 140, 80), new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.7 }));
+      powerSupply.position.set(150, 140, 80);
+      groupMod2.add(powerSupply);
+
+      scene.add(groupMod2);
+
+      // ==========================================
+      // HOSES INTERCONNECTION GROUP
+      // ==========================================
+      hosesGroup = new THREE.Group();
+
+      // Hose 1: Sedimenter lateral (h=5cm above cone) to Peristaltic Pump
+      const curve1 = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-350, 380, 0),
+        new THREE.Vector3(-250, 480, 80),
+        new THREE.Vector3(-50, 750, 140),
+        new THREE.Vector3(10, 830, 140)
+      ]);
+      const hose1 = new THREE.Mesh(new THREE.TubeGeometry(curve1, 32, 7, 8, false), new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 }));
+      hosesGroup.add(hose1);
+
+      // Hose 2: UF Membrane Permeate port down into HDPE tank
+      const curve2 = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(250, 930, -120),
+        new THREE.Vector3(260, 750, 0),
+        new THREE.Vector3(230, 500, 80)
+      ]);
+      const hose2 = new THREE.Mesh(new THREE.TubeGeometry(curve2, 32, 6, 8, false), new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.2 }));
+      hosesGroup.add(hose2);
+
+      scene.add(hosesGroup);
+    }
+
+    function toggleExplodedView() {
+      if (!groupMod1 || !groupMod2 || !groupMod3) return;
+      isExploded = !isExploded;
+      const btn = document.getElementById('btn-explode');
+      if (btn) btn.innerText = isExploded ? "Vista Ensamblada" : "Despiece / Ensamblado";
+
+      const targetMod1X = isExploded ? -800 : -500;
+      const targetMod2Y = isExploded ? 1050 : 710;
+      const targetMod3Y = isExploded ? -100 : 0;
+
+      animateProperty(groupMod1.position, 'x', targetMod1X, 500);
+      animateProperty(groupMod2.position, 'y', targetMod2Y, 500);
+      animateProperty(groupMod3.position, 'y', targetMod3Y, 500);
+    }
+
+    function toggleWireframe() {
+      wireframeMode = !wireframeMode;
+      document.getElementById('btn-wireframe').classList.toggle('active-view', wireframeMode);
+      scene.traverse(child => {
+        if (child.isMesh && child.material) {
+          child.material.wireframe = wireframeMode;
+        }
+      });
+    }
+
+    function toggleHoses() {
+      showHoses = !showHoses;
+      document.getElementById('btn-hoses').classList.toggle('active-view', !showHoses);
+      hosesGroup.visible = showHoses;
+    }
+
+    function resetCamera() {
+      setCameraPos(1300, 1100, 1500, 0, 500, 0);
+    }
+
+    function setPresetView(view) {
+      if (view === 'front') {
+        setCameraPos(0, 600, 2200, 0, 600, 0);
+      } else if (view === 'side') {
+        setCameraPos(2200, 600, 0, 0, 600, 0);
+      } else if (view === 'top') {
+        setCameraPos(0, 2400, 100, 0, 500, 0);
+      }
+    }
+
+    function setCameraPos(x, y, z, tx, ty, tz) {
+      animateProperty(camera.position, 'x', x, 600);
+      animateProperty(camera.position, 'y', y, 600);
+      animateProperty(camera.position, 'z', z, 600);
+      controls.target.set(tx, ty, tz);
+    }
+
+    function animateProperty(obj, prop, targetVal, duration) {
+      const startVal = obj[prop];
+      const startTime = performance.now();
+
+      function update(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 0.5 - Math.cos(progress * Math.PI) / 2; // Ease in out
+        obj[prop] = startVal + (targetVal - startVal) * ease;
+        if (progress < 1) {
+          requestAnimationFrame(update);
+        }
+      }
+      requestAnimationFrame(update);
+    }
+
+    function highlight3DModule(modNum) {
+      // Gentle pulse / focus animation
+      if (!groupMod1 || !groupMod2 || !groupMod3) return;
+      if (modNum === 1) {
+        controls.target.set(-500, 450, 0);
+      } else if (modNum === 2) {
+        controls.target.set(150, 930, 0);
+      } else if (modNum === 3) {
+        controls.target.set(150, 350, 0);
+      }
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('three-canvas');
+      if (!container || !renderer) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Launch Three.js on load
+    window.addEventListener('DOMContentLoaded', () => {
+      initThree();
+      selectModule(1);
+    });
+  </script>
+</body>
+</html>
