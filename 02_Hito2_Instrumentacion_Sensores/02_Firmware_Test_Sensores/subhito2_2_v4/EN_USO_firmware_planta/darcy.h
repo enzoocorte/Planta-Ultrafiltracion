@@ -14,7 +14,7 @@ struct ResultadoDarcy {
   float mu_Pas;      // Viscosidad dinámica del agua a temperatura T [Pa · s]
   float TCF;         // Factor de corrección por temperatura (mu(T) / mu_20)
   float R_total;     // Resistencia hidráulica total [m^-1]
-  float R_torta;     // Resistencia por capa de torta / ensuciamiento [m^-1]
+  float R_adicional; // Resistencia hidráulica adicional aparente (torta + polarización) [m^-1]
   float TMP_bar;     // Presión transmembrana efectiva [bar]
   bool  valido;      // Estado de cálculo válido
 };
@@ -25,11 +25,12 @@ public:
 
   // Viscosidad dinámica del agua mediante ecuación de Vogel (válida 5 a 60 °C)
   static float viscosidadAgua(float temp_C) {
-    const float T_K = temp_C + 273.15f;
+    float t_segura = constrain(temp_C, 5.0f, 60.0f);
+    const float T_K = t_segura + 273.15f;
     return 2.414e-5f * powf(10.0f, 247.8f / (T_K - 140.0f));
   }
 
-  void  setRm(float rm) { if (rm > 1e11f && rm < 1e16f) _Rm = rm; }
+  void  setRm(float rm) { if (std::isfinite(rm) && rm > 1e11f && rm < 1e16f) _Rm = rm; }
   float Rm() const      { return _Rm; }
 
   // Cálculo hidráulico en tiempo real
@@ -42,8 +43,9 @@ public:
       return r;
     }
 
+    float t_val = constrain(temp_C, 5.0f, 60.0f);
     r.TMP_bar = tmp_bar;
-    r.mu_Pas  = viscosidadAgua(temp_C);
+    r.mu_Pas  = viscosidadAgua(t_val);
     r.TCF     = r.mu_Pas / MU20;
 
     // J [LMH] = Q [L/h] / Area [m²] = (qPerm [mL/min] * 0.06) / 2.2 m²
@@ -55,9 +57,11 @@ public:
     const float TMP_Pa = tmp_bar * 100000.0f;
 
     // Ley de Darcy: J = TMP / (mu * R_total) => R_total = TMP / (mu * J)
-    r.R_total = TMP_Pa / (r.mu_Pas * J_SI);
-    r.R_torta = r.R_total - _Rm;
-    r.valido  = true;
+    if (J_SI > 1e-12f && r.mu_Pas > 1e-6f) {
+      r.R_total     = TMP_Pa / (r.mu_Pas * J_SI);
+      r.R_adicional = r.R_total - _Rm;
+      r.valido      = std::isfinite(r.R_total) && std::isfinite(r.R_adicional);
+    }
 
     return r;
   }

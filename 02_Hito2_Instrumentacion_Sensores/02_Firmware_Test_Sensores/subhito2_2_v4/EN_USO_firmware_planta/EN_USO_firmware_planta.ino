@@ -23,9 +23,10 @@ constexpr uint16_t DNS_PORT = 53;
 // ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y GESTIÓN DE ENSAYOS
 // ------------------------------------------------------------------------------
 struct RegistroCalibracion {
-  uint8_t  id_ensayo;
+  uint16_t id_ensayo;      // 16 bits: previene desbordamiento
   uint32_t t_relativo_s;
   float    rpm;
+  bool     en_regimen;     // Distingue régimen permanente vs transitorio dinámico de rampa
   float    q_bomba;
   float    f_alim;
   float    q_alim;
@@ -39,10 +40,11 @@ struct RegistroCalibracion {
   float    k_alim;
   float    k_perm;
   float    j_lmh;
+  float    tmp_bar;        // Preparado para integración Subhito 2.3
 };
 
 struct EnsayoInfo {
-  uint8_t  id;
+  uint16_t id;
   float    rpm_consigna;
   uint32_t t_inicio_ms;
   uint32_t duracion_s;
@@ -51,13 +53,14 @@ struct EnsayoInfo {
   float    vol_perm;
 };
 
-// Buffers de almacenamiento en RAM
+// Buffers de almacenamiento en RAM con Buffer Circular (Cero desplazamiento de memoria / O(1))
 RegistroCalibracion bufferLog[MAX_REGISTROS];
-size_t numRegistros = 0;
+size_t bufferHead = 0;   // Índice circular de inserción
+size_t bufferCount = 0;  // Cantidad de muestras almacenadas (0 .. MAX_REGISTROS)
 
 EnsayoInfo listaEnsayos[MAX_ENSAYOS];
 size_t numEnsayos = 0;
-uint8_t ensayoActualId = 1;
+uint16_t ensayoActualId = 1;
 
 // Variables de estado del ensayo actual
 uint32_t tInicioEnsayo_ms = 0;
@@ -122,6 +125,7 @@ void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
 
 // ------------------------------------------------------------------------------
 // FUNCIÓN PARA GUARDAR MUESTRA EN EL DATALOGGER (CADA 10 SEGUNDOS)
+// Inserción en Buffer Circular Indexado (O(1) - Cero fragmentación / Cero copia)
 // ------------------------------------------------------------------------------
 void guardarMuestraDatalogger() {
   if (tInicioEnsayo_ms == 0) {
@@ -130,18 +134,11 @@ void guardarMuestraDatalogger() {
 
   uint32_t t_rel_s = (millis() - tInicioEnsayo_ms) / 1000;
 
-  // Desplazamiento FIFO circular si el buffer se llena
-  if (numRegistros >= MAX_REGISTROS) {
-    for (size_t i = 0; i < MAX_REGISTROS - 1; i++) {
-      bufferLog[i] = bufferLog[i + 1];
-    }
-    numRegistros = MAX_REGISTROS - 1;
-  }
-
   RegistroCalibracion reg;
   reg.id_ensayo    = ensayoActualId;
   reg.t_relativo_s = t_rel_s;
   reg.rpm          = bomba.rpmActual();
+  reg.en_regimen   = bomba.enRegimenEstable(); // Filtro clave para análisis experimental
   reg.q_bomba      = bomba.caudalTeorico_mLmin();
   reg.f_alim       = sensorAlimentacion.frecuencia_Hz();
   reg.q_alim       = sensorAlimentacion.caudal_mLmin();
@@ -155,11 +152,19 @@ void guardarMuestraDatalogger() {
   reg.k_alim       = sensorAlimentacion.getK();
   reg.k_perm       = sensorPermeado.getK();
   reg.j_lmh        = (reg.q_perm * 0.06f) / AREA_MEMBRANA_M2;
+  reg.tmp_bar      = resultadoDarcy.valido ? resultadoDarcy.TMP_bar : 0.0f;
 
-  bufferLog[numRegistros++] = reg;
+  // Inserción O(1) en Buffer Circular Indexado
+  bufferLog[bufferHead] = reg;
+  bufferHead = (bufferHead + 1) % MAX_REGISTROS;
+  if (bufferCount < MAX_REGISTROS) {
+    bufferCount++;
+  }
 
-  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f mL/min | Q_Perm=%.1f mL/min | J=%.2f LMH | Y=%.1f%%\n",
-                (unsigned int)numRegistros, ensayoActualId, t_rel_s, reg.rpm, reg.q_alim, reg.q_perm, reg.j_lmh, reg.recov);
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | %s | Q_Alim=%.1f mL/min | Q_Perm=%.1f mL/min | J=%.2f LMH | Y=%.1f%%\n",
+                (unsigned int)bufferCount, ensayoActualId, t_rel_s, reg.rpm,
+                reg.en_regimen ? "ESTABLE" : "RAMPA",
+                reg.q_alim, reg.q_perm, reg.j_lmh, reg.recov);
 }
 
 // ------------------------------------------------------------------------------
@@ -168,17 +173,25 @@ void guardarMuestraDatalogger() {
 void finalizarEnsayoActual() {
   uint32_t duracion_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
   uint16_t muestrasEnsayo = 0;
-  for (size_t i = 0; i < numRegistros; i++) {
+  for (size_t i = 0; i < bufferCount; i++) {
     if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
   }
 
-  // Si no hubo muestras registradas en este ensayo, registrar una de cierre
-  if (muestrasEnsayo == 0) {
+  // Si no hubo muestras registradas en este ensayo pero duró más de 5s, registrar una de cierre
+  if (muestrasEnsayo == 0 && duracion_s >= 5) {
     guardarMuestraDatalogger();
     muestrasEnsayo = 1;
   }
 
-  if (numEnsayos < MAX_ENSAYOS) {
+  if (muestrasEnsayo > 0) {
+    // Si la lista de resúmenes de ensayos está llena, rotar el más antiguo (FIFO)
+    if (numEnsayos >= MAX_ENSAYOS) {
+      for (size_t i = 0; i < MAX_ENSAYOS - 1; i++) {
+        listaEnsayos[i] = listaEnsayos[i + 1];
+      }
+      numEnsayos = MAX_ENSAYOS - 1;
+    }
+
     listaEnsayos[numEnsayos].id           = ensayoActualId;
     listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
     listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;
@@ -195,7 +208,7 @@ void finalizarEnsayoActual() {
 
 void iniciarNuevoEnsayo(float consignaRpm) {
   uint16_t muestrasPrevias = 0;
-  for (size_t i = 0; i < numRegistros; i++) {
+  for (size_t i = 0; i < bufferCount; i++) {
     if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
   }
   if (muestrasPrevias > 0) {
@@ -225,12 +238,13 @@ void handleStatus() {
   float qPerm = sensorPermeado.caudal_mLmin();
   jLMH_actual = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
-  char buf[768];
+  char buf[800];
   int n = snprintf(buf, sizeof(buf),
     "{"
-    "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,"
+    "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
     "\"ip\":\"%s\",\"alim_ok\":%s,\"perm_ok\":%s,\"f_alim\":%.2f,\"q_alim\":%.1f,\"vol_alim\":%.4f,"
     "\"f_perm\":%.2f,\"q_perm\":%.1f,\"vol_perm\":%.4f,\"q_ret\":%.1f,\"recov\":%.2f,"
+    "\"pulsos_alim\":%lu,\"pulsos_perm\":%lu,"
     "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
     "\"k_alim\":%.2f,\"k_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
     "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
@@ -242,23 +256,25 @@ void handleStatus() {
     bomba.invirtiendo() ? "true" : "false",
     bomba.sentidoHorario() ? "true" : "false",
     bomba.enRegimenEstable() ? "true" : "false",
+    bomba.enEmergencia() ? "true" : "false",
     WiFi.softAPIP().toString().c_str(),
     !sensorAlimentacion.sinSenal() ? "true" : "false",
     !sensorPermeado.sinSenal() ? "true" : "false",
     sensorAlimentacion.frecuencia_Hz(), qAlim, sensorAlimentacion.volumen_L(),
     sensorPermeado.frecuencia_Hz(), qPerm, sensorPermeado.volumen_L(),
     qRet_mLmin, recuperacion,
+    (unsigned long)sensorAlimentacion.pulsosBrutos(), (unsigned long)sensorPermeado.pulsosBrutos(),
     bomba.caudalTeorico_mLmin(), deltaBomba, jLMH_actual, flagCruceSensores ? "true" : "false",
     sensorAlimentacion.getK(), sensorPermeado.getK(),
     bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
     autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
-    (unsigned)numRegistros, (unsigned)ensayoActualId, (unsigned long)t_act_s,
+    (unsigned)bufferCount, (unsigned)ensayoActualId, (unsigned long)t_act_s,
     ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
   );
 
   if (n >= (int)sizeof(buf)) {
     n = sizeof(buf) - 1;
-    Serial.println("⚠️ [WARN] handleStatus buf[768] truncado");
+    Serial.println("⚠️ [WARN] handleStatus buf truncado");
   }
 
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -297,11 +313,17 @@ void handleCmd() {
       autoCalibrando = false;
       autoCalMensaje = "Auto-calibracion cancelada al apagar bomba.";
     }
+  } else if (act == "EMERGENCY") {
+    bomba.paradaEmergencia();
+  } else if (act == "REARM") {
+    bomba.rearmarEmergencia();
   } else if (act == "DIR") {
     bomba.toggleSentido();
   } else if (act == "RESET_VOL") {
     sensorAlimentacion.resetVolumen();
     sensorPermeado.resetVolumen();
+    volAlimInicioEnsayo = 0.0f;
+    volPermInicioEnsayo = 0.0f;
   }
   server.send(200, "text/plain", "OK");
 }
@@ -309,25 +331,32 @@ void handleCmd() {
 void handleSetRPM() {
   if (server.hasArg("rpm")) {
     float nuevoRpm = server.arg("rpm").toFloat();
+    if (!std::isfinite(nuevoRpm) || nuevoRpm < RPM_MIN || nuevoRpm > RPM_MAX) {
+      server.send(400, "text/plain", "ERROR: RPM fuera de rango o invalido");
+      return;
+    }
+
     float rpmActualConsigna = bomba.rpmObjetivo();
 
-    // Si la bomba está en marcha y el usuario cambia consigna en >= 1 RPM:
-    // Segmentar automáticamente: cerrar ensayo previo y arrancar nuevo ensayo en t = 0s
-    if (bomba.enMarcha() && fabs(nuevoRpm - rpmActualConsigna) >= 1.0f) {
-      finalizarEnsayoActual();
-      if (bomba.setRPM(nuevoRpm)) {
-        iniciarNuevoEnsayo(nuevoRpm);
-        server.send(200, "text/plain", "OK");
-      } else {
-        server.send(400, "text/plain", "ERROR: RPM fuera de rango");
+    // Protección anti-saturación de ensayos (Auditoría Ronda 5):
+    // Solo segmentamos si el cambio es sustancial (>= 1.5 RPM) Y el ensayo actual ya tuvo
+    // tiempo de registrar datos (> 5 segundos). Si el operador cambia antes, solo ajusta la consigna.
+    if (bomba.enMarcha() && fabsf(nuevoRpm - rpmActualConsigna) >= 1.5f) {
+      uint32_t duracionActual = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+      if (duracionActual >= 5) {
+        finalizarEnsayoActual();
+        if (bomba.setRPM(nuevoRpm)) {
+          iniciarNuevoEnsayo(nuevoRpm);
+          server.send(200, "text/plain", "OK");
+          return;
+        }
       }
-      return;
     }
 
     if (bomba.setRPM(nuevoRpm)) {
       server.send(200, "text/plain", "OK");
     } else {
-      server.send(400, "text/plain", "ERROR: RPM fuera de rango o invalido");
+      server.send(400, "text/plain", "ERROR al ajustar RPM");
     }
   } else {
     server.send(400, "text/plain", "Falta argumento rpm");
@@ -458,21 +487,23 @@ void handleExportCSV() {
   server.sendHeader("Connection", "close");
   server.send(200, "text/csv; charset=UTF-8", "");
   
-  // Encabezado CSV
+  // Encabezado CSV con columna Estable_1_0 para filtrado riguroso en análisis de datos
   server.sendContent("sep=;\n"
                      "PLANTA DE ULTRAFILTRACION FX100 - REGISTRO DE ENSAYOS Y CALIBRACION\n"
-                     "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Q_Bomba_Teorico_mLmin;Frec_Alimentacion_Hz;Q_Alimentacion_mLmin;Vol_Alimentacion_L;Frec_PERMEADO_Hz;Q_PERMEADO_mLmin;Vol_PERMEADO_L;Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Alim_Pct;K_Alim;K_Perm;J_LMH\n");
+                     "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Estable_1_0;Q_Bomba_Teorico_mLmin;Frec_Alimentacion_Hz;Q_Alimentacion_mLmin;Vol_Alimentacion_L;Frec_PERMEADO_Hz;Q_PERMEADO_mLmin;Vol_PERMEADO_L;Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Alim_Pct;K_Alim;K_Perm;J_LMH\n");
 
-  uint8_t filtroId = 0;
+  uint16_t filtroId = 0;
   if (targetEnsayo == "actual") {
     filtroId = ensayoActualId;
   } else if (targetEnsayo != "all") {
-    filtroId = (uint8_t)targetEnsayo.toInt();
+    filtroId = (uint16_t)targetEnsayo.toInt();
   }
 
-  char fila[200];
-  for (size_t i = 0; i < numRegistros; i++) {
-    const RegistroCalibracion& r = bufferLog[i];
+  char fila[256];
+  for (size_t i = 0; i < bufferCount; i++) {
+    // Lectura en orden cronológico dentro del buffer circular
+    size_t idx = (bufferHead + MAX_REGISTROS - bufferCount + i) % MAX_REGISTROS;
+    const RegistroCalibracion& r = bufferLog[idx];
     
     if (filtroId > 0 && r.id_ensayo != filtroId) {
       continue;
@@ -482,25 +513,33 @@ void handleExportCSV() {
     uint32_t secs = r.t_relativo_s % 60;
 
     int len = snprintf(fila, sizeof(fila),
-      "%u;%lu;%02u:%02u;%.1f;%.1f;%.2f;%.1f;%.4f;%.2f;%.1f;%.4f;%.1f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
-      r.id_ensayo, (unsigned long)r.t_relativo_s, mins, secs,
-      r.rpm, r.q_bomba, r.f_alim, r.q_alim, r.vol_alim,
+      "%u;%lu;%02lu:%02lu;%.1f;%d;%.1f;%.2f;%.1f;%.4f;%.2f;%.1f;%.4f;%.1f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+      (unsigned)r.id_ensayo, (unsigned long)r.t_relativo_s, (unsigned long)mins, (unsigned long)secs,
+      r.rpm, r.en_regimen ? 1 : 0, r.q_bomba, r.f_alim, r.q_alim, r.vol_alim,
       r.f_perm, r.q_perm, r.vol_perm, r.q_ret, r.recov,
       r.delta, r.k_alim, r.k_perm, r.j_lmh
     );
 
-    server.sendContent(fila, len);
-    if ((i & 31) == 0) yield();
+    if (len > 0 && (size_t)len < sizeof(fila)) {
+      server.sendContent(fila, len);
+    } else if (len >= (int)sizeof(fila)) {
+      server.sendContent(fila, sizeof(fila) - 1);
+    }
+
+    if ((i & 15) == 0) yield();
   }
 
   server.sendContent(""); // Cierra el streaming chunked
 }
 
 void handleClearCSV() {
-  numRegistros = 0;
+  bufferHead = 0;
+  bufferCount = 0;
   numEnsayos = 0;
   ensayoActualId = 1;
   tInicioEnsayo_ms = millis();
+  volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+  volPermInicioEnsayo = sensorPermeado.volumen_L();
   server.send(200, "text/plain", "LOGS_CLEARED");
 }
 
@@ -647,6 +686,9 @@ void loop() {
     recuperacion = (qAlim > 50.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
     jLMH_actual  = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
+    // Cálculo continuo del modelo de Darcy (TMP nominal 0.20 bar a 20°C hasta conectar transductores ADS1115)
+    resultadoDarcy = modeloDarcy.calcular(qPerm, 0.20f, 20.0f);
+
     float qBomba = bomba.caudalTeorico_mLmin();
     deltaBomba   = (qBomba > 1.0f) ? (((qAlim - qBomba) / qBomba) * 100.0f) : 0.0f;
 
@@ -670,8 +712,8 @@ void loop() {
             sensorAlimentacion.setK(nuevoKa);
             Serial.printf("[AUTO-CAL] K_Alim ajustado: %.2f Hz/(L/min)\n", nuevoKa);
           }
-          // NOTA METROLÓGICA (Auditoría Ronda 4): Permeado depende de Darcy y ensuciamiento,
-          // no de RPM de la bomba. NUNCA se auto-calibra con target ficticio. Se calibra con balanza gravimétrica.
+          // NOTA METROLÓGICA (Auditoría Ronda 4/5): Permeado depende de Darcy y ensuciamiento,
+          // no de RPM de la bomba. Se calibra con balanza gravimétrica independiente.
           float kpActual = sensorPermeado.getK();
 
           guardarParametrosNVS(sensorAlimentacion.getK(), kpActual,
@@ -686,9 +728,12 @@ void loop() {
       }
     }
 
-    // Telemetría periódica por Serial
-    Serial.printf("[TELEMETRIA] RPM: %4.1f | Q_Alim: %5.1f mL/min | Q_Perm: %5.1f mL/min | J: %4.2f LMH | Q_Ret: %5.1f mL/min | Y: %4.1f%% | V_Perm: %.3f L\n",
-                  bomba.rpmActual(), qAlim, qPerm, jLMH_actual, qRet_mLmin, recuperacion, sensorPermeado.volumen_L());
+    // Telemetría periódica por Serial (incluye pulsos brutos para auditoría de permeado seco)
+    Serial.printf("[TELEMETRIA] RPM: %4.1f | %s | Q_Alim: %5.1f mL/min (%lu pul) | Q_Perm: %5.1f mL/min (%lu pul) | J: %4.2f LMH | Y: %4.1f%% | V_Perm: %.3f L\n",
+                  bomba.rpmActual(), bomba.enRegimenEstable() ? "ESTABLE" : "RAMPA",
+                  qAlim, (unsigned long)sensorAlimentacion.pulsosBrutos(),
+                  qPerm, (unsigned long)sensorPermeado.pulsosBrutos(),
+                  jLMH_actual, recuperacion, sensorPermeado.volumen_L());
   }
 
   // 3. Muestreo del Datalogger cada 10 segundos (SOLO mientras la bomba está en marcha)

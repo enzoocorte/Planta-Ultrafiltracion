@@ -12,17 +12,22 @@
 // Driver DM860 en CÁTODO COMÚN: GPIO envía HIGH -> Optoacoplador ON
 constexpr uint8_t PIN_PUL                = 18;  // DM860 PUL+ (PUL- a GND común)
 constexpr uint8_t PIN_DIR                = 19;  // DM860 DIR+ (DIR- a GND común)
+constexpr uint8_t PIN_ENA                = 23;  // DM860 ENA+ (ENA- a GND: HIGH = Driver deshabilitado en parada de emergencia)
 constexpr uint8_t PIN_LED_BOMBA          = 2;   // LED Azul Onboard (indicador de marcha)
 
 // Caudalímetros de Efecto Hall YF-S401
 constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Sensor de Alimentación (Borne 12 Sup)
-constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup, Pull-up 4.7k a 3.3V)
+constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup, Pull-up externo a 3.3V)
+
+// Puertos I2C para ADS1115 (Subhito 2.3 - Transductores de Presión)
+constexpr uint8_t PIN_I2C_SDA             = 21;  // ESP32 SDA
+constexpr uint8_t PIN_I2C_SCL             = 22;  // ESP32 SCL
 
 // ------------------------------------------------------------------------------
 // 2. PARÁMETROS CINEMÁTICOS DE LA BOMBA (MOTOR NEMA 34 / DM860)
 // ------------------------------------------------------------------------------
 constexpr uint16_t PULSOS_POR_REV = 3200;     // DM860 configurado a 1/16 micropasos (3200 pulsos/rev)
-constexpr float ML_POR_VUELTA     = 13.6000f; // Calibrado: 680.0 mL/min / 50.0 RPM = 13.6000 mL/rev
+constexpr float ML_POR_VUELTA     = 13.6000f; // Calibrado nominal: 13.6000 mL/rev (~680 mL/min a 50 RPM)
 
 // Rango de Operación en RPM
 constexpr float RPM_MIN           = 15.0f;    // ~204 mL/min
@@ -37,14 +42,15 @@ constexpr float AREA_MEMBRANA_M2       = 2.2f;    // Superficie interfacial efec
 constexpr float K_UF_NOMINAL           = 73.0f;   // mL / (h * mmHg)
 constexpr float DIAMETRO_CAPILAR_UM    = 185.0f;  // Diámetro interno capilar (μm)
 constexpr float ESPESOR_PARED_UM       = 35.0f;   // Grosor de pared capilar (μm)
-constexpr float TMP_MAX_SEGURA_BAR     = 0.50f;   // Límite máximo admisible de TMP (bar)
+constexpr float TMP_MAX_SEGURA_BAR     = 0.50f;   // Límite máximo admisible de TMP (bar) - Disparo de interbloqueo
+constexpr float P1_MAX_SEGURA_BAR      = 0.60f;   // Límite máximo de presión en entrada de cartucho (bar)
 constexpr float Q_CLINICO_SANGRE_MAX   = 600.0f;  // mL/min (límite en hemodiálisis clínica)
 
-// Rampas: Arranque Suave Confiable (LEDC Seguro) y Frenado Rápido (< 1.5s)
+// Rampas de Aceleración y Frenado Conforme a Auditoría Ronda 5 (< 1.5s parada garantizada)
 constexpr float ACEL_ARRANQUE_RPM_S  = 2.0f;   // 2.0 RPM/s despegue inicial suave y confiable
 constexpr float ACEL_NOMINAL_RPM_S   = 3.5f;   // 3.5 RPM/s aceleración progresiva
 constexpr float DESACEL_AJUSTE_RPM_S = 8.0f;   // 8.0 RPM/s desaceleración en marcha
-constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al presionar STOP (~2.2s desde 100 RPM, <1.5s desde 65 RPM)
+constexpr float FRENADO_PARADA_RPM_S = 70.0f;  // 70.0 RPM/s frenado rápido garantizado (< 1.43s desde 100 RPM)
 
 // ------------------------------------------------------------------------------
 // 4. CALIBRACIÓN DE FÁBRICA DE CAUDALÍMETROS YF-S401

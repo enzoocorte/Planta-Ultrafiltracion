@@ -7,6 +7,8 @@
 
 void Bomba::begin() {
   pinMode(PIN_DIR, OUTPUT);
+  pinMode(PIN_ENA, OUTPUT);
+  digitalWrite(PIN_ENA, LOW); // ENA en LOW: Driver DM860 habilitado normalmente
   fijarSentido(true); // Sentido horario por defecto
 
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
@@ -20,7 +22,9 @@ void Bomba::begin() {
 }
 
 void Bomba::arrancar() {
+  if (_enEmergencia) return; // Bloqueado si hay alarma de sobrepresión/emergencia activa
   _enMarcha = true;
+  digitalWrite(PIN_ENA, LOW); // Asegura habilitación
   if (_objetivo < RPM_MIN) {
     _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
   }
@@ -34,8 +38,30 @@ void Bomba::detener() {
   }
 }
 
+void Bomba::paradaEmergencia() {
+  _enEmergencia = true;
+  _enMarcha = false;
+  _invirtiendo = false;
+  _actual = 0.0f;
+  _objetivo = 0.0f;
+  _fActual = 0;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+  ledcWrite(PIN_PUL, 0);
+#else
+  ledcWrite(0, 0);
+#endif
+  digitalWrite(PIN_ENA, HIGH); // Corte físico instantáneo en el DM860 (< 1 ms)
+}
+
+void Bomba::rearmarEmergencia() {
+  _enEmergencia = false;
+  digitalWrite(PIN_ENA, LOW);
+  _actual = 0.0f;
+  _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+}
+
 bool Bomba::setRPM(float rpm) {
-  if (!std::isfinite(rpm)) return false;
+  if (!std::isfinite(rpm) || _enEmergencia) return false;
   float r = constrain(rpm, RPM_MIN, RPM_MAX);
   if (_invirtiendo) {
     _rpmGuardada = r;   // Almacena consigna si el usuario mueve slider durante el frenado de inversión
@@ -47,7 +73,7 @@ bool Bomba::setRPM(float rpm) {
 }
 
 void Bomba::toggleSentido() {
-  if (_invirtiendo) return;
+  if (_invirtiendo || _enEmergencia) return;
   if (_actual < 1.0f) {
     fijarSentido(!_horario);
   } else {
@@ -63,6 +89,18 @@ void Bomba::fijarSentido(bool horario) {
 }
 
 void Bomba::tick(float dt) {
+  if (_enEmergencia) {
+    _actual = 0.0f;
+    _fActual = 0;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
+    digitalWrite(PIN_ENA, HIGH);
+    return;
+  }
+
   float objetivo = _enMarcha ? _objetivo : 0.0f;
 
   if (_actual < objetivo) {

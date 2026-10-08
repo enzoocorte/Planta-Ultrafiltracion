@@ -28,6 +28,7 @@ public:
   void  resetVolumen()         { _vol = 0.0f; }
   const char* nombre()   const { return _nombre; }
   bool  esAlimentacion() const { return _esAlimentacion; }
+  uint32_t pulsosBrutos()const { return _pulsosBrutos; } // Diagnóstico de ráfagas EMI para prueba en seco
 
   // Calibración dinámica sin recompilar [Hz / (L/min)]
   void  setK(float nuevoK)     { if (nuevoK > 0.1f) _k = nuevoK; }
@@ -44,13 +45,15 @@ private:
   volatile uint32_t _pulsos = 0;
   volatile uint32_t _t_ultimo = 0;
   volatile uint32_t _t_primero = 0;
-  volatile uint32_t _periodo_us = 0;
+  volatile uint32_t _dt_min_us = 0xFFFFFFFF;
+  volatile uint32_t _dt_max_us = 0;
 
-  float _f = 0.0f;
-  float _q = 0.0f;
-  float _vol = 0.0f;
-  float _tiempoSinPulso_s = 0.0f;
-  bool  _fallo = false;
+  float    _f = 0.0f;
+  float    _q = 0.0f;
+  float    _vol = 0.0f;
+  float    _tiempoSinPulso_s = 0.0f;
+  uint32_t _pulsosBrutos = 0;
+  bool     _fallo = false;
 
   portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED;
 };

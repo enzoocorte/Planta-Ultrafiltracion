@@ -15,6 +15,8 @@ public:
   void begin();
   void arrancar();
   void detener();
+  void paradaEmergencia();       // Corte instantáneo físico y enclavado (< 1 ms, sin rampa)
+  void rearmarEmergencia();      // Rearme manual tras condición segura
   bool setRPM(float rpm);
   void toggleSentido();
 
@@ -23,7 +25,8 @@ public:
   bool  enMarcha() const            { return _enMarcha; }
   bool  invirtiendo() const         { return _invirtiendo; }
   bool  sentidoHorario() const      { return _horario; }
-  bool  enRegimenEstable() const    { return (_enMarcha && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
+  bool  enEmergencia() const        { return _enEmergencia; }
+  bool  enRegimenEstable() const    { return (_enMarcha && !_enEmergencia && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
   float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
 
   void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
@@ -40,6 +43,7 @@ private:
   bool _enMarcha = false;
   bool _horario = true;
   bool _invirtiendo = false;
+  bool _enEmergencia = false;
 
   float _objetivo = RPM_INICIO;
   float _actual = 0.0f;

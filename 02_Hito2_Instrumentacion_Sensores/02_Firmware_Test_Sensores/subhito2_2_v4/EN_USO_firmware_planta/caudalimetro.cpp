@@ -12,60 +12,89 @@ void Caudalimetro::begin() {
 }
 
 void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
-  // Captura atómica de variables acumuladas por la ISR en la ventana transcurrida
+  // Captura atómica de variables acumuladas por la ISR en la ventana de 1 segundo
   portENTER_CRITICAL(&_mux);
-  uint32_t n      = _pulsos;
-  _pulsos         = 0;
-  uint32_t per_us = _periodo_us;
-  uint32_t t_prim = _t_primero;
-  uint32_t t_ult  = _t_ultimo;
+  uint32_t n       = _pulsos;
+  _pulsos          = 0;
+  uint32_t t_prim  = _t_primero;
+  uint32_t t_ult   = _t_ultimo;
+  uint32_t dt_min  = _dt_min_us;
+  uint32_t dt_max  = _dt_max_us;
+  _dt_min_us       = 0xFFFFFFFF;
+  _dt_max_us       = 0;
   portEXIT_CRITICAL(&_mux);
 
-  // 1. CÁLCULO DE FRECUENCIA CON MÉTODO DE PERÍODO RECÍPROCO DE ALTA RESOLUCIÓN:
-  // Exige al menos 2 pulsos continuos en la ventana de 1 segundo para validar rotación real.
-  // Un pulso único o aislado es descartado como ruido transitorio electromagnético.
-  if (n >= 2 && (t_ult - t_prim) > 0) {
-    _f = ((float)(n - 1) * 1000000.0f) / (float)(t_ult - t_prim);
-  } else {
-    _f = 0.0f;
+  _pulsosBrutos = n; // Almacenado para telemetría y prueba de permeado seco
+
+  // 1. CÁLCULO DE FRECUENCIA Y FILTRADO DE COHERENCIA TEMPORAL (DICTAMEN AUDITORÍA RONDA 5):
+  // Una turbina hidráulica arrastrada por líquido posee inercia mecánica y emite pulsos
+  // distribuidos homogéneamente en el tiempo (relación dt_max / dt_min < 3.5).
+  // Una perturbación electromagnética (EMI) del motor NEMA 34 genera ráfagas concentradas
+  // (varios pulsos en pocos milisegundos y el resto del segundo vacío).
+  bool pulsosCoherentes = false;
+  float f_calculada = 0.0f;
+
+  if (n >= 2 && (t_ult > t_prim)) {
+    uint32_t ventanaPulsos_us = t_ult - t_prim;
+
+    // Validación de coherencia de rotación si n >= 3:
+    // Rechaza ráfagas espurias donde los pulsos ocurrieron apretados seguidos de un largo silencio
+    bool dispersionPeriodoOk = (n < 4) || (dt_min > 0 && ((float)dt_max / (float)dt_min <= 4.0f));
+
+    // Verificación de ocupación de ventana: para n pulsos a baja frecuencia (< 60 Hz),
+    // los pulsos deben estar distribuidos en una fracción razonable de la ventana (> 50 ms).
+    bool ventanaTemporalOk = (ventanaPulsos_us >= 30000UL) || (n <= 3);
+
+    if (dispersionPeriodoOk && ventanaTemporalOk) {
+      f_calculada = ((float)(n - 1) * 1000000.0f) / (float)ventanaPulsos_us;
+      pulsosCoherentes = true;
+    } else {
+      Serial.printf("[%s] Ráfaga EMI descartada por dispersión: n=%lu, dt_min=%lu us, dt_max=%lu us, span=%lu us\n",
+                    _nombre, (unsigned long)n, (unsigned long)dt_min, (unsigned long)dt_max, (unsigned long)ventanaPulsos_us);
+    }
   }
 
-  // 2. UMBRAL DE CORTE DE VELOCIDAD MÍNIMA (DEADBAND / ZERO-FLOW CUT-OFF):
-  // La turbina YF-S401 tiene fricción mecánica estática en su eje cerámico. Físicamente no gira
-  // de forma continua por debajo de ~2.5 Hz (< 20 mL/min).
-  // Toda frecuencia < 2.0 Hz es cortada a cero absoluto para garantizar 0.0 mL/min cuando
-  // no circula agua (eliminando el caudal fantasma de permeado por acoplamiento con el motor).
-  if (_f < 2.0f) {
+  _f = pulsosCoherentes ? f_calculada : 0.0f;
+
+  // 2. DEAD-BAND METROLÓGICO (Fricción estática de eje cerámico YF-S401):
+  // La turbina no gira de forma continua y estable por debajo de ~2.5 Hz (< 20-30 mL/min).
+  // Toda frecuencia < 2.5 Hz es truncada a cero absoluto para evitar acumulación de sesgo.
+  if (_f < 2.5f) {
     _f = 0.0f;
   }
 
   // 3. CÁLCULO DE CAUDAL INSTANTÁNEO EN mL/min:
-  // Q [mL/min] = (F * 1000.0) / K
+  // Q [mL/min] = (F [Hz] * 1000) / K
   float q = (_f * 1000.0f) / _k;
 
-  // Filtro de plausibilidad física (corte de picos transitorios por perturbación EMI)
+  // Umbral de caudal mínimo medible del sensor (límite de cuantificación YF-S401 ~30 mL/min)
+  if (q < 30.0f) {
+    q = 0.0f;
+    _f = 0.0f;
+  }
+
+  // Filtro de plausibilidad física (corte de picos transitorios)
   if (q > Q_MAX_FISICO_MLMIN) {
     q = 0.0f;
     _f = 0.0f;
     Serial.printf("[%s] Ruido EMI descartado: %lu pulsos espurios\n", _nombre, (unsigned long)n);
-  } else if (_f > 0.0f) {
+  } else if (_f > 0.0f && q > 0.0f) {
     // 4. INTEGRACIÓN DE VOLUMEN TOTALIZADO EN LITROS:
-    // Solo se acumula volumen si hay flujo real continuo confirmado
+    // Solo se acumula volumen si hay flujo real continuo y validado
     _vol += (float)n / (_k * 60.0f);
   }
 
   // 5. FILTRO EXPONENCIAL PONDERADO (EMA) SINTONIZADO PARA FLUJO PERISTÁLTICO:
-  // Suaviza la pulsación rodillo a rodillo del cabezal peristáltico de 3 rodillos (tau ≈ 3.5 segundos).
-  // Evita que la lectura salte o baile en pantalla al mover la manguera en la probeta.
+  // Suaviza la pulsación rodillo a rodillo del cabezal peristáltico (tau ≈ 4.5 s con dt=1s, alfa=0.20)
   if (q > 0.0f) {
     if (_q == 0.0f) {
-      _q = q; // Respuesta rápida desde reposo
+      _q = q; // Respuesta ágil desde reposo
     } else {
       _q = 0.20f * q + 0.80f * _q; // Filtrado estable
     }
   } else {
     // Decaimiento rápido a cero al detenerse el flujo
-    _q = 0.5f * _q;
+    _q = 0.50f * _q;
     if (_q < 1.0f) _q = 0.0f;
   }
 
@@ -89,19 +118,16 @@ void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
   uint32_t t = micros();
 
   portENTER_CRITICAL_ISR(&c->_mux);
-  // Diferencia sin signo uint32_t: segura ante desbordamiento de micros() cada 71.58 min
+  // Diferencia sin signo uint32_t: inmune a desbordamiento de micros() cada 71.58 min
   uint32_t dt = t - c->_t_ultimo;
 
-  // Blanking anti-rebote: descarta transitorios mecánicos y capacitivos (FILTRO_RUIDO_US = 1500 us)
+  // Blanking anti-rebote: descarta transitorios mecánicos y picos rápidos (< 1500 us)
   if (dt >= FILTRO_RUIDO_US) {
     if (c->_pulsos == 0) {
       c->_t_primero = t;
-    }
-    // Si el tiempo transcurrido es menor a 5 segundos, registramos el período inter-pulso real
-    if (dt < 5000000UL) {
-      c->_periodo_us = dt;
     } else {
-      c->_periodo_us = 0; // Tras una parada prolongada, se descarta el período espurio
+      if (dt < c->_dt_min_us) c->_dt_min_us = dt;
+      if (dt > c->_dt_max_us) c->_dt_max_us = dt;
     }
     c->_t_ultimo = t;
     c->_pulsos++;
