@@ -4,9 +4,10 @@ Caudalimetro::Caudalimetro(uint8_t pin, float k, const char* nombre, bool esAlim
   : _pin(pin), _k(k), _nombre(nombre), _esAlimentacion(esAlimentacion) {}
 
 void Caudalimetro::begin() {
-  // Placa 2 ya dispone de pull-up externo de 4.7 kΩ a 3.3V y capacitor de 100 nF.
-  // Se configura como INPUT de alta impedancia para respetar los niveles del front-end.
-  pinMode(_pin, INPUT);
+  // Activar resistencia INPUT_PULLUP interna del ESP32 (45 kΩ a 3.3V) en paralelo con el circuito RC externo.
+  // Garantiza máxima rigidez contra acoplamiento inductivo y asegura nivel lógico HIGH
+  // evitando que el pin actúe como antena ante el campo magnético del motor NEMA 34.
+  pinMode(_pin, INPUT_PULLUP);
   attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, FALLING);
 }
 
@@ -20,63 +21,52 @@ void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
   uint32_t t_ult  = _t_ultimo;
   portEXIT_CRITICAL(&_mux);
 
-  uint32_t tAhora = micros();
-  // Diferencia sin signo uint32_t: matemáticamente inmune al desbordamiento (rollover de 71.58 min)
-  uint32_t tSinFlanco = tAhora - t_ult;
-
   // 1. CÁLCULO DE FRECUENCIA CON MÉTODO DE PERÍODO RECÍPROCO DE ALTA RESOLUCIÓN:
-  // - n >= 2 pulsos: medimos el tiempo exacto entre el 1er y último pulso dentro de la ventana.
-  //   Resolución en microsegundos; elimina por completo el error de discretización ±1 pulso.
-  // - n == 1 pulso: la ventana solo capturó un flanco, se usa el período entre pulsos sucesivos per_us.
-  // - n == 0 pulsos: no hubo eventos en la ventana (régimen bajo o detención).
+  // Exige al menos 2 pulsos continuos en la ventana de 1 segundo para validar rotación real.
+  // Un pulso único o aislado es descartado como ruido transitorio electromagnético.
   if (n >= 2 && (t_ult - t_prim) > 0) {
     _f = ((float)(n - 1) * 1000000.0f) / (float)(t_ult - t_prim);
-  } else if (n == 1 && per_us > 0) {
-    _f = 1000000.0f / (float)per_us;
+  } else {
+    _f = 0.0f;
   }
 
-  // 2. COTA FÍSICA SUPERIOR CONTINUA EN AUSENCIA DE PULSOS RECIENTES:
-  // Si transcurrió tSinFlanco microsegundos desde el último pulso registrado,
-  // la física impone que la frecuencia instantánea real no puede exceder 1e6 / tSinFlanco.
-  // Esto garantiza un decaimiento suave y asintótico hacia cero cuando la bomba frena,
-  // impidiendo que la frecuencia quede congelada artificialmente.
-  if (tSinFlanco > 0) {
-    float f_max_posible = 1000000.0f / (float)tSinFlanco;
-    if (_f > f_max_posible) {
-      _f = f_max_posible;
-    }
-  }
-
-  // Decaimiento estricto a cero absoluto tras 3.0 segundos sin pulsos
-  if (n == 0 && tSinFlanco > 3000000UL) {
+  // 2. UMBRAL DE CORTE DE VELOCIDAD MÍNIMA (DEADBAND / ZERO-FLOW CUT-OFF):
+  // La turbina YF-S401 tiene fricción mecánica estática en su eje cerámico. Físicamente no gira
+  // de forma continua por debajo de ~2.5 Hz (< 20 mL/min).
+  // Toda frecuencia < 2.0 Hz es cortada a cero absoluto para garantizar 0.0 mL/min cuando
+  // no circula agua (eliminando el caudal fantasma de permeado por acoplamiento con el motor).
+  if (_f < 2.0f) {
     _f = 0.0f;
   }
 
   // 3. CÁLCULO DE CAUDAL INSTANTÁNEO EN mL/min:
-  // Por definición metrológica: K está en [Hz / (L/min)].
-  // Q [L/min] = F / K  ===>  Q [mL/min] = (F * 1000.0) / K
+  // Q [mL/min] = (F * 1000.0) / K
   float q = (_f * 1000.0f) / _k;
 
   // Filtro de plausibilidad física (corte de picos transitorios por perturbación EMI)
   if (q > Q_MAX_FISICO_MLMIN) {
     q = 0.0f;
     _f = 0.0f;
-    Serial.printf("[%s] Ruido descartado: %lu pulsos espurios\n", _nombre, (unsigned long)n);
-  } else {
+    Serial.printf("[%s] Ruido EMI descartado: %lu pulsos espurios\n", _nombre, (unsigned long)n);
+  } else if (_f > 0.0f) {
     // 4. INTEGRACIÓN DE VOLUMEN TOTALIZADO EN LITROS:
-    // 1 L/min = (1/60) L/s  ==>  Pulsos por Litro = K * 60
-    // Vol [L] = pulsos / (K * 60)
-    // Solo se acumulan pulsos físicamente plausibles.
+    // Solo se acumula volumen si hay flujo real continuo confirmado
     _vol += (float)n / (_k * 60.0f);
   }
 
-  // 5. FILTRO EXPONENCIAL PONDERADO (EMA):
-  // Atenúa el rizo de presión y caudal producido por los 3 rodillos del cabezal peristáltico.
-  // Constante de tiempo aproximada: tau ~ 2 segundos.
-  if (n > 0 || _f > 0.05f) {
-    _q = 0.4f * q + 0.6f * _q;
+  // 5. FILTRO EXPONENCIAL PONDERADO (EMA) SINTONIZADO PARA FLUJO PERISTÁLTICO:
+  // Suaviza la pulsación rodillo a rodillo del cabezal peristáltico de 3 rodillos (tau ≈ 3.5 segundos).
+  // Evita que la lectura salte o baile en pantalla al mover la manguera en la probeta.
+  if (q > 0.0f) {
+    if (_q == 0.0f) {
+      _q = q; // Respuesta rápida desde reposo
+    } else {
+      _q = 0.20f * q + 0.80f * _q; // Filtrado estable
+    }
   } else {
-    _q = 0.0f;
+    // Decaimiento rápido a cero al detenerse el flujo
+    _q = 0.5f * _q;
+    if (_q < 1.0f) _q = 0.0f;
   }
 
   // 6. DIAGNÓSTICO ASIMÉTRICO DE PÉRDIDA DE SEÑAL / CABLE CORTADO:

@@ -54,9 +54,9 @@ constexpr float FRENADO_PARADA_RPM_S = 45.0f;  // 45.0 RPM/s frenado rápido al 
 //   F [Hz] = K * Q [L/min]  ===>  Q [mL/min] = (F [Hz] * 1000) / K
 //   Pulsos por Litro = K * 60
 // Nominal de fabricante YF-S401: F = 98 * Q (L/min) => K = 98.0 Hz/(L/min) (5880 pul/L)
-// Calibración experimental con probeta (Owen a 50 y 72 RPM):
-constexpr float K_ALIMENTACION = 154.62f; // Hz/(L/min) -> 9277.2 pulsos/L (105.14 Hz a 680.0 mL/min)
-constexpr float K_PERMEADO     = 55.00f;  // Hz/(L/min) -> 3300.0 pulsos/L (5.50 Hz a 100.0 mL/min)
+// Calibración experimental con probeta validada en laboratorio (20 a 90 RPM):
+constexpr float K_ALIMENTACION = 196.50f; // Hz/(L/min) -> 11790 pulsos/L (meseta experimental a 60-80 RPM)
+constexpr float K_PERMEADO     = 687.33f; // Hz/(L/min) -> valor calibrado nominal sensor permeado
 
 constexpr uint32_t FILTRO_RUIDO_US = 1500;    // 1.5 ms de blanking anti-rebote (hasta 666 Hz / ~4300 mL/min)
 // Auditoría Ronda 4: A 100 RPM el caudal máximo de bomba es 1360 mL/min.
@@ -66,8 +66,8 @@ constexpr float Q_MAX_FISICO_MLMIN = 2500.0f; // Límite físico de plausibilida
 // ------------------------------------------------------------------------------
 // 4. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN Y AUTO-CALIBRACIÓN
 // ------------------------------------------------------------------------------
-constexpr uint32_t INTERVALO_LOG_MS   = 1000;   // Muestreo y almacenamiento cada 1 segundo (1 Hz)
-constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 10 minutos de ensayo continuo
+constexpr uint32_t INTERVALO_LOG_MS   = 10000;  // Muestreo cada 10 segundos (600 muestras = 100 minutos continuos)
+constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras = 1.66 horas de ensayo continuo sin sobreescritura
 constexpr size_t   MAX_ENSAYOS        = 20;     // Hasta 20 corridas/ensayos registrados en memoria
 constexpr uint8_t  MUESTRAS_AUTO_CAL  = 15;     // 15 muestras (15 seg) para auto-calibración en régimen permanente
 

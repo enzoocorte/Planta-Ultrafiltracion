@@ -163,6 +163,53 @@ void guardarMuestraDatalogger() {
 }
 
 // ------------------------------------------------------------------------------
+// GESTIÓN AUTOMÁTICA DE SESIONES Y ENSAYOS
+// ------------------------------------------------------------------------------
+void finalizarEnsayoActual() {
+  uint32_t duracion_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+  uint16_t muestrasEnsayo = 0;
+  for (size_t i = 0; i < numRegistros; i++) {
+    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
+  }
+
+  // Si no hubo muestras registradas en este ensayo, registrar una de cierre
+  if (muestrasEnsayo == 0) {
+    guardarMuestraDatalogger();
+    muestrasEnsayo = 1;
+  }
+
+  if (numEnsayos < MAX_ENSAYOS) {
+    listaEnsayos[numEnsayos].id           = ensayoActualId;
+    listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
+    listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;
+    listaEnsayos[numEnsayos].duracion_s   = duracion_s;
+    listaEnsayos[numEnsayos].muestras     = muestrasEnsayo;
+    listaEnsayos[numEnsayos].vol_alim     = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
+    listaEnsayos[numEnsayos].vol_perm     = sensorPermeado.volumen_L() - volPermInicioEnsayo;
+    numEnsayos++;
+
+    Serial.printf("\n<<< [ENSAYO #%u FINALIZADO Y REGISTRADO] Consigna: %.1f RPM | Duracion: %us | Muestras: %u | Vol Perm: %.3f L >>>\n\n",
+                  ensayoActualId, bomba.rpmObjetivo(), duracion_s, muestrasEnsayo, sensorPermeado.volumen_L() - volPermInicioEnsayo);
+  }
+}
+
+void iniciarNuevoEnsayo(float consignaRpm) {
+  uint16_t muestrasPrevias = 0;
+  for (size_t i = 0; i < numRegistros; i++) {
+    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+  }
+  if (muestrasPrevias > 0) {
+    ensayoActualId++;
+  }
+  tInicioEnsayo_ms = millis();
+  volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+  volPermInicioEnsayo = sensorPermeado.volumen_L();
+  tDatalogger = millis();
+  guardarMuestraDatalogger(); // Muestra inicial garantizada en t = 0s
+  Serial.printf("\n>>> [ENSAYO #%u INICIADO] Consigna: %.1f RPM <<<\n", ensayoActualId, consignaRpm);
+}
+
+// ------------------------------------------------------------------------------
 // MANEJADORES DE RUTAS DEL SERVIDOR WEB
 // ------------------------------------------------------------------------------
 void handleRoot() {
@@ -261,8 +308,23 @@ void handleCmd() {
 
 void handleSetRPM() {
   if (server.hasArg("rpm")) {
-    float rpm = server.arg("rpm").toFloat();
-    if (bomba.setRPM(rpm)) {
+    float nuevoRpm = server.arg("rpm").toFloat();
+    float rpmActualConsigna = bomba.rpmObjetivo();
+
+    // Si la bomba está en marcha y el usuario cambia consigna en >= 1 RPM:
+    // Segmentar automáticamente: cerrar ensayo previo y arrancar nuevo ensayo en t = 0s
+    if (bomba.enMarcha() && fabs(nuevoRpm - rpmActualConsigna) >= 1.0f) {
+      finalizarEnsayoActual();
+      if (bomba.setRPM(nuevoRpm)) {
+        iniciarNuevoEnsayo(nuevoRpm);
+        server.send(200, "text/plain", "OK");
+      } else {
+        server.send(400, "text/plain", "ERROR: RPM fuera de rango");
+      }
+      return;
+    }
+
+    if (bomba.setRPM(nuevoRpm)) {
       server.send(200, "text/plain", "OK");
     } else {
       server.send(400, "text/plain", "ERROR: RPM fuera de rango o invalido");
@@ -551,46 +613,12 @@ void loop() {
     
     // Flanco de subida: Iniciar sesión de ensayo
     if (enMarcha && !bombaEnMarchaAnterior) {
-      uint16_t muestrasPrevias = 0;
-      for (size_t i = 0; i < numRegistros; i++) {
-        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
-      }
-      if (muestrasPrevias > 0) {
-        ensayoActualId++;
-      }
-      tInicioEnsayo_ms = millis();
-      volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
-      volPermInicioEnsayo = sensorPermeado.volumen_L();
-      Serial.printf("\n>>> [ENSAYO #%u INICIADO] Consigna: %.1f RPM <<<\n", ensayoActualId, bomba.rpmObjetivo());
+      iniciarNuevoEnsayo(bomba.rpmObjetivo());
     }
     
     // Flanco de bajada: Finalizar sesión y registrar
     if (!enMarcha && bombaEnMarchaAnterior) {
-      uint32_t duracion_s = (millis() - tInicioEnsayo_ms) / 1000;
-      uint16_t muestrasEnsayo = 0;
-      for (size_t i = 0; i < numRegistros; i++) {
-        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
-      }
-
-      // Si duró al menos 1s o no hubo muestras periódicas aún, registrar muestra de cierre
-      if (muestrasEnsayo == 0) {
-        guardarMuestraDatalogger();
-        muestrasEnsayo = 1;
-      }
-
-      if (numEnsayos < MAX_ENSAYOS) {
-        listaEnsayos[numEnsayos].id           = ensayoActualId;
-        listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
-        listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;
-        listaEnsayos[numEnsayos].duracion_s   = duracion_s;
-        listaEnsayos[numEnsayos].muestras     = muestrasEnsayo;
-        listaEnsayos[numEnsayos].vol_alim     = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
-        listaEnsayos[numEnsayos].vol_perm     = sensorPermeado.volumen_L() - volPermInicioEnsayo;
-        numEnsayos++;
-
-        Serial.printf("\n<<< [ENSAYO #%u FINALIZADO Y REGISTRADO] Duracion: %us | Muestras: %u | Vol Perm: %.3f L >>>\n\n",
-                      ensayoActualId, duracion_s, muestrasEnsayo, sensorPermeado.volumen_L() - volPermInicioEnsayo);
-      }
+      finalizarEnsayoActual();
     }
 
     bombaEnMarchaAnterior = enMarcha;
