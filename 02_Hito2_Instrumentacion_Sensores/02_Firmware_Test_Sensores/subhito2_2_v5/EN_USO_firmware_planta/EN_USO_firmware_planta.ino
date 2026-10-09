@@ -229,6 +229,18 @@ void handleRoot() {
   server.send_P(200, "text/html", INDEX_HTML);
 }
 
+// Redirección Automática de Portal Cautivo:
+// Hace que al conectarse al Wi-Fi, Android / iOS / Windows abran automáticamente el SCADA
+void handleCaptivePortal() {
+  String host = server.hostHeader();
+  if (host.indexOf("192.168.4.1") >= 0 || host.indexOf("bomba.local") >= 0) {
+    handleRoot();
+  } else {
+    server.sendHeader("Location", "http://192.168.4.1/", true);
+    server.send(302, "text/plain", "");
+  }
+}
+
 void handleStatus() {
   uint32_t t_act_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
   uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
@@ -630,12 +642,12 @@ void setup() {
   server.on("/clear_csv", HTTP_GET, handleClearCSV);
 
   // Rutas de sondeo de conectividad de sistemas operativos para Portal Cautivo
-  server.on("/generate_204", HTTP_GET, handleRoot);        // Android Captive Portal Check
-  server.on("/gen_204", HTTP_GET, handleRoot);             // Android alternativo
-  server.on("/ncsi.txt", HTTP_GET, handleRoot);            // Windows Network Connectivity Status
-  server.on("/connecttest.txt", HTTP_GET, handleRoot);     // Windows alternativo
-  server.on("/hotspot-detect.html", HTTP_GET, handleRoot); // Apple iOS / macOS
-  server.onNotFound(handleRoot);                           // Cualquier otra URL no registrada abre el SCADA
+  server.on("/generate_204", HTTP_GET, handleCaptivePortal);        // Android Captive Portal Check
+  server.on("/gen_204", HTTP_GET, handleCaptivePortal);             // Android alternativo
+  server.on("/ncsi.txt", HTTP_GET, handleCaptivePortal);            // Windows Network Connectivity Status
+  server.on("/connecttest.txt", HTTP_GET, handleCaptivePortal);     // Windows alternativo
+  server.on("/hotspot-detect.html", HTTP_GET, handleCaptivePortal); // Apple iOS / macOS
+  server.onNotFound(handleCaptivePortal);                           // Redirección 302 automática al SCADA
 
   server.begin();
   Serial.println("[HTTP] Servidor Web SCADA iniciado con exito en puerto 80.\n");
