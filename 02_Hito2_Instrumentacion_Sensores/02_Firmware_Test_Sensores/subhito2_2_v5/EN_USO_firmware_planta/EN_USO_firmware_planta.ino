@@ -574,8 +574,13 @@ void setup() {
   pinMode(PIN_LED_BOMBA, OUTPUT);
   digitalWrite(PIN_LED_BOMBA, LOW);
 
-  sensorAlimentacion.begin();
-  sensorPermeado.begin();
+  sensorAlimentacion.declararCalibrado(CAL_ALIMENTACION_VALIDADA);
+  sensorPermeado.declararCalibrado(CAL_PERMEADO_VALIDADA);
+  const bool inicioAlim = sensorAlimentacion.begin();
+  const bool inicioPerm = sensorPermeado.begin();
+  if (!inicioAlim || !inicioPerm) {
+    Serial.println("⚠️ [ERROR CRÍTICO] Fallo en la inicialización de caudalímetros");
+  }
   bomba.begin();
 
   // 3. Configuración Wi-Fi Robusta (AP Dedicado Anti-Desconexión)

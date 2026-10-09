@@ -23,6 +23,18 @@ constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11
 constexpr uint8_t PIN_I2C_SDA             = 21;  // ESP32 SDA
 constexpr uint8_t PIN_I2C_SCL             = 22;  // ESP32 SCL
 
+// ASERCIONES ESTÁTICAS DE SEGURIDAD (Auditoría GPT Astra Ronda 7):
+// Garantizan que no exista ninguna colisión física de pines entre motor, sensores e I2C
+static_assert(PIN_SENSOR_ALIMENTACION != PIN_SENSOR_PERMEADO, "Los sensores no pueden compartir GPIO");
+static_assert(PIN_SENSOR_ALIMENTACION != PIN_PUL && PIN_SENSOR_ALIMENTACION != PIN_DIR && PIN_SENSOR_ALIMENTACION != PIN_ENA, "Colision sensor alim con motor");
+static_assert(PIN_SENSOR_PERMEADO != PIN_PUL && PIN_SENSOR_PERMEADO != PIN_DIR && PIN_SENSOR_PERMEADO != PIN_ENA, "Colision sensor perm con motor");
+static_assert(PIN_SENSOR_ALIMENTACION != PIN_I2C_SDA && PIN_SENSOR_ALIMENTACION != PIN_I2C_SCL, "Colision sensor alim con I2C");
+static_assert(PIN_SENSOR_PERMEADO != PIN_I2C_SDA && PIN_SENSOR_PERMEADO != PIN_I2C_SCL, "Colision sensor perm con I2C");
+
+// Declaración de Estado de Calibración Metrológica
+constexpr bool CAL_ALIMENTACION_VALIDADA = true;   // Probeta en rango 200-1360 mL/min
+constexpr bool CAL_PERMEADO_VALIDADA     = false;  // Requiere caracterización gravimétrica en banco (Subhito 2.2)
+
 // ------------------------------------------------------------------------------
 // 2. PARÁMETROS CINEMÁTICOS DE LA BOMBA (MOTOR NEMA 34 / DM860)
 // ------------------------------------------------------------------------------
