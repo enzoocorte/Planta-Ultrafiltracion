@@ -11,6 +11,7 @@
 #include <Preferences.h>
 #include "config.h"
 #include "caudalimetro.h"
+#include "registro_ensayos.h"
 #include "Bomba.h"
 #include "darcy.h"
 #include "index_html.h"
@@ -75,9 +76,10 @@ float   autoCalSumFrecAlim = 0.0f;
 float   autoCalSumFrecPerm = 0.0f;
 String  autoCalMensaje = "";
 
-// Instanciación de componentes (Alimentación con alarma de corte; Permeado sin alarma en reposo)
-Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION", true);
-Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO", false);
+// Instanciación de componentes con especificaciones metrológicas de GPT Astra
+Caudalimetro sensorAlimentacion(SENSOR_ALIM_CFG, "ALIMENTACION", true);
+Caudalimetro sensorPermeado(SENSOR_PERM_CFG, "PERMEADO", false);
+RegistroEnsayos registroEnsayos;
 Bomba bomba;
 WebServer server(80);
 Preferences prefs;
@@ -341,6 +343,10 @@ void handleCmd() {
     sensorPermeado.setModoSeco(false);
     sensorAlimentacion.setModoSeco(false);
     Serial.println("[AUDITORIA] Modo Seco DESACTIVADO");
+  } else if (act == "LIMPIAR_ALARMA_SECO") {
+    sensorPermeado.limpiarAlarmaSeco();
+    sensorAlimentacion.limpiarAlarmaSeco();
+    Serial.println("[AUDITORIA] Alarmas de Ruido Seco Limpiadas");
   } else if (act == "DIR") {
     bomba.toggleSentido();
   } else if (act == "RESET_VOL") {
@@ -564,7 +570,20 @@ void handleClearCSV() {
   tInicioEnsayo_ms = millis();
   volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
   volPermInicioEnsayo = sensorPermeado.volumen_L();
+  registroEnsayos.limpiar();
   server.send(200, "text/plain", "LOGS_CLEARED");
+}
+
+// Exportación CSV con Esquema Metrológico Certificado (GPT Astra)
+void handleExportMetrologia() {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"PlantaUF_Metrologia_Certificada.csv\"");
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/csv; charset=UTF-8", "");
+  WiFiClient client = server.client();
+  registroEnsayos.exportarCSV(client);
+  server.sendContent("");
 }
 
 // ------------------------------------------------------------------------------
@@ -586,8 +605,8 @@ void setup() {
   pinMode(PIN_LED_BOMBA, OUTPUT);
   digitalWrite(PIN_LED_BOMBA, LOW);
 
-  sensorAlimentacion.declararCalibrado(CAL_ALIMENTACION_VALIDADA);
-  sensorPermeado.declararCalibrado(CAL_PERMEADO_VALIDADA);
+  sensorAlimentacion.declararCalibrado(SENSOR_ALIM_CFG.calibracionDocumentada);
+  sensorPermeado.declararCalibrado(SENSOR_PERM_CFG.calibracionDocumentada);
   const bool inicioAlim = sensorAlimentacion.begin();
   const bool inicioPerm = sensorPermeado.begin();
   if (!inicioAlim || !inicioPerm) {
@@ -639,6 +658,7 @@ void setup() {
   server.on("/cancelar_auto_cal", HTTP_GET, handleCancelarAutoCal);
   server.on("/calibrar_rpm_q", HTTP_GET, handleCalibrarRpmQ);
   server.on("/export_csv", HTTP_GET, handleExportCSV);
+  server.on("/export_metrologia", HTTP_GET, handleExportMetrologia);
   server.on("/clear_csv", HTTP_GET, handleClearCSV);
 
   // Rutas de sondeo de conectividad de sistemas operativos para Portal Cautivo
@@ -682,11 +702,13 @@ void loop() {
     // Flanco de subida: Iniciar sesión de ensayo
     if (enMarcha && !bombaEnMarchaAnterior) {
       iniciarNuevoEnsayo(bomba.rpmObjetivo());
+      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmObjetivo(), true);
     }
     
     // Flanco de bajada: Finalizar sesión y registrar
     if (!enMarcha && bombaEnMarchaAnterior) {
       finalizarEnsayoActual();
+      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, 0.0, false);
     }
 
     bombaEnMarchaAnterior = enMarcha;
@@ -694,14 +716,14 @@ void loop() {
 
   // 2. Adquisición y cálculo de caudales cada 1000 ms (1 segundo)
   if (tAhora - tCaudal >= 1000) {
-    float dt = (tAhora - tCaudal) / 1000.0f;
     tCaudal = tAhora;
 
     bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
     float qBomba = bomba.caudalTeorico_mLmin();
 
-    sensorAlimentacion.actualizar(dt, bombaEmpuja, qBomba);
-    sensorPermeado.actualizar(dt, bombaEmpuja, qBomba);
+    sensorAlimentacion.capturar(bombaEmpuja);
+    sensorPermeado.capturar(bombaEmpuja);
+    registroEnsayos.tick(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), bombaEmpuja);
 
     float qAlim = sensorAlimentacion.caudal_mLmin();
     float qPerm = sensorPermeado.caudal_mLmin();
