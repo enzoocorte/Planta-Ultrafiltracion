@@ -1,107 +1,160 @@
 #include "caudalimetro.h"
 
-Caudalimetro::Caudalimetro(uint8_t pin, float k, const char* nombre, bool esAlimentacion)
-  : _pin(pin), _k(k), _nombre(nombre), _esAlimentacion(esAlimentacion) {}
+// ==============================================================================
+// IMPLEMENTACIÓN DE CAUDALÍMETRO (V5 - Anti-EMI & Validación de Ancho de Pulso)
+// ==============================================================================
 
-void Caudalimetro::begin() {
-  // Activar resistencia INPUT_PULLUP interna del ESP32 (45 kΩ a 3.3V) en paralelo con el circuito RC externo.
-  // Garantiza máxima rigidez contra acoplamiento inductivo y asegura nivel lógico HIGH
-  // evitando que el pin actúe como antena ante el campo magnético del motor NEMA 34.
-  pinMode(_pin, INPUT_PULLUP);
-  attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, FALLING);
+Caudalimetro::Caudalimetro(uint8_t pin, float k, const char* nombre, bool esAlimentacion)
+  : _pin(pin), _k(k), _nombre(nombre), _esAlimentacion(esAlimentacion) {
+  if (_esAlimentacion) {
+    // Alimentación: Flujos de 200 a 1400 mL/min (Frecuencia hasta ~270 Hz)
+    // A 270 Hz, el semi-período es ~1850 us. Filtramos glitches < 200 us.
+    _p.anchoMinLow_us  = 200;
+    _p.anchoMinHigh_us = 200;
+    _p.periodoMin_us   = 1000;    // Máx 1000 Hz admisible
+    _p.periodoMax_us   = 1000000; // 1 s sin pulsos => detenido
+    _p.qMin_mLmin      = 30.0f;   // Umbral de corte de cuantificación mecánica
+  } else {
+    // Permeado: Flujos de 10 a 150 mL/min (Frecuencia hasta ~70 Hz con K=687 o ~20 Hz con K=196)
+    // A 70 Hz, el semi-período es ~7100 us. Filtramos glitches < 600 us.
+    _p.anchoMinLow_us  = 600;
+    _p.anchoMinHigh_us = 600;
+    _p.periodoMin_us   = 2500;    // Máx 400 Hz admisible
+    _p.periodoMax_us   = 1500000; // 1.5 s sin pulsos => detenido
+    _p.qMin_mLmin      = 4.0f;    // Umbral adaptativo bajo para ultrafiltración (no trunca a 30 mL/min)
+  }
 }
 
-void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
-  // Captura atómica de variables acumuladas por la ISR en la ventana de 1 segundo
+void Caudalimetro::begin() {
+  pinMode(_pin, INPUT_PULLUP);
+  _tSubida = micros();
+  _tBajada = _tSubida;
+  _tUltimoValido = _tSubida;
+  // Interrupción en CHANGE para monitorear transiciones de subida y bajada
+  attachInterruptArg(digitalPinToInterrupt(_pin), isrPuente, this, CHANGE);
+}
+
+void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
+  reinterpret_cast<Caudalimetro*>(arg)->isrInterna();
+}
+
+void IRAM_ATTR Caudalimetro::isrInterna() {
+  uint32_t t = micros();
+  bool nivelAlto = digitalRead(_pin);
+
+  portENTER_CRITICAL_ISR(&_mux);
+  _flancosTotal++;
+
+  if (!nivelAlto) {
+    // Flanco de bajada (HIGH -> LOW)
+    // Para que sea un flanco válido de álabe de turbina, el nivel HIGH previo
+    // debe haber durado al menos _p.anchoMinHigh_us (diferencia sin signo)
+    uint32_t duracionHigh = t - _tSubida;
+    if (duracionHigh >= _p.anchoMinHigh_us) {
+      _bajadaCandidata = true;
+      _tBajada = t;
+    } else {
+      _bajadaCandidata = false;
+      _glitchesTotal++;
+    }
+  } else {
+    // Flanco de subida (LOW -> HIGH)
+    // El nivel LOW que finaliza debe haber durado al menos _p.anchoMinLow_us
+    uint32_t duracionLow = t - _tBajada;
+    if (_bajadaCandidata && duracionLow >= _p.anchoMinLow_us) {
+      uint32_t periodo = _tBajada - _tUltimoValido;
+      if (_validosTotal == 0 || periodo >= _p.periodoMin_us) {
+        if (_validosTotal == 0) {
+          _tPrimeroValido = _tBajada;
+        }
+        _tUltimoValido = _tBajada;
+        _validosTotal++;
+      } else {
+        _glitchesTotal++; // Rechazado por período menor al físico admisible
+      }
+    } else {
+      _glitchesTotal++; // Rechazado: pulso estrecho (glitch EMI o rebote de rampa RC)
+    }
+    _bajadaCandidata = false;
+    _tSubida = t;
+  }
+  portEXIT_CRITICAL_ISR(&_mux);
+}
+
+void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja, float qBombaTeorico_mLmin) {
+  // Captura atómica de eventos acumulados en la ventana de 1 segundo
   portENTER_CRITICAL(&_mux);
-  uint32_t n       = _pulsos;
-  _pulsos          = 0;
-  uint32_t t_prim  = _t_primero;
-  uint32_t t_ult   = _t_ultimo;
-  uint32_t dt_min  = _dt_min_us;
-  uint32_t dt_max  = _dt_max_us;
-  _dt_min_us       = 0xFFFFFFFF;
-  _dt_max_us       = 0;
+  uint32_t flancos  = _flancosTotal;  _flancosTotal  = 0;
+  uint32_t nValidos = _validosTotal;  _validosTotal  = 0;
+  uint32_t nGlitch  = _glitchesTotal; _glitchesTotal = 0;
+  uint32_t tPrim    = _tPrimeroValido;
+  uint32_t tUlt     = _tUltimoValido;
   portEXIT_CRITICAL(&_mux);
 
-  _pulsosBrutos = n; // Almacenado para telemetría y prueba de permeado seco
+  _flancosVentana  = flancos;
+  _validosVentana  = nValidos;
+  _glitchesVentana = nGlitch;
 
-  // 1. CÁLCULO DE FRECUENCIA Y FILTRADO DE COHERENCIA TEMPORAL (DICTAMEN AUDITORÍA RONDA 5):
-  // Una turbina hidráulica arrastrada por líquido posee inercia mecánica y emite pulsos
-  // distribuidos homogéneamente en el tiempo (relación dt_max / dt_min < 3.5).
-  // Una perturbación electromagnética (EMI) del motor NEMA 34 genera ráfagas concentradas
-  // (varios pulsos en pocos milisegundos y el resto del segundo vacío).
-  bool pulsosCoherentes = false;
-  float f_calculada = 0.0f;
-
-  if (n >= 2 && (t_ult > t_prim)) {
-    uint32_t ventanaPulsos_us = t_ult - t_prim;
-
-    // Validación de coherencia de rotación si n >= 3:
-    // Rechaza ráfagas espurias donde los pulsos ocurrieron apretados seguidos de un largo silencio
-    bool dispersionPeriodoOk = (n < 4) || (dt_min > 0 && ((float)dt_max / (float)dt_min <= 4.0f));
-
-    // Verificación de ocupación de ventana: para n pulsos a baja frecuencia (< 60 Hz),
-    // los pulsos deben estar distribuidos en una fracción razonable de la ventana (> 50 ms).
-    bool ventanaTemporalOk = (ventanaPulsos_us >= 30000UL) || (n <= 3);
-
-    if (dispersionPeriodoOk && ventanaTemporalOk) {
-      f_calculada = ((float)(n - 1) * 1000000.0f) / (float)ventanaPulsos_us;
-      pulsosCoherentes = true;
-    } else {
-      Serial.printf("[%s] Ráfaga EMI descartada por dispersión: n=%lu, dt_min=%lu us, dt_max=%lu us, span=%lu us\n",
-                    _nombre, (unsigned long)n, (unsigned long)dt_min, (unsigned long)dt_max, (unsigned long)ventanaPulsos_us);
-    }
+  // En Modo Seco: si se detecta cualquier flanco o pulso, enclavar alarma
+  if (_modoSeco && (flancos > 0 || nValidos > 0)) {
+    _ruidoEnSeco = true;
   }
 
-  _f = pulsosCoherentes ? f_calculada : 0.0f;
-
-  // 2. DEAD-BAND METROLÓGICO (Fricción estática de eje cerámico YF-S401):
-  // La turbina no gira de forma continua y estable por debajo de ~2.5 Hz (< 20-30 mL/min).
-  // Toda frecuencia < 2.5 Hz es truncada a cero absoluto para evitar acumulación de sesgo.
-  if (_f < 2.5f) {
+  // 1. Cálculo de frecuencia sobre pulsos físicamente validados
+  if (nValidos >= 2 && (tUlt - tPrim) > 0) {
+    _f = ((float)(nValidos - 1) * 1000000.0f) / (float)(tUlt - tPrim);
+  } else if (nValidos == 1) {
+    _f = 1.0f / dt_s;
+  } else {
     _f = 0.0f;
   }
 
-  // 3. CÁLCULO DE CAUDAL INSTANTÁNEO EN mL/min:
-  // Q [mL/min] = (F [Hz] * 1000) / K
+  // Si transcurrió más de periodoMax sin pulsos, flujo detenido
+  uint32_t tAhora = micros();
+  if ((tAhora - _tUltimoValido) > _p.periodoMax_us) {
+    _f = 0.0f;
+  }
+
+  // 2. Cálculo de caudal instantáneo en mL/min
   float q = (_f * 1000.0f) / _k;
 
-  // Umbral de caudal mínimo medible del sensor (límite de cuantificación YF-S401 ~30 mL/min)
-  if (q < 30.0f) {
+  // Deadband adaptativo por canal
+  if (q < _p.qMin_mLmin || _f < 0.5f) {
     q = 0.0f;
     _f = 0.0f;
   }
 
-  // Filtro de plausibilidad física (corte de picos transitorios)
+  // Sanity Gate (Hallazgo GLM): En permeado, si la bomba está parada o caudal teórico < 20 mL/min,
+  // físicamente no puede haber flujo transmembrana impulsado
+  if (!_esAlimentacion && (qBombaTeorico_mLmin < 20.0f || !bombaEmpuja)) {
+    q = 0.0f;
+    _f = 0.0f;
+  }
+
+  // Plausibilidad física máxima
   if (q > Q_MAX_FISICO_MLMIN) {
     q = 0.0f;
     _f = 0.0f;
-    Serial.printf("[%s] Ruido EMI descartado: %lu pulsos espurios\n", _nombre, (unsigned long)n);
-  } else if (_f > 0.0f && q > 0.0f) {
-    // 4. INTEGRACIÓN DE VOLUMEN TOTALIZADO EN LITROS:
-    // Solo se acumula volumen si hay flujo real continuo y validado
-    _vol += (float)n / (_k * 60.0f);
+    Serial.printf("[%s] Ruido EMI descartado por plausibilidad: %lu flancos\n", _nombre, (unsigned long)flancos);
+  } else if (_f > 0.0f && q > 0.0f && !_modoSeco) {
+    // 3. Integración de volumen totalizado en litros
+    _vol += (float)nValidos / (_k * 60.0f);
   }
 
-  // 5. FILTRO EXPONENCIAL PONDERADO (EMA) SINTONIZADO PARA FLUJO PERISTÁLTICO:
-  // Suaviza la pulsación rodillo a rodillo del cabezal peristáltico (tau ≈ 4.5 s con dt=1s, alfa=0.20)
+  // 4. Filtrado EMA
   if (q > 0.0f) {
     if (_q == 0.0f) {
-      _q = q; // Respuesta ágil desde reposo
+      _q = q;
     } else {
-      _q = 0.20f * q + 0.80f * _q; // Filtrado estable
+      _q = 0.25f * q + 0.75f * _q;
     }
   } else {
-    // Decaimiento rápido a cero al detenerse el flujo
-    _q = 0.50f * _q;
-    if (_q < 1.0f) _q = 0.0f;
+    // Corte inmediato a 0 (elimina cola lenta de 10s tras presionar STOP)
+    _q = 0.0f;
   }
 
-  // 6. DIAGNÓSTICO ASIMÉTRICO DE PÉRDIDA DE SEÑAL / CABLE CORTADO:
-  // - Alimentación: si la bomba empuja (RPM > 1) y pasan 5 segundos sin pulsos -> FALLA CRÍTICA.
-  // - Permeado: caudal nulo es una condición admisible (válvula cerrada o baja TMP) -> NO alarma.
-  if (n > 0 || _f > 0.05f) {
+  // 5. Diagnóstico de pérdida de señal
+  if (nValidos > 0 || _f > 0.05f) {
     _tiempoSinPulso_s = 0.0f;
     _fallo = false;
   } else if (bombaEmpuja && _esAlimentacion) {
@@ -111,26 +164,4 @@ void Caudalimetro::actualizar(float dt_s, bool bombaEmpuja) {
     _tiempoSinPulso_s = 0.0f;
     _fallo = false;
   }
-}
-
-void IRAM_ATTR Caudalimetro::isrPuente(void* arg) {
-  Caudalimetro* c = reinterpret_cast<Caudalimetro*>(arg);
-  uint32_t t = micros();
-
-  portENTER_CRITICAL_ISR(&c->_mux);
-  // Diferencia sin signo uint32_t: inmune a desbordamiento de micros() cada 71.58 min
-  uint32_t dt = t - c->_t_ultimo;
-
-  // Blanking anti-rebote: descarta transitorios mecánicos y picos rápidos (< 1500 us)
-  if (dt >= FILTRO_RUIDO_US) {
-    if (c->_pulsos == 0) {
-      c->_t_primero = t;
-    } else {
-      if (dt < c->_dt_min_us) c->_dt_min_us = dt;
-      if (dt > c->_dt_max_us) c->_dt_max_us = dt;
-    }
-    c->_t_ultimo = t;
-    c->_pulsos++;
-  }
-  portEXIT_CRITICAL_ISR(&c->_mux);
 }

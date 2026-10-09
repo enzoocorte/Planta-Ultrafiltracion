@@ -238,13 +238,15 @@ void handleStatus() {
   float qPerm = sensorPermeado.caudal_mLmin();
   jLMH_actual = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
-  char buf[800];
+  char buf[960];
   int n = snprintf(buf, sizeof(buf),
     "{"
     "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
     "\"ip\":\"%s\",\"alim_ok\":%s,\"perm_ok\":%s,\"f_alim\":%.2f,\"q_alim\":%.1f,\"vol_alim\":%.4f,"
     "\"f_perm\":%.2f,\"q_perm\":%.1f,\"vol_perm\":%.4f,\"q_ret\":%.1f,\"recov\":%.2f,"
-    "\"pulsos_alim\":%lu,\"pulsos_perm\":%lu,"
+    "\"flan_alim\":%lu,\"val_alim\":%lu,\"gl_alim\":%lu,"
+    "\"flan_perm\":%lu,\"val_perm\":%lu,\"gl_perm\":%lu,"
+    "\"modo_seco\":%s,\"ruido_seco\":%s,"
     "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
     "\"k_alim\":%.2f,\"k_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
     "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
@@ -263,7 +265,9 @@ void handleStatus() {
     sensorAlimentacion.frecuencia_Hz(), qAlim, sensorAlimentacion.volumen_L(),
     sensorPermeado.frecuencia_Hz(), qPerm, sensorPermeado.volumen_L(),
     qRet_mLmin, recuperacion,
-    (unsigned long)sensorAlimentacion.pulsosBrutos(), (unsigned long)sensorPermeado.pulsosBrutos(),
+    (unsigned long)sensorAlimentacion.flancosBrutos(), (unsigned long)sensorAlimentacion.pulsosValidos(), (unsigned long)sensorAlimentacion.glitchesVentana(),
+    (unsigned long)sensorPermeado.flancosBrutos(), (unsigned long)sensorPermeado.pulsosValidos(), (unsigned long)sensorPermeado.glitchesVentana(),
+    sensorPermeado.modoSeco() ? "true" : "false", sensorPermeado.ruidoDetectadoEnSeco() ? "true" : "false",
     bomba.caudalTeorico_mLmin(), deltaBomba, jLMH_actual, flagCruceSensores ? "true" : "false",
     sensorAlimentacion.getK(), sensorPermeado.getK(),
     bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
@@ -317,6 +321,14 @@ void handleCmd() {
     bomba.paradaEmergencia();
   } else if (act == "REARM") {
     bomba.rearmarEmergencia();
+  } else if (act == "MODO_SECO_ON") {
+    sensorPermeado.setModoSeco(true);
+    sensorAlimentacion.setModoSeco(true);
+    Serial.println("[AUDITORIA] Modo Seco ACTIVADO");
+  } else if (act == "MODO_SECO_OFF") {
+    sensorPermeado.setModoSeco(false);
+    sensorAlimentacion.setModoSeco(false);
+    Serial.println("[AUDITORIA] Modo Seco DESACTIVADO");
   } else if (act == "DIR") {
     bomba.toggleSentido();
   } else if (act == "RESET_VOL") {
@@ -626,7 +638,7 @@ void setup() {
   tLoop = millis();
   tCaudal = millis();
   tDatalogger = millis();
-  tInicioEnsayo_ms = millis();
+  tInicioEnsayo_ms = 0; // Se inicializa en 0 hasta que el operador inicie la primera prueba
 }
 
 // ------------------------------------------------------------------------------
@@ -669,8 +681,10 @@ void loop() {
     tCaudal = tAhora;
 
     bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
-    sensorAlimentacion.actualizar(dt, bombaEmpuja);
-    sensorPermeado.actualizar(dt, bombaEmpuja);
+    float qBomba = bomba.caudalTeorico_mLmin();
+
+    sensorAlimentacion.actualizar(dt, bombaEmpuja, qBomba);
+    sensorPermeado.actualizar(dt, bombaEmpuja, qBomba);
 
     float qAlim = sensorAlimentacion.caudal_mLmin();
     float qPerm = sensorPermeado.caudal_mLmin();
@@ -686,10 +700,11 @@ void loop() {
     recuperacion = (qAlim > 50.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
     jLMH_actual  = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
-    // Cálculo continuo del modelo de Darcy (TMP nominal 0.20 bar a 20°C hasta conectar transductores ADS1115)
-    resultadoDarcy = modeloDarcy.calcular(qPerm, 0.20f, 20.0f);
+    // NOTA AUDITORÍA: El modelo de Darcy requiere TMP real medida por transductores de presión (Subhito 2.3).
+    // Para evitar fabricar datos sintéticos en el registro de calibración, Darcy permanece en reposo
+    // hasta la integración del bus I2C / ADS1115.
+    resultadoDarcy = ResultadoDarcy{};
 
-    float qBomba = bomba.caudalTeorico_mLmin();
     deltaBomba   = (qBomba > 1.0f) ? (((qAlim - qBomba) / qBomba) * 100.0f) : 0.0f;
 
     // Máquina de estados de Auto-Calibración en régimen permanente
@@ -728,12 +743,12 @@ void loop() {
       }
     }
 
-    // Telemetría periódica por Serial (incluye pulsos brutos para auditoría de permeado seco)
-    Serial.printf("[TELEMETRIA] RPM: %4.1f | %s | Q_Alim: %5.1f mL/min (%lu pul) | Q_Perm: %5.1f mL/min (%lu pul) | J: %4.2f LMH | Y: %4.1f%% | V_Perm: %.3f L\n",
+    // Telemetría periódica por Serial (incluye métricas de diagnóstico anti-EMI Ronda 6)
+    Serial.printf("[TELEMETRIA] RPM: %4.1f | %s | Q_Alim: %5.1f mL/min (F:%lu, V:%lu, G:%lu) | Q_Perm: %5.1f mL/min (F:%lu, V:%lu, G:%lu) | J: %4.2f LMH | Y: %4.1f%%\n",
                   bomba.rpmActual(), bomba.enRegimenEstable() ? "ESTABLE" : "RAMPA",
-                  qAlim, (unsigned long)sensorAlimentacion.pulsosBrutos(),
-                  qPerm, (unsigned long)sensorPermeado.pulsosBrutos(),
-                  jLMH_actual, recuperacion, sensorPermeado.volumen_L());
+                  qAlim, (unsigned long)sensorAlimentacion.flancosBrutos(), (unsigned long)sensorAlimentacion.pulsosValidos(), (unsigned long)sensorAlimentacion.glitchesVentana(),
+                  qPerm, (unsigned long)sensorPermeado.flancosBrutos(), (unsigned long)sensorPermeado.pulsosValidos(), (unsigned long)sensorPermeado.glitchesVentana(),
+                  jLMH_actual, recuperacion);
   }
 
   // 3. Muestreo del Datalogger cada 10 segundos (SOLO mientras la bomba está en marcha)
