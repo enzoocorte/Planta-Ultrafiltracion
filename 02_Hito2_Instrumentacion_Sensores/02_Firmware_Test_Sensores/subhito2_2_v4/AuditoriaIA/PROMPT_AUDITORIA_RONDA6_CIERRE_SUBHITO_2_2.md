@@ -11,6 +11,9 @@ Actúas como un **Auditor Senior en Sistemas Embebidos, Metrología Industrial y
 No tienes memoria previa de rondas anteriores. Evalúa de manera crítica, rigurosa, cuantitativa e imparcial la documentación, el problema físico-experimental y el código completo presentado a continuación.
 Tu dictamen debe indicar con total claridad: **APROBADO**, **APROBADO CON OBSERVACIONES**, o **RECHAZADO**, justificando cada punto matemáticamente y emitiendo recomendaciones directas de implementación.
 
+> **REQUERIMIENTO OBLIGATORIO DE CÓDIGO FUNCIONAL:**  
+> No te limites a emitir críticas conceptuales ni sugerencias abstractas. **Debes entregar tu propia propuesta de CÓDIGO COMPLETO, funcional y listo para compilar en ESP32 (Drop-in replacement)** para los módulos que consideres que deben corregirse (especialmente `caudalimetro.h`, `caudalimetro.cpp`, o una arquitectura alternativa con el periférico PCNT / DSP). El equipo de ingenieros contrastará tu código con el firmware actual para integrar tus mejoras directamente en el software real de la planta.
+
 ---
 
 # 1. CONTEXTO GENERAL DEL PROYECTO Y OBJETIVOS
@@ -1463,3 +1466,10 @@ Como perito y auditor del proyecto, responde de forma exhaustiva y fundamentada 
 - A la luz de las mejoras implementadas en el firmware entregado (Buffer Circular $O(1)$, columna `Estable_1_0`, filtros de coherencia, parada rápida $< 1.5\text{ s}$ y parada de emergencia instantánea física con `PIN_ENA`):
   - ¿Apruebas el cierre del Subhito 2.2 bajo condición de superar con éxito la "Prueba de Permeado Seco" en banco (0 pulsos durante 5 min a 20, 40, 60, 80 y 100 RPM)?
   - ¿O consideras que existen observaciones bloqueantes no resueltas en el software que impidan su certificación? Emite tu dictamen técnico final con las acciones recomendadas en orden de prioridad.
+
+### PREGUNTA 6 / ENTREGA OBLIGATORIA DE CÓDIGO COMPLETO: Tu propuesta de implementación definitiva
+- Como auditor experto, **proporciona el código fuente C++ completo y listo para compilar** de la solución que consideres 100% correcta y robusta para resolver este desafío de medición sin tocar el hardware actual:
+  - Si consideras que la solución consiste en perfeccionar el procesamiento sobre la ISR actual, entrega tu versión completa de `caudalimetro.h` y `caudalimetro.cpp`.
+  - Si consideras que la solución superior es utilizar el periférico de hardware `PCNT` (Pulse Counter) del ESP32 con su filtro de glitches en silicio, escribe la implementación completa y funcional en C++ lista para reemplazar la clase actual.
+  - Si consideras que se requiere un estimador estadístico, filtro de mediana móvil, o descarte por plausibilidad espectral, escribe el código C++ completo con su lógica desarrollada.
+- **REGLA ESTRICTA DE ENTREGA:** No utilices pseudocódigo ni comentarios evasivos como `// implementar aqui mas adelante`. El código debe estar 100% escrito, limpio y listo para ser integrado y probado en el microcontrolador ESP32 de la planta real.
