@@ -143,7 +143,7 @@ private:
   uint64_t _rechazosPrevios = 0;
   double   _volumenEstimadoAcumulado_L = 0.0;
   float    _qSuavizadoDisplay = 0.0f;
-  float    _sinPulso_s = 0.0f;
+  int64_t  _inicioSinPulso_us = -1;
   bool     _falloAlimentacion = false;
   Muestra  _ultimaMuestra;
 };

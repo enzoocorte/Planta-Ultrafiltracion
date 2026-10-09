@@ -74,7 +74,14 @@ void loop() {
   constexpr bool bombaEmpuja = false;
   constexpr double rpm = 0.0;
 
-  registro.tick(alimentacion, permeado, rpm, bombaEmpuja);
+  static uint32_t ultimaCaptura_ms = 0;
+  const uint32_t ahora_ms = millis();
+  if (ahora_ms - ultimaCaptura_ms >= 1000U) {
+    ultimaCaptura_ms = ahora_ms;
+    const auto ma = alimentacion.capturar(bombaEmpuja);
+    const auto mp = permeado.capturar(bombaEmpuja);
+    registro.tick(ma, mp, rpm);
+  }
 
   if (Serial.available()) {
     const char comando = static_cast<char>(Serial.read());

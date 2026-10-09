@@ -24,7 +24,7 @@ void Caudalimetro::reiniciarEstimadorLocked() {
 }
 
 bool Caudalimetro::setK(double nuevoK) {
-  if (_iniciado || !std::isfinite(nuevoK) || nuevoK < 0.1) return false;
+  if (!std::isfinite(nuevoK) || nuevoK < 0.1) return false;
   _cfg.k_Hz_por_Lmin = nuevoK;
   _cfg.calibracionDocumentada = false;
   return true;
@@ -205,12 +205,13 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
   }
 
   // En modo seco no se genera estimación de caudal
-  if (!seco && !sinSenal && periodo > 0) {
+  // Sección 4.2 de Astra: Solo publicar estimación recíproca si hay períodos NUEVOS en la ventana
+  const bool hayPeriodosNuevos = (periodos > 0 && suma > 0);
+
+  if (!seco && !sinSenal && hayPeriodosNuevos) {
     m.calidad |= PERIODO_DISPONIBLE;
-    m.frecuencia_Hz = (periodos > 0 && suma > 0) ?
-                      (1.0e6 * (double)periodos / (double)suma) :
-                      (1.0e6 / (double)periodo);
-    m.q_mLmin = (1000.0 * m.frecuencia_Hz) / m.k;
+    m.frecuencia_Hz = 1.0e6 * static_cast<double>(periodos) / static_cast<double>(suma);
+    m.q_mLmin = 1000.0 * m.frecuencia_Hz / m.k;
 
     if (m.q_mLmin > _cfg.qMaxOperativo_mLmin) {
       m.calidad |= FUERA_RANGO_OPERATIVO;
@@ -235,20 +236,25 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
     m.calidad |= SIN_IMPULSION;
   }
 
-  // Suavizado EMA solo para indicación visual en SCADA
+  // Suavizado EMA solo para indicación visual en SCADA (si no hay flujo nuevo, cae a 0)
   if (std::isfinite(m.q_mLmin) && m.q_mLmin > 0.0) {
     _qSuavizadoDisplay = (_qSuavizadoDisplay == 0.0f) ? (float)m.q_mLmin : (0.25f * (float)m.q_mLmin + 0.75f * _qSuavizadoDisplay);
   } else {
     _qSuavizadoDisplay = 0.0f;
   }
 
-  // Detección de fallo en alimentación si la bomba gira pero no se detectan pulsos en 5 s
-  if (_validosVentana > 0 || !bombaEmpuja || !_esAlimentacion) {
-    _sinPulso_s = 0.0f;
+  // Sección 4.3 de Astra: Detección rigurosa de tiempo real transcurrido para fallo de alimentación
+  if (!_esAlimentacion || seco || !bombaEmpuja) {
+    _inicioSinPulso_us = -1;
+    _falloAlimentacion = false;
+  } else if (nuevos) {
+    _inicioSinPulso_us = (m.ultimoAceptado_us >= 0) ? m.ultimoAceptado_us : m.t_us;
     _falloAlimentacion = false;
   } else {
-    _sinPulso_s += 1.0f; // periodo de captura aproximado
-    _falloAlimentacion = (_sinPulso_s >= 5.0f);
+    if (_inicioSinPulso_us < 0) {
+      _inicioSinPulso_us = m.t_us;
+    }
+    _falloAlimentacion = (m.t_us - _inicioSinPulso_us >= 5000000LL);
   }
 
   _ultimaMuestra = m;

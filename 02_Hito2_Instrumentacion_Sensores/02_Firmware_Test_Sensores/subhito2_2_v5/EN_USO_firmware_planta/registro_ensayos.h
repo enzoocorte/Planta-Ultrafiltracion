@@ -83,23 +83,15 @@ public:
     return true;
   }
 
-  bool tick(Caudalimetro& a, Caudalimetro& p, double rpm, bool bombaEmpuja) {
+  bool tick(const Caudalimetro::Muestra& ma, const Caudalimetro::Muestra& mp, double rpm) {
     if (!_activo) return false;
     const int64_t ahora = esp_timer_get_time();
     if (ahora < _proximo_us) return false;
 
-    const uint64_t vencidos = (uint64_t)((ahora - _proximo_us) / INTERVALO_LOG_US) + 1;
-    _proximo_us += (int64_t)vencidos * INTERVALO_LOG_US;
+    const uint64_t vencidos = static_cast<uint64_t>((ahora - _proximo_us) / INTERVALO_LOG_US) + 1;
+    _proximo_us += static_cast<int64_t>(vencidos) * INTERVALO_LOG_US;
 
-    // Se reserva 1 fila fija para FIN
-    if (_n >= MAX_FILAS - 1 || !std::isfinite(rpm) || rpm < 0.0) {
-      omitir(vencidos);
-      return false;
-    }
-
-    const auto ma = a.capturar(bombaEmpuja);
-    const auto mp = p.capturar(bombaEmpuja);
-    if (!iniciadas(ma, mp)) {
+    if (_n >= MAX_FILAS - 1 || !std::isfinite(rpm) || rpm < 0.0 || !iniciadas(ma, mp)) {
       omitir(vencidos);
       return false;
     }
@@ -108,7 +100,7 @@ public:
       omitir(vencidos - 1);
     }
 
-    guardar(Tipo::PERIODICA, esp_timer_get_time() - _inicio_us, rpm, ma, mp);
+    guardar(Tipo::PERIODICA, ahora - _inicio_us, rpm, ma, mp);
     return true;
   }
 

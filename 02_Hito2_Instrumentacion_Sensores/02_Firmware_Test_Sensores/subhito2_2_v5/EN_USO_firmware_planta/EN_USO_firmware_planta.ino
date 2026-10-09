@@ -154,7 +154,7 @@ void guardarMuestraDatalogger() {
   reg.k_alim       = sensorAlimentacion.getK();
   reg.k_perm       = sensorPermeado.getK();
   reg.j_lmh        = (reg.q_perm * 0.06f) / AREA_MEMBRANA_M2;
-  reg.tmp_bar      = resultadoDarcy.valido ? resultadoDarcy.TMP_bar : 0.0f;
+  reg.tmp_bar      = resultadoDarcy.valido ? resultadoDarcy.TMP_bar : NAN;
 
   // Inserción O(1) en Buffer Circular Indexado
   bufferLog[bufferHead] = reg;
@@ -721,9 +721,9 @@ void loop() {
     bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
     float qBomba = bomba.caudalTeorico_mLmin();
 
-    sensorAlimentacion.capturar(bombaEmpuja);
-    sensorPermeado.capturar(bombaEmpuja);
-    registroEnsayos.tick(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), bombaEmpuja);
+    const auto ma = sensorAlimentacion.capturar(bombaEmpuja);
+    const auto mp = sensorPermeado.capturar(bombaEmpuja);
+    registroEnsayos.tick(ma, mp, bomba.rpmActual());
 
     float qAlim = sensorAlimentacion.caudal_mLmin();
     float qPerm = sensorPermeado.caudal_mLmin();
