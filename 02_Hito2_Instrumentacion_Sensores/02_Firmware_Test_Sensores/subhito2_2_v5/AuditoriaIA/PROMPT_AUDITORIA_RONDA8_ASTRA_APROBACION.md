@@ -3,7 +3,7 @@
 > **INSTRUCCIÓN PARA EL MODELO AUDITOR (use.ai / GPT-4o / Claude Opus):**
 > Actúas como un **Auditor Metrológico y Revisor Experto de Firmware de Tiempo Real (ESP32 / FreeRTOS / ESP-IDF)**.
 > Se te presenta el caso técnico completo y cerrado de la Planta Piloto de Ultrafiltración Tangencial (UNSa). Lee con atención todo el contexto (este prompt es **100% autocontenido y no requiere memoria previa**), el levantamiento formal de las objeciones de la auditoría anterior (Ronda 7), la integración completa de las mejoras propuestas y el código fuente compilado.
-> **Tu objetivo:** Emitir el dictamen formal (**[APROBADO]** o **[APROBADO CON OBSERVACIONES]**) para habilitar el ensayo experimental en banco y **suministrar tu código final completo, limpio, bien estructurado y documentado en C++**, listo para que los tesistas lo incorporen y defiendan ante el tribunal de grado.
+> **Tu objetivo:** Emitir un dictamen formal sincero e inapelable (**[APROBADO]**, **[APROBADO CON OBSERVACIONES]** o **[RECHAZADO]**). Si consideras que aún debe ser **[RECHAZADO]**, debes justificar técnicamente los motivos y **suministrar obligatoriamente tu código completo, funcional, limpio, bien estructurado y documentado en C++ explicando con exactitud cómo quedaría aprobado**, listo para que los tesistas lo incorporen y defiendan ante el tribunal de grado.
 
 ---
 
@@ -617,8 +617,9 @@ private:
 ## 4. ENTREGABLES REQUERIDOS AL AUDITOR EXPERTO
 
 1. **Dictamen Metrológico Formal:**
-   * Emitir veredicto formal (**[APROBADO]** o **[APROBADO CON OBSERVACIONES]**) para autorizar el paso a los ensayos experimentales con agua en banco.
+   * Emitir veredicto formal inequívoco: **[APROBADO]**, **[APROBADO CON OBSERVACIONES]** o **[RECHAZADO]** para autorizar el paso a los ensayos experimentales con agua en banco.
+   * Si tu veredicto es **[RECHAZADO]**, debes justificar técnicamente qué aspecto exacto lo motiva y explicar detalladamente con tu código propuesto qué cambios específicos se deben hacer para que quede **[APROBADO]**.
 2. **Evaluación de la Solución de Software:**
    * ¿Consideras que la arquitectura implementada (ancho de nivel en `CHANGE`, continuidad temporal de 64 bits, desacoplamiento de totalizador volumétrico y módulo `RegistroEnsayos`) resuelve con el máximo rigor posible las limitaciones del hardware congelado ($4.7\text{ k}\Omega + 200\text{ nF}$)?
-3. **CÓDIGO COMPLETO FINAL DEL AUDITOR:**
-   * Si sugieres cualquier ajuste adicional, suministra **tu versión completa, limpia, modular y comentada en C++** de los archivos involucrados, garantizando que sea comprensible y defendible por los tesistas en su presentación académica final.
+3. **CÓDIGO COMPLETO FINAL DEL AUDITOR (ENTREGABLE OBLIGATORIO):**
+   * Ya sea que tu dictamen sea de aprobación o rechazo, debes suministrar **tu versión completa, funcional, limpia, modular y exhaustivamente comentada en C++** de los archivos involucrados (`caudalimetro.h`, `caudalimetro.cpp`, `registro_ensayos.h`, etc.), mostrando con precisión **cómo debe quedar el código para estar plenamente aprobado y listo para producción**, con una estructura comprensible que Antonella y Owen puedan defender con solvencia en su tesis.
