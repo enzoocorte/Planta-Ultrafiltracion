@@ -30,6 +30,15 @@ bool Caudalimetro::setK(double nuevoK) {
   return true;
 }
 
+bool Caudalimetro::setQMinDetectable(double nuevoQMin_mLmin) {
+  if (!std::isfinite(nuevoQMin_mLmin) || nuevoQMin_mLmin < 0.0 ||
+      nuevoQMin_mLmin >= _cfg.qMaxOperativo_mLmin) {
+    return false;
+  }
+  _cfg.qMinDetectable_mLmin = nuevoQMin_mLmin;
+  return true;
+}
+
 bool Caudalimetro::declararCalibrado(bool valido) {
   if (_iniciado) return false;
   _cfg.calibracionDocumentada = valido;
@@ -46,7 +55,9 @@ bool Caudalimetro::begin() {
       !std::isfinite(_cfg.k_Hz_por_Lmin) || _cfg.k_Hz_por_Lmin <= 0.0 ||
       _cfg.lowMin_us == 0 || _cfg.highMin_us == 0 ||
       _cfg.periodoMin_us == 0 || _cfg.timeout_us < _cfg.periodoMin_us ||
-      !std::isfinite(_cfg.qMaxOperativo_mLmin) || _cfg.qMaxOperativo_mLmin <= 0.0) {
+      !std::isfinite(_cfg.qMaxOperativo_mLmin) || _cfg.qMaxOperativo_mLmin <= 0.0 ||
+      !std::isfinite(_cfg.qMinDetectable_mLmin) || _cfg.qMinDetectable_mLmin < 0.0 ||
+      _cfg.qMinDetectable_mLmin >= _cfg.qMaxOperativo_mLmin) {
     return false;
   }
 
@@ -56,7 +67,8 @@ bool Caudalimetro::begin() {
     return false;
   }
 
-  pinMode(_cfg.pin, INPUT); // Utiliza el pull-up externo existente de 4.7k a 3.3V
+  // Pull-up interno + externo: evita pin flotante y lecturas fantasmas por EMI.
+  pinMode(_cfg.pin, INPUT_PULLUP);
 
   portENTER_CRITICAL(&_mux);
   _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
@@ -212,6 +224,12 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
     m.calidad |= PERIODO_DISPONIBLE;
     m.frecuencia_Hz = 1.0e6 * static_cast<double>(periodos) / static_cast<double>(suma);
     m.q_mLmin = 1000.0 * m.frecuencia_Hz / m.k;
+
+    // Piso metrológico: por debajo de este umbral se considera ruido/no cuantificable.
+    if (m.q_mLmin < _cfg.qMinDetectable_mLmin || m.frecuencia_Hz < 0.5) {
+      m.q_mLmin = 0.0;
+      m.frecuencia_Hz = 0.0;
+    }
 
     if (m.q_mLmin > _cfg.qMaxOperativo_mLmin) {
       m.calidad |= FUERA_RANGO_OPERATIVO;

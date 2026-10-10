@@ -252,7 +252,7 @@ void handleStatus() {
   float qPerm = sensorPermeado.caudal_mLmin();
   jLMH_actual = (qPerm * 0.06f) / AREA_MEMBRANA_M2;
 
-  char buf[960];
+  char buf[1088];
   int n = snprintf(buf, sizeof(buf),
     "{"
     "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
@@ -262,7 +262,7 @@ void handleStatus() {
     "\"flan_perm\":%lu,\"val_perm\":%lu,\"gl_perm\":%lu,"
     "\"modo_seco\":%s,\"ruido_seco\":%s,"
     "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
-    "\"k_alim\":%.2f,\"k_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
+    "\"k_alim\":%.2f,\"k_perm\":%.2f,\"qmin_alim\":%.2f,\"qmin_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
     "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
     "\"n_logs\":%u,\"ensayo_act\":%u,\"t_ensayo_s\":%lu,"
     "\"heap\":%u,\"maxblk\":%u,"
@@ -284,6 +284,7 @@ void handleStatus() {
     sensorPermeado.modoSeco() ? "true" : "false", sensorPermeado.ruidoDetectadoEnSeco() ? "true" : "false",
     bomba.caudalTeorico_mLmin(), deltaBomba, jLMH_actual, flagCruceSensores ? "true" : "false",
     sensorAlimentacion.getK(), sensorPermeado.getK(),
+    sensorAlimentacion.getQMinDetectable(), sensorPermeado.getQMinDetectable(),
     bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
     autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
     (unsigned)bufferCount, (unsigned)ensayoActualId, (unsigned long)t_act_s,
@@ -395,13 +396,22 @@ void handleSetRPM() {
 
 // Configuración en Modo Desarrollador
 void handleSetDev() {
+  String err = "";
   if (server.hasArg("ka")) {
     float ka = server.arg("ka").toFloat();
-    sensorAlimentacion.setK(ka);
+    if (!sensorAlimentacion.setK(ka)) err += "ka invalido;";
   }
   if (server.hasArg("kp")) {
     float kp = server.arg("kp").toFloat();
-    sensorPermeado.setK(kp);
+    if (!sensorPermeado.setK(kp)) err += "kp invalido;";
+  }
+  if (server.hasArg("qmina")) {
+    float qmina = server.arg("qmina").toFloat();
+    if (!sensorAlimentacion.setQMinDetectable(qmina)) err += "qmina invalido;";
+  }
+  if (server.hasArg("qminp")) {
+    float qminp = server.arg("qminp").toFloat();
+    if (!sensorPermeado.setQMinDetectable(qminp)) err += "qminp invalido;";
   }
   if (server.hasArg("ml")) {
     float ml = server.arg("ml").toFloat();
@@ -418,6 +428,11 @@ void handleSetDev() {
                          bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
   }
 
+  if (err.length() > 0) {
+    String out = "{\"status\":\"error\",\"msg\":\"" + err + "\"}";
+    server.send(400, "application/json", out);
+    return;
+  }
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 

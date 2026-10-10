@@ -1,5 +1,5 @@
 # GUÍA OPERATIVA DEL SCADA WEB Y PROTOCOLO DE CALIBRACIÓN
-## Planta Piloto de Ultrafiltración FX-100 • Firmware v4 (Subhito 2.2)
+## Planta Piloto de Ultrafiltración FX-100 • Firmware v5 (Subhito 2.2)
 
 ---
 
@@ -268,3 +268,52 @@ Para el trabajo conjunto con Owen y Antonella en el laboratorio:
 1. Repetir el procedimiento para 25, 35, 44, 75 y 100 RPM.
 2. Al finalizar todas las corridas, seleccionar en el desplegable `📦 Todos los Ensayos (Histórico Completo)` y presionar `📥 Descargar Ensayo Seleccionado en Excel (.CSV)`.
 3. Copiar las columnas a la planilla `PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx` para graficar las curvas $Q \text{ vs. RPM}$ y obtener el $R^2$ de regresión lineal.
+
+---
+
+## 7. Rutina de Banco Anti-Lecturas Fantasma (Q_Perm ≈ 0 sin flujo real)
+
+### Objetivo
+Validar que el canal de permeado no publique caudal falso cuando sólo se ensaya la línea de alimentación.
+
+### Paso 1: Preparación
+1. Conectar **sólo** el caudalímetro de alimentación en la hidráulica.
+2. Dejar el sensor de permeado conectado eléctricamente (GPIO 27), pero sin flujo real de permeado.
+3. Encender la planta y esperar **2 a 3 minutos** para estabilización.
+
+### Paso 2: Cero en reposo (bomba OFF, 5 min)
+1. Mantener la bomba detenida durante 5 minutos.
+2. Criterio esperado: `Q_Alim = 0` y `Q_Perm = 0` sostenido.
+3. Aceptación: sin picos persistentes; cualquier evento aislado debe volver a cero de inmediato.
+
+### Paso 3: Alimentación sola (bomba ON en 3 escalones)
+1. Correr ensayos de **25, 50 y 72 RPM**, durante **3 minutos** por escalón.
+2. Esperado:
+   - `Q_Alim > 0` y estable según RPM.
+   - `Q_Perm ≈ 0` durante todo el escalón.
+3. Revisar telemetría F/V/G (`flancos`, `válidos`, `glitches`):
+   - En permeado pueden aparecer flancos o glitches por ruido.
+   - Aun así, el caudal de permeado debe mantenerse en cero.
+
+### Paso 4: Prueba EMI intencional (2 min)
+1. Conmutar cargas cercanas y/o aproximar cableado de potencia del motor al mazo de sensores por 2 minutos.
+2. Esperado: no debe aparecer caudal falso sostenido en permeado.
+
+### Paso 5: Repetición cruzada de sensores
+1. Intercambiar físicamente sensores/canales una vez.
+2. Repetir Paso 2 y Paso 3.
+3. Objetivo: confirmar que la anomalía no “sigue al canal”.
+
+### Paso 6: Criterio de cierre
+En todas las corridas con solo alimentación, `Q_Perm` debe quedar en cero (salvo ruido transitorio breve sin persistencia).
+
+### Ajuste temporal de sensibilidad (sin recompilar)
+Si aparece ruido persistente en permeado, subir temporalmente el piso de detección de permeado (`qMinDetectable`) y repetir la prueba:
+
+- Estado actual: `GET /status` (campos `qmin_alim` y `qmin_perm`).
+- Ajuste temporal en caliente:  
+  `GET /set_dev?qminp=6.0`  (ejemplo: elevar permeado a 6.0 mL/min).
+- Ajuste temporal de alimentación si se requiere:  
+  `GET /set_dev?qmina=25.0`
+
+> Nota: estos ajustes son temporales en RAM y se pierden al reiniciar o al restablecer parámetros.
