@@ -85,6 +85,7 @@ struct ConfigSensor {
   uint32_t periodoMin_us;
   uint32_t timeout_us;
   double   qMaxOperativo_mLmin;
+  double   qMinDetectable_mLmin;
   bool     calibracionDocumentada;
   double   qMinCal_mLmin;
   double   qMaxCal_mLmin;
@@ -99,6 +100,7 @@ constexpr ConfigSensor SENSOR_ALIM_CFG = {
   1000,                    // Período mínimo admisible (1000 us = 1000 Hz)
   1000000,                 // Timeout de pérdida de señal (1 s)
   1400.0,                  // Q máximo operativo admisible (mL/min)
+  20.0,                    // Umbral mínimo detectable (rechazo de ruido espurio)
   true,                    // Calibración documentada en laboratorio
   200.0,                   // Q mínimo del intervalo calibrado (mL/min)
   1360.0                   // Q máximo del intervalo calibrado (mL/min)
@@ -113,6 +115,7 @@ constexpr ConfigSensor SENSOR_PERM_CFG = {
   2500,                    // Período mínimo admisible (2500 us = 400 Hz)
   5000000,                 // Timeout de pérdida de señal (5 s)
   200.0,                   // Q máximo operativo admisible (mL/min)
+  4.0,                     // Umbral mínimo detectable para suprimir lecturas fantasmas
   false,                   // Requiere balanza gravimétrica en Subhito 2.2
   0.0,                     // Q min
   0.0                      // Q max
