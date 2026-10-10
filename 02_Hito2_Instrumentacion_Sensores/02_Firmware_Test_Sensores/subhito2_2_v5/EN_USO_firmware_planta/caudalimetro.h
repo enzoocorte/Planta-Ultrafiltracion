@@ -97,6 +97,8 @@ public:
   // Configuración y calibración
   bool  setK(double nuevoK);
   float getK()                        const { return (float)_cfg.k_Hz_por_Lmin; }
+  bool  setQMinDetectable(double nuevoQMin_mLmin);
+  float getQMinDetectable()           const { return (float)_cfg.qMinDetectable_mLmin; }
   bool  declararCalibrado(bool valido);
 
 private:

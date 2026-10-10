@@ -30,6 +30,15 @@ bool Caudalimetro::setK(double nuevoK) {
   return true;
 }
 
+bool Caudalimetro::setQMinDetectable(double nuevoQMin_mLmin) {
+  if (!std::isfinite(nuevoQMin_mLmin) || nuevoQMin_mLmin < 0.0 ||
+      nuevoQMin_mLmin >= _cfg.qMaxOperativo_mLmin) {
+    return false;
+  }
+  _cfg.qMinDetectable_mLmin = nuevoQMin_mLmin;
+  return true;
+}
+
 bool Caudalimetro::declararCalibrado(bool valido) {
   if (_iniciado) return false;
   _cfg.calibracionDocumentada = valido;
