@@ -396,31 +396,65 @@ void handleSetRPM() {
 
 // Configuración en Modo Desarrollador
 void handleSetDev() {
-  String err = "";
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"No se pueden modificar factores metrologicos durante un ensayo activo\"}");
+    return;
+  }
+
+  // 1. Validar primero todos los parámetros antes de aplicar
+  float ka = -1.0f, kp = -1.0f, ml = -1.0f, qmina = -1.0f, qminp = -1.0f;
+  int32_t pul = -1;
+
   if (server.hasArg("ka")) {
-    float ka = server.arg("ka").toFloat();
-    if (!sensorAlimentacion.setK(ka)) err += "ka invalido;";
+    ka = server.arg("ka").toFloat();
+    if (!std::isfinite(ka) || ka < 10.0f || ka > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Alimentacion fuera de rango (10-1000)\"}");
+      return;
+    }
   }
   if (server.hasArg("kp")) {
-    float kp = server.arg("kp").toFloat();
-    if (!sensorPermeado.setK(kp)) err += "kp invalido;";
-  }
-  if (server.hasArg("qmina")) {
-    float qmina = server.arg("qmina").toFloat();
-    if (!sensorAlimentacion.setQMinDetectable(qmina)) err += "qmina invalido;";
-  }
-  if (server.hasArg("qminp")) {
-    float qminp = server.arg("qminp").toFloat();
-    if (!sensorPermeado.setQMinDetectable(qminp)) err += "qminp invalido;";
+    kp = server.arg("kp").toFloat();
+    if (!std::isfinite(kp) || kp < 10.0f || kp > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Permeado fuera de rango (10-1000)\"}");
+      return;
+    }
   }
   if (server.hasArg("ml")) {
-    float ml = server.arg("ml").toFloat();
-    bomba.setMlPorVuelta(ml);
+    ml = server.arg("ml").toFloat();
+    if (!std::isfinite(ml) || ml < 1.0f || ml > 50.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Cilindrada fuera de rango (1-50 mL/rev)\"}");
+      return;
+    }
   }
   if (server.hasArg("pul")) {
-    uint16_t pul = (uint16_t)server.arg("pul").toInt();
-    bomba.setPulsosPorRev(pul);
+    pul = server.arg("pul").toInt();
+    if (pul < 200 || pul > 25600) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Pulsos/rev fuera de rango (200-25600)\"}");
+      return;
+    }
   }
+  if (server.hasArg("qmina")) {
+    qmina = server.arg("qmina").toFloat();
+    if (!std::isfinite(qmina) || qmina < 0.0f || qmina > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable alimentacion invalido\"}");
+      return;
+    }
+  }
+  if (server.hasArg("qminp")) {
+    qminp = server.arg("qminp").toFloat();
+    if (!std::isfinite(qminp) || qminp < 0.0f || qminp > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable permeado invalido\"}");
+      return;
+    }
+  }
+
+  // 2. Aplicar únicamente si todos pasaron la validación
+  if (ka > 0.0f) sensorAlimentacion.setK(ka);
+  if (kp > 0.0f) sensorPermeado.setK(kp);
+  if (ml > 0.0f) bomba.setMlPorVuelta(ml);
+  if (pul > 0)   bomba.setPulsosPorRev((uint16_t)pul);
+  if (qmina >= 0.0f) sensorAlimentacion.setQMinDetectable(qmina);
+  if (qminp >= 0.0f) sensorPermeado.setQMinDetectable(qminp);
 
   bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
   if (saveNvs) {
@@ -428,11 +462,6 @@ void handleSetDev() {
                          bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
   }
 
-  if (err.length() > 0) {
-    String out = "{\"status\":\"error\",\"msg\":\"" + err + "\"}";
-    server.send(400, "application/json", out);
-    return;
-  }
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
@@ -458,6 +487,10 @@ void handleCancelarAutoCal() {
 
 // Calibrador Completo por RPM y Caudal de Probeta
 void handleCalibrarRpmQ() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"No se puede calibrar mientras un ensayo metrologico esta en curso\"}");
+    return;
+  }
   if (!server.hasArg("rpm") || !server.hasArg("qa")) {
     server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos (requiere rpm y qa)\"}");
     return;
@@ -467,14 +500,16 @@ void handleCalibrarRpmQ() {
   float qa  = server.arg("qa").toFloat();
   float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
 
-  if (rpm <= 0.0f || qa <= 0.0f) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"RPM y Caudal de Alimentacion deben ser > 0\"}");
+  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp)) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o <= 0\"}");
     return;
   }
 
   // 1. Cilindrada real de la bomba
   float nuevaCilindrada = qa / rpm;
-  bomba.setMlPorVuelta(nuevaCilindrada);
+  if (nuevaCilindrada >= 1.0f && nuevaCilindrada <= 50.0f) {
+    bomba.setMlPorVuelta(nuevaCilindrada);
+  }
 
   // 2. Factores K basados en frecuencia actual
   float fa = sensorAlimentacion.frecuencia_Hz();
@@ -578,6 +613,10 @@ void handleExportCSV() {
 }
 
 void handleClearCSV() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "text/plain", "ENSAYO_ACTIVO: Detenga la bomba antes de limpiar los registros.");
+    return;
+  }
   bufferHead = 0;
   bufferCount = 0;
   numEnsayos = 0;
@@ -619,6 +658,10 @@ public:
 
 // Exportación CSV con Esquema Metrológico Certificado (GPT Astra)
 void handleExportMetrologia() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "text/plain", "ENSAYO_ACTIVO: Detenga la bomba o finalice el ensayo antes de exportar el registro metrologico.");
+    return;
+  }
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
   server.sendHeader("Content-Disposition", "attachment; filename=\"PlantaUF_Metrologia_Certificada.csv\"");
@@ -649,8 +692,6 @@ void setup() {
   pinMode(PIN_LED_BOMBA, OUTPUT);
   digitalWrite(PIN_LED_BOMBA, LOW);
 
-  sensorAlimentacion.declararCalibrado(SENSOR_ALIM_CFG.calibracionDocumentada);
-  sensorPermeado.declararCalibrado(SENSOR_PERM_CFG.calibracionDocumentada);
   const bool inicioAlim = sensorAlimentacion.begin();
   const bool inicioPerm = sensorPermeado.begin();
   if (!inicioAlim || !inicioPerm) {
@@ -746,13 +787,13 @@ void loop() {
     // Flanco de subida: Iniciar sesión de ensayo
     if (enMarcha && !bombaEnMarchaAnterior) {
       iniciarNuevoEnsayo(bomba.rpmObjetivo());
-      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmObjetivo(), true);
+      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), true);
     }
     
     // Flanco de bajada: Finalizar sesión y registrar
     if (!enMarcha && bombaEnMarchaAnterior) {
       finalizarEnsayoActual();
-      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, 0.0, false);
+      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), false);
     }
 
     bombaEnMarchaAnterior = enMarcha;

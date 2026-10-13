@@ -373,6 +373,9 @@
             </div>
             <div class="info-row">
               <span>Frecuencia: <b id="f_perm_val" style="color:#e2e8f0">0.0 Hz</b></span>
+              <span>Factor K: <b id="lbl_kp" style="color:var(--perm)">196.50</b> Hz/(L/min)</span>
+            </div>
+            <div class="info-row" style="margin-top:2px">
               <span>Flujo Darcy: <b id="flux_darcy_val" style="color:var(--perm)">0.00 LMH</b></span>
             </div>
           </div>
@@ -873,6 +876,7 @@
       } else {
         kPerm = Math.max(10.0, Math.round((kPerm + delta) * 10) / 10);
         document.getElementById('inp_kp').value = kPerm.toFixed(2);
+        document.getElementById('lbl_kp').innerText = kPerm.toFixed(2);
         showToast("K Permeado ajustado a " + kPerm.toFixed(2) + " Hz/(L/min)");
       }
     }

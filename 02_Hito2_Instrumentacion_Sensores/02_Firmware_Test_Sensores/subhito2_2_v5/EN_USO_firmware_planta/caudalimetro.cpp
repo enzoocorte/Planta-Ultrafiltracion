@@ -25,8 +25,12 @@ void Caudalimetro::reiniciarEstimadorLocked() {
 
 bool Caudalimetro::setK(double nuevoK) {
   if (!std::isfinite(nuevoK) || nuevoK < 0.1) return false;
+  portENTER_CRITICAL(&_mux);
   _cfg.k_Hz_por_Lmin = nuevoK;
   _cfg.calibracionDocumentada = false;
+  ++_epoca; // Cada cambio de factor K inicia una nueva época metrológica
+  reiniciarEstimadorLocked();
+  portEXIT_CRITICAL(&_mux);
   return true;
 }
 
@@ -46,7 +50,9 @@ bool Caudalimetro::declararCalibrado(bool valido) {
 }
 
 void Caudalimetro::resetVolumen() {
+  portENTER_CRITICAL(&_mux);
   _pulsosOffset = _pulsosMedicion;
+  portEXIT_CRITICAL(&_mux);
   _volumenEstimadoAcumulado_L = 0.0;
 }
 

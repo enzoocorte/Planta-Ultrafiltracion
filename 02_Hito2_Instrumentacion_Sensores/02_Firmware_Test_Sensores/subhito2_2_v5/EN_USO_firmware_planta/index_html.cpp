@@ -328,6 +328,9 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           </div>
           <div class="info-row">
             <span>Frecuencia: <b id="fp" style="color:#e2e8f0">0.0 Hz</b></span>
+            <span>Factor K: <b id="lbl_kp" style="color:var(--perm)">196.50</b> Hz/(L/min)</span>
+          </div>
+          <div class="info-row" style="margin-top:2px">
             <span>Flujo Darcy: <b id="j_lmh" style="color:var(--perm)">0.00 LMH</b></span>
           </div>
         </div>

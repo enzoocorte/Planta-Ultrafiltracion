@@ -159,14 +159,14 @@ void Bomba::tick(float dt) {
 
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
     if (f != _fActual) { 
-      ledcChangeFrequency(PIN_PUL, f, 10); 
-      _fActual = f; 
+      uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10); 
+      if (retF > 0) _fActual = retF;
     }
     ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
 #else
     if (f != _fActual) { 
-      ledcSetup(0, f, 10); 
-      _fActual = f; 
+      uint32_t retF = ledcSetup(0, f, 10); 
+      if (retF > 0) _fActual = retF;
     }
     ledcWrite(0, 512);
 #endif

@@ -1,55 +1,54 @@
-# EXPEDIENTE COMPLETO DE AUDITORÍA TÉCNICA Y DICTAMEN METROLÓGICO — FIRMWARE V5.2 DEFINITIVO
-## PROYECTO: PLANTA PILOTO DE ULTRAFILTRACIÓN (TESIS DE GRADO EN INGENIERÍA INDUSTRIAL - UNSA 2026)
+# EXPEDIENTE DE AUDITORÍA TÉCNICA — FIRMWARE V5.2 (SUBHITO 2.2)
+## BANCO EXPERIMENTAL DE ULTRAFILTRACIÓN TANGENCIAL (TESIS DE GRADO EN INGENIERÍA INDUSTRIAL - UNSA 2026)
 
 ---
 
-### 1. CONTEXTO INSTITUCIONAL, OBJETIVOS Y CONDICIÓN DE AUDITORÍA
+### 1. ALCANCE Y CONTEXTO DEL DICTAMEN SOLICITADO
 Estimado auditor de IA (GPT Astra / use.ai / Claude / ChatGPT):
-Por favor, analiza este expediente completo y emite tu dictamen técnico y metrológico para la aprobación final del firmware antes de su compilación y carga en el microcontrolador ESP32.
-**Asume que este es un nuevo proceso de auditoría y no tienes memoria de interacciones previas. Toda la información necesaria está autocontenida en este documento.**
+
+Por favor, analiza este expediente técnico completo y emite tu dictamen para **habilitar la compilación, carga en el ESP32 y ejecución de la campaña de ensayos de calibración en banco de laboratorio supervisado**.
+
+> **Aclaración de Alcance Metrológico y de Seguridad:**
+> 1. Este firmware **NO** es para uso clínico en pacientes ni para una planta de producción industrial no atendida.
+> 2. Su propósito exclusivo es la **campaña experimental de calibración metrológica en banco de laboratorio universitario supervisado** con recirculación atmosférica de agua desmineralizada a baja presión.
+> 3. La campaña cuenta con **protección hidráulica pasiva independiente** (recirculación abierta a presión atmosférica sin estrangulamiento de retentado) y supervisión manual continua del operador.
+> 4. Los términos "calibración" o "validación" se entienden en el marco de la caracterización experimental del Hito 2.2 de la tesis, sujeta a verificación empírica con probeta graduada y cronómetro.
 
 #### A. Marco Institucional y Autores
 - **Proyecto:** Tesis de Grado para optar al título de Ingeniero Industrial.
 - **Institución:** Universidad Nacional de Salta (UNSa), Facultad de Ingeniería, Salta, Argentina (2026).
 - **Tesistas:** Antonella Guitián & Owen Cañizares.
 - **Codirector:** Ing. Enzo Corte.
-- **Objeto de Investigación:** Planta Piloto de Ultrafiltración Tangencial automatizada con microcontrolador ESP32, bomba peristáltica con motor paso a paso NEMA y driver DM860, y cartucho de hemodiálisis capilar Fresenius FX100 (membrana Helixone® de fibra hueca, 2.2 m² de área efectiva).
+- **Objeto de Estudio:** Banco experimental de ultrafiltración tangencial con bomba peristáltica (motor paso a paso NEMA 23/34 y driver DM860 en cátodo común) y cartucho capilar Fresenius FX100 (membrana Helixone® de fibra hueca, 2.2 m² de área interfacial).
 
-#### B. Estado Actual del Proyecto y Hitos de la Tesis
-- **Hito 1 (Completado):** Diseño cinemático y electromecánico de la bomba peristáltica (3200 pulsos/rev, micropasos 1/16, desplazamiento volumétrico nominal calibrado de 13.60 mL/rev).
-- **Hito 2.1 (Completado):** Control cinemático en lazo abierto mediante pulsos LEDC PWM con rampa sigmoidal S-Curve de despegue suave y frenado rápido y seguro en < 1.5 s.
-- **Hito 2.2 (HITO ACTUAL):** Instrumentación de caudalímetros YF-S401 (Alimentación y Permeado) con acondicionamiento físico RC (200 nF) y digital anti-glitch, calibración gravimétrica/volumétrica con probetas, y datalogging metrológico multi-sesión.
-- **Hito 2.3 (Próximo):** Integración de transductores de presión transmembrana (TMP) mediante bus I2C y ADC ADS1115 para validación del modelo de resistencias en serie de Darcy.
-
-#### C. Problemática Física Fundamental del Sensor YF-S401
-1. **Rango de Trabajo Sub-Nominal:** El sensor comercial de efecto Hall YF-S401 está especificado de fábrica para 300 a 6000 mL/min con K nominal = 98 Hz/(L/min). En nuestra planta, opera en:
-   - Alimentación: 200 a 1360 mL/min (flujo pulsátil peristáltico). Ensayos empíricos demostraron K real = 196.50 Hz/(L/min) por la inercia de los álabes ante el flujo pulsátil.
-   - Permeado: 10 a 200 mL/min (muy por debajo del umbral del fabricante). Ambos sensores son idénticos físicamente (YF-S401), por lo que comparten la misma constante de base K = 196.50 Hz/(L/min).
-2. **Inmunidad Electromagnética (EMI):** El driver DM860 y el motor paso a paso inducen glitches transitorios en el cableado. El hardware dispone de:
-   - Filtros analógicos RC pasivos dedicados (R pull-up 4.7 kΩ a 3.3V + C = 200 nF a GND).
-   - Filtrado digital por firmware en la ISR (ancho mínimo de pulso HIGH >= 400 us, LOW >= 400 us, período mínimo >= 1800 us).
+#### B. Arquitectura de Hardware y Pines (Aserción Estática de Cero Colisiones)
+- **Driver DM860:** Pulsos STEP en GPIO 18 (generados por periférico hardware LEDC PWM), Dirección DIR en GPIO 19, Habilitación ENA en GPIO 23 (HIGH = inhibición física < 1 ms).
+- **Caudalímetro de Alimentación (YF-S401):** GPIO 14 (Borne 12, pull-up externo 4.7 kΩ a 3.3V + filtro RC pasa-bajos pasivo de 200 nF a GND).
+- **Caudalímetro de Permeado (YF-S401):** GPIO 27 (Borne 11, pull-up externo 4.7 kΩ a 3.3V + filtro RC pasa-bajos pasivo de 200 nF a GND).
+- **Bus I2C (Reservado para ADS1115 en Subhito 2.3):** SDA en GPIO 21, SCL en GPIO 22.
 
 ---
 
-### 2. MATRIZ DE RESOLUCIÓN DE HALLAZGOS DE AUDITORÍAS PREVIAS (RONDAS 8 Y 9)
-En las revisiones documentales previas, la auditoría técnica señaló 9 observaciones que han sido íntegramente resueltas en este código:
+### 2. MATRIZ DE RESOLUCIÓN INTEGRAL DE LOS 10 HALLAZGOS DE AUDITORÍA (RONDAS 9 Y 10)
 
-| # | Observación Auditoría Previa | Solución Arquitectónica Definitiva en V5.2 | Archivo / Función Afectada |
+En las revisiones previas, señalaste observaciones técnicas críticas. Cada una de ellas ha sido abordada y resuelta en el código adjunto:
+
+| # | Observación de Auditoría | Solución Implementada en el Firmware | Archivo y Ubicación |
 |---|---|---|---|
-| 1 | Expediente incompleto (faltaban `Bomba`, `darcy`, `index_html`, etc.) | **Expediente 100% completo adjuntado**: Los 10 archivos fuente están provistos íntegramente abajo sin omisiones. | Todos los archivos fuente |
-| 2 | `setK()` rechazaba cambios tras `begin()` (`if (_iniciado) return false;`) | Se eliminó la traba de `_iniciado`. `setK()` ahora recalcula K en caliente y pone `calibracionDocumentada = false` para desacoplarlo de la fábrica. | `caudalimetro.cpp` (`setK`) |
-| 3 | Calibración cargada de NVS heredaba bandera documental fija | Al sintonizar K en vivo o por probeta, `_cfg.calibracionDocumentada` se establece en `false`, asegurando trazabilidad real. | `caudalimetro.cpp` |
-| 4 | Doble captura en el ciclo (`capturar()` en telemetría y en registro) | `registroEnsayos.tick(ma, mp, rpm)` recibe la muestra inmutable ya adquirida, eliminando ventanas vacías. | `registro_ensayos.h`, `EN_USO_firmware_planta.ino` |
-| 5 | Detección de fallo de alimentación (`_sinPulso_s`) contaba llamadas, no tiempo | Se implementó medición rigurosa de tiempo transcurrido en microsegundos con `esp_timer_get_time()` (>= 5.0 s reales). | `caudalimetro.cpp` (l. 265-276) |
-| 6 | Exportación metrológica mezclaba `WiFiClient` directo con chunked HTTP | Se implementó la clase adaptadora `ServerPrintAdapter : public Print` que canaliza el streaming mediante `server.sendContent()`. | `EN_USO_firmware_planta.ino` |
-| 7 | Presión / Darcy reportaba `0.0 bar` sin sensores I2C | Si Darcy no es válido, se exporta estrictamente `NAN`, evitando datos sintéticos en el registro. | `darcy.h`, `EN_USO_firmware_planta.ino` |
-| 8 | `resetVolumen()` no era persistente (siguiente captura reconstruía pulsos) | Se implementó tara persistente: `_pulsosOffset = _pulsosMedicion;` restándolo en cada cálculo de volumen. | `caudalimetro.cpp`, `caudalimetro.h` |
-| 9 | Retención de último período en bajo flujo generaba caudal fantasma | Se aplicó la **Sección 4.2 de Astra**: solo se calcula caudal instantáneo si `hayPeriodosNuevos = (periodos > 0 && suma > 0)`. Si no hay pulsos en la ventana, cae a 0.0 mL/min en el acto. | `caudalimetro.cpp` (l. 220-235) |
+| **1** | **Bug JavaScript en SCADA:** `$('lbl_kp')` no existía en el DOM, provocando excepción unhandled que congelaba la telemetría periódica. | Se incorporó el elemento `<b id="lbl_kp">` en la tarjeta de Permeado del SCADA, visualizando su factor K en tiempo real sin excepciones. | `index_html.cpp` (l. 331) |
+| **2** | **Carrera crítica en lectura de 64 bits en tara (`resetVolumen`):** `_pulsosOffset = _pulsosMedicion;` se ejecutaba fuera de la sección crítica. | Lectura protegida con spinlock SMP: `portENTER_CRITICAL(&_mux); _pulsosOffset = _pulsosMedicion; portEXIT_CRITICAL(&_mux);`. | `caudalimetro.cpp` (`resetVolumen`) |
+| **3** | **Trazabilidad de calibración NVS en `setup()`:** `declararCalibrado(true)` en `setup()` pisaba la invalidación legítima de `setK(ka)` de NVS. | Se eliminó la llamada redundante en `setup()`. Los parámetros cargados desde NVS permanecen estrictamente como `calibracionDocumentada = false`. | `EN_USO_firmware_planta.ino` (`setup`) |
+| **4** | **Cambio de K alteraba volumen acumulado y no cambiaba época:** `setK()` permitía cambiar K sin cerrar época ni proteger la sesión. | 1) `setK()` ahora incrementa `_epoca++` y limpia acumuladores (`reiniciarEstimadorLocked()`).<br>2) Se prohíbe reconfigurar K mientras hay un ensayo activo (`registroEnsayos.activo() -> HTTP 409`). | `caudalimetro.cpp` (`setK`), `EN_USO_firmware_planta.ino` |
+| **5** | **Validación previa en endpoints REST:** Se aplicaban parámetros parciales antes de comprobar errores. | Los endpoints `/set_dev` y `/calibrar_rpm_q` validan exhaustivamente todos los rangos (`ka, kp, ml, pul`) antes de aplicar o persistir en Flash NVS. | `EN_USO_firmware_planta.ino` |
+| **6** | **Streaming HTTP metrológico mezclaba `WiFiClient` con chunked:** `sendContent` tras socket TCP rompía el framing HTTP. | Se implementó la clase adaptadora `ServerPrintAdapter : public Print` que escribe buffers formateados exclusivamente mediante `server.sendContent()`. | `EN_USO_firmware_planta.ino` |
+| **7** | **Exportación metrológica con sesión activa:** `/export_metrologia` enviaba HTTP 200 y fallaba silenciosamente si había sesión activa. | Si `registroEnsayos.activo()`, responde `HTTP 409 Conflict` avisando que se debe detener la bomba para exportar. | `EN_USO_firmware_planta.ino` |
+| **8** | **Retorno ignorado en LEDC:** `ledcChangeFrequency` o `ledcSetup` podían retornar 0 por error y se actualizaba `_fActual`. | Se verifica `uint32_t retF = ledcChangeFrequency(...); if (retF > 0) _fActual = retF;` garantizando consistencia del estado del temporizador. | `Bomba.cpp` (`tick`) |
+| **9** | **RPM dinámicas en bordes de ensayo:** `iniciar` recibía consigna teórica y `finalizar` recibía 0.0 durante el frenado. | Ambos eventos registran ahora la velocidad cinemática instantánea real del eje: `bomba.rpmActual()`. | `EN_USO_firmware_planta.ino` (l. 788-798) |
+| **10** | **Retención de último período en bajo flujo:** El estimador no inventa flujo a velocidad cero. | Solo se calcula caudal recíproco si `hayPeriodosNuevos = (periodos > 0 && suma > 0)` en la ventana. Sin pulsos nuevos, la velocidad instantánea cae a 0.0 mL/min. | `caudalimetro.cpp` (l. 220-235) |
 
 ---
 
-### 3. EXPEDIENTE COMPLETO DEL CÓDIGO FUENTE (10 ARCHIVOS)
-A continuación se adjuntan los 10 archivos fuente del firmware sin omitir ninguna línea de código:
+### 3. EXPEDIENTE COMPLETO DEL CÓDIGO FUENTE (10 ARCHIVOS ÍNTEGROS)
 
 #### ARCHIVO 1: config.h
 ```cpp
@@ -419,14 +418,14 @@ void Bomba::tick(float dt) {
 
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
     if (f != _fActual) { 
-      ledcChangeFrequency(PIN_PUL, f, 10); 
-      _fActual = f; 
+      uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10); 
+      if (retF > 0) _fActual = retF;
     }
     ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
 #else
     if (f != _fActual) { 
-      ledcSetup(0, f, 10); 
-      _fActual = f; 
+      uint32_t retF = ledcSetup(0, f, 10); 
+      if (retF > 0) _fActual = retF;
     }
     ledcWrite(0, 512);
 #endif
@@ -627,8 +626,12 @@ void Caudalimetro::reiniciarEstimadorLocked() {
 
 bool Caudalimetro::setK(double nuevoK) {
   if (!std::isfinite(nuevoK) || nuevoK < 0.1) return false;
+  portENTER_CRITICAL(&_mux);
   _cfg.k_Hz_por_Lmin = nuevoK;
   _cfg.calibracionDocumentada = false;
+  ++_epoca; // Cada cambio de factor K inicia una nueva época metrológica
+  reiniciarEstimadorLocked();
+  portEXIT_CRITICAL(&_mux);
   return true;
 }
 
@@ -648,7 +651,9 @@ bool Caudalimetro::declararCalibrado(bool valido) {
 }
 
 void Caudalimetro::resetVolumen() {
+  portENTER_CRITICAL(&_mux);
   _pulsosOffset = _pulsosMedicion;
+  portEXIT_CRITICAL(&_mux);
   _volumenEstimadoAcumulado_L = 0.0;
 }
 
@@ -1603,6 +1608,9 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           </div>
           <div class="info-row">
             <span>Frecuencia: <b id="fp" style="color:#e2e8f0">0.0 Hz</b></span>
+            <span>Factor K: <b id="lbl_kp" style="color:var(--perm)">196.50</b> Hz/(L/min)</span>
+          </div>
+          <div class="info-row" style="margin-top:2px">
             <span>Flujo Darcy: <b id="j_lmh" style="color:var(--perm)">0.00 LMH</b></span>
           </div>
         </div>
@@ -2499,31 +2507,65 @@ void handleSetRPM() {
 
 // Configuración en Modo Desarrollador
 void handleSetDev() {
-  String err = "";
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"No se pueden modificar factores metrologicos durante un ensayo activo\"}");
+    return;
+  }
+
+  // 1. Validar primero todos los parámetros antes de aplicar
+  float ka = -1.0f, kp = -1.0f, ml = -1.0f, qmina = -1.0f, qminp = -1.0f;
+  int32_t pul = -1;
+
   if (server.hasArg("ka")) {
-    float ka = server.arg("ka").toFloat();
-    if (!sensorAlimentacion.setK(ka)) err += "ka invalido;";
+    ka = server.arg("ka").toFloat();
+    if (!std::isfinite(ka) || ka < 10.0f || ka > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Alimentacion fuera de rango (10-1000)\"}");
+      return;
+    }
   }
   if (server.hasArg("kp")) {
-    float kp = server.arg("kp").toFloat();
-    if (!sensorPermeado.setK(kp)) err += "kp invalido;";
-  }
-  if (server.hasArg("qmina")) {
-    float qmina = server.arg("qmina").toFloat();
-    if (!sensorAlimentacion.setQMinDetectable(qmina)) err += "qmina invalido;";
-  }
-  if (server.hasArg("qminp")) {
-    float qminp = server.arg("qminp").toFloat();
-    if (!sensorPermeado.setQMinDetectable(qminp)) err += "qminp invalido;";
+    kp = server.arg("kp").toFloat();
+    if (!std::isfinite(kp) || kp < 10.0f || kp > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Permeado fuera de rango (10-1000)\"}");
+      return;
+    }
   }
   if (server.hasArg("ml")) {
-    float ml = server.arg("ml").toFloat();
-    bomba.setMlPorVuelta(ml);
+    ml = server.arg("ml").toFloat();
+    if (!std::isfinite(ml) || ml < 1.0f || ml > 50.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Cilindrada fuera de rango (1-50 mL/rev)\"}");
+      return;
+    }
   }
   if (server.hasArg("pul")) {
-    uint16_t pul = (uint16_t)server.arg("pul").toInt();
-    bomba.setPulsosPorRev(pul);
+    pul = server.arg("pul").toInt();
+    if (pul < 200 || pul > 25600) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Pulsos/rev fuera de rango (200-25600)\"}");
+      return;
+    }
   }
+  if (server.hasArg("qmina")) {
+    qmina = server.arg("qmina").toFloat();
+    if (!std::isfinite(qmina) || qmina < 0.0f || qmina > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable alimentacion invalido\"}");
+      return;
+    }
+  }
+  if (server.hasArg("qminp")) {
+    qminp = server.arg("qminp").toFloat();
+    if (!std::isfinite(qminp) || qminp < 0.0f || qminp > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable permeado invalido\"}");
+      return;
+    }
+  }
+
+  // 2. Aplicar únicamente si todos pasaron la validación
+  if (ka > 0.0f) sensorAlimentacion.setK(ka);
+  if (kp > 0.0f) sensorPermeado.setK(kp);
+  if (ml > 0.0f) bomba.setMlPorVuelta(ml);
+  if (pul > 0)   bomba.setPulsosPorRev((uint16_t)pul);
+  if (qmina >= 0.0f) sensorAlimentacion.setQMinDetectable(qmina);
+  if (qminp >= 0.0f) sensorPermeado.setQMinDetectable(qminp);
 
   bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
   if (saveNvs) {
@@ -2531,11 +2573,6 @@ void handleSetDev() {
                          bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
   }
 
-  if (err.length() > 0) {
-    String out = "{\"status\":\"error\",\"msg\":\"" + err + "\"}";
-    server.send(400, "application/json", out);
-    return;
-  }
   server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
@@ -2561,6 +2598,10 @@ void handleCancelarAutoCal() {
 
 // Calibrador Completo por RPM y Caudal de Probeta
 void handleCalibrarRpmQ() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"No se puede calibrar mientras un ensayo metrologico esta en curso\"}");
+    return;
+  }
   if (!server.hasArg("rpm") || !server.hasArg("qa")) {
     server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos (requiere rpm y qa)\"}");
     return;
@@ -2570,14 +2611,16 @@ void handleCalibrarRpmQ() {
   float qa  = server.arg("qa").toFloat();
   float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
 
-  if (rpm <= 0.0f || qa <= 0.0f) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"RPM y Caudal de Alimentacion deben ser > 0\"}");
+  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp)) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o <= 0\"}");
     return;
   }
 
   // 1. Cilindrada real de la bomba
   float nuevaCilindrada = qa / rpm;
-  bomba.setMlPorVuelta(nuevaCilindrada);
+  if (nuevaCilindrada >= 1.0f && nuevaCilindrada <= 50.0f) {
+    bomba.setMlPorVuelta(nuevaCilindrada);
+  }
 
   // 2. Factores K basados en frecuencia actual
   float fa = sensorAlimentacion.frecuencia_Hz();
@@ -2681,6 +2724,10 @@ void handleExportCSV() {
 }
 
 void handleClearCSV() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "text/plain", "ENSAYO_ACTIVO: Detenga la bomba antes de limpiar los registros.");
+    return;
+  }
   bufferHead = 0;
   bufferCount = 0;
   numEnsayos = 0;
@@ -2722,6 +2769,10 @@ public:
 
 // Exportación CSV con Esquema Metrológico Certificado (GPT Astra)
 void handleExportMetrologia() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "text/plain", "ENSAYO_ACTIVO: Detenga la bomba o finalice el ensayo antes de exportar el registro metrologico.");
+    return;
+  }
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
   server.sendHeader("Content-Disposition", "attachment; filename=\"PlantaUF_Metrologia_Certificada.csv\"");
@@ -2752,8 +2803,6 @@ void setup() {
   pinMode(PIN_LED_BOMBA, OUTPUT);
   digitalWrite(PIN_LED_BOMBA, LOW);
 
-  sensorAlimentacion.declararCalibrado(SENSOR_ALIM_CFG.calibracionDocumentada);
-  sensorPermeado.declararCalibrado(SENSOR_PERM_CFG.calibracionDocumentada);
   const bool inicioAlim = sensorAlimentacion.begin();
   const bool inicioPerm = sensorPermeado.begin();
   if (!inicioAlim || !inicioPerm) {
@@ -2849,13 +2898,13 @@ void loop() {
     // Flanco de subida: Iniciar sesión de ensayo
     if (enMarcha && !bombaEnMarchaAnterior) {
       iniciarNuevoEnsayo(bomba.rpmObjetivo());
-      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmObjetivo(), true);
+      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), true);
     }
     
     // Flanco de bajada: Finalizar sesión y registrar
     if (!enMarcha && bombaEnMarchaAnterior) {
       finalizarEnsayoActual();
-      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, 0.0, false);
+      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, bomba.rpmActual(), false);
     }
 
     bombaEnMarchaAnterior = enMarcha;
@@ -2950,10 +2999,9 @@ void loop() {
 
 ---
 
-### 4. GUÍA DE EVALUACIÓN Y PREGUNTAS CLAVE PARA EL DICTAMEN
-Por favor, audita el código fuente adjunto en base a los siguientes ejes críticos:
-1. **Seguridad en Concurrencia y FreeRTOS:** ¿El uso de spinlocks `portENTER_CRITICAL` / `portEXIT_CRITICAL` en la ISR y en la tarea principal garantiza ausencia de carreras críticas o corrupción de contadores de 64 bits?
-2. **Metrología y Filosofía Anti-Ruido:** ¿El filtrado digital por ancho de pulso, el aislamiento del modo seco mediante épocas monótonas y la condición `hayPeriodosNuevos` garantizan que no se generen caudales fantasmas en reposo o a bajo flujo?
-3. **Persistencia y Calibración en Caliente:** ¿Es robusto el esquema de almacenamiento NVS y la sintonía en caliente de factores K y cilindrada desde la interfaz web SCADA?
-4. **Doble Datalogger:** ¿Es coherente la convivencia del log operativo de proceso (16 columnas con separador sep=; para Microsoft Excel) y el registro metrológico de bajo nivel (29 columnas con estampas microsegundo para auditoría científica)?
-5. **Dictamen Final:** En base a esta revisión integral del expediente, ¿emites dictamen de **APROBADO** para proceder con la compilación en el ESP32 y la ejecución de la campaña experimental de laboratorio?
+### 4. PREGUNTAS CLAVE PARA EL DICTAMEN DE AUDITORÍA
+En función del expediente completo adjunto y de las correcciones implementadas:
+1. **Seguridad en Concurrencia:** ¿Consideras que la protección con spinlocks FreeRTOS (`portENTER_CRITICAL` / `portEXIT_CRITICAL`) en la ISR y en las lecturas de 64 bits (`_pulsosMedicion`, `_pulsosOffset`, muestras atómicas) es robusta y previene carreras de datos?
+2. **Robustez de la Interfaz SCADA y Endpoints REST:** ¿El SCADA y los manejadores HTTP garantizan que las solicitudes se procesen sin excepciones JavaScript y sin riesgo de corromper la memoria NVS durante una corrida experimental?
+3. **Manejo Metrológico de Sesiones:** ¿La separación entre eventos `INICIO`, `PERIODICA` y `FIN`, la reserva de plaza fija en el buffer y el bloqueo de reconfiguración en sesión activa aseguran la trazabilidad de los datos recolectados en laboratorio?
+4. **Dictamen Técnico:** ¿Apruebas este firmware V5.2 para proceder con la compilación en Arduino IDE / ESP32 y la ejecución de la campaña experimental supervisada en banco de laboratorio?
