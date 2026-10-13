@@ -1,48 +1,50 @@
-# GUÍA OPERATIVA DEL SCADA WEB Y PROTOCOLO DE CALIBRACIÓN
-## Planta Piloto de Ultrafiltración FX-100 • Firmware v5 (Subhito 2.2)
+# GUÍA OPERATIVA DEL SCADA WEB Y PROTOCOLO DE CONFIGURACIÓN
+## Planta Piloto de Ultrafiltración FX-100 • Firmware V5.2 Definitivo (Subhito 2.2)
 
 ---
 
 > [!NOTE]
-> **Acceso a la Interfaz Web:**
-> * **Punto de Acceso Wi-Fi (Modo Local Planta):** Conectarse a la red `Bomba_Peristaltica_UF` (Contraseña: `plantapiloto2`).
-> * **Dirección IP en Navegador:** `http://192.168.4.1/` o mediante mDNS `http://bomba.local/`.
-> * **Sin Dependencia de Internet:** La red del ESP32 cuenta con un *Servidor DNS Captive Portal* integrado en el puerto 53 que responde a cualquier consulta del sistema operativo, garantizando que computadoras y celulares no descarten la red.
+> **Acceso Inmediato a la Interfaz Web:**
+> * **Red Wi-Fi Autogestionada (Punto de Acceso):** Conectarse a la red `Bomba_Peristaltica_UF` (Contraseña: `plantapiloto2`).
+> * **Apertura Automática (Portal Cautivo):** Gracias al servidor DNS en puerto 53 y redirección HTTP 302, el celular o tablet abre automáticamente el SCADA en pantalla completa.
+> * **Acceso Manual en Laptop:** `http://192.168.4.1/` o mDNS `http://bomba.local/`.
 
 ---
 
-## 1. Arquitectura y Distribución del Panel SCADA
+## 1. Arquitectura y Distribución del Panel SCADA V5.2
 
-La interfaz del SCADA v4 está organizada en **4 módulos funcionales** compactos, diseñados específicamente para su uso desde una notebook de laboratorio o teléfonos móviles en el banco de ensayo:
+La interfaz web está organizada en **4 módulos funcionales** optimizados para notebooks y dispositivos móviles:
 
 ```mermaid
 graph TD
     A["SCADA Web (192.168.4.1)"] --> B["1. Control de Bomba Peristáltica"]
     A --> C["2. Instrumentación & Balance Hidráulico"]
-    A --> D["3. Modo Desarrollador (🛠️ Dev)"]
-    A --> E["4. Datalogger Multi-Sesión (Excel)"]
+    A --> D["3. Modo Desarrollador (🛠️ Modo Dev)"]
+    A --> E["4. Historial & Datalogger Dual"]
     
-    B --> B1["RPM Instantánea vs Consigna"]
+    B --> B1["RPM Real vs Consigna"]
     B --> B2["Botones Rápidos (25, 35, 44🩸, 50, 75, 100🧪)"]
     B --> B3["Rampa S-Curve (Start / Stop / Sentido)"]
     
     C --> C1["Alimentación: Q (mL/min), Frec (Hz), Vol (L), K"]
-    C --> C2["Permeado: Q (mL/min), Frec (Hz), Vol (L), Flux Darcy (LMH)"]
-    C --> C3["Balance Hidráulico: Q_ret, Y%, Q_bomba, Desviación Δ%"]
+    C --> C2["Permeado: Q (mL/min), Frec (Hz), Vol (L), Flux Darcy"]
+    C --> C3["Botón Directo Modo Seco (Test Anti-Ruido)"]
+    C --> C4["Balance Hidráulico: Q_ret, Y%, Q_bomba, Desviación Δ%"]
     
-    D --> D1["Auto-Calibración en Régimen (15s)"]
+    D --> D1["Ajuste Táctil de K con Botones [ - ] y [ + ]"]
     D --> D2["Calibrador Directo por RPM y Probeta"]
-    D --> D3["Edición Manual K, Cilindrada y NVS"]
+    D --> D3["Auto-Calibración en Régimen Estable (15s)"]
+    D --> D4["Grabación Permanente en Flash NVS"]
     
-    E --> E1["Segmentación Automática por Ensayo"]
-    E --> E2["Exportador CSV Compatible con Excel"]
+    E --> E1["Exportar Excel (.CSV - 16 columnas)"]
+    E --> E2["Exportar Metrología Científica (.CSV - 29 columnas)"]
 ```
 
 ---
 
-## 2. Módulo 1: Control de la Bomba Peristáltica (MBP-2000)
+## 2. Módulo 1: Control de la Bomba Peristáltica (NEMA 34 / DM860)
 
-Este panel gobierna el motor paso a paso NEMA 23 acoplado al cabezal peristáltico mediante el driver industrial DM542.
+Gobierna el motor paso a paso NEMA 34 de alto torque acoplado al cabezal peristáltico mediante el driver industrial DM860 (alimentado a 48V, configurado a 3200 micropasos/vuelta).
 
 ```
 +--------------------------------------------------------------+
@@ -63,47 +65,41 @@ Este panel gobierna el motor paso a paso NEMA 23 acoplado al cabezal peristálti
 +--------------------------------------------------------------+
 ```
 
-### Elementos y Funciones:
-1. **Pantalla Principal de RPM:**
-   * Muestra la velocidad angular **instantánea real** en tiempo real (por ejemplo, subiendo de `0.0` a `50.0` durante la aceleración).
-   * Indica en el subtítulo la **consigna objetivo**.
+### Funciones Clave:
+1. **RPM Instantánea:** Informa la velocidad real calculada por hardware en cada milisegundo durante la aceleración/frenado.
 2. **Badge de Estado:**
-   * `DETENIDA` (Gris): Pulsos de step inactivos, bobinas relajadas según configuración.
-   * `EN MARCHA` (Verde): Generando pulsos por interrupción de hardware del ESP32.
-   * `INVIRTIENDO` (Ámbar): Transición de frenado y cambio de sentido de giro para proteger el rotor y las mangueras.
-3. **Selección de Velocidad (Consignas Predefinidas & Slider):**
-   * **Slider Continuo:** Permite ajustar con precisión de 1 en 1 entre **15 RPM y 100 RPM**.
-   * **Botonera de Acceso Rápido:**
-     * `25 RPM`: Régimen bajo para purga inicial y verificación de estanqueidad.
-     * `35 RPM`: Flujo intermedio bajo (~476 mL/min).
-     * `44 RPM 🩸`: **Punto Crítico Clínico** (Caudal de alimentación de 600 mL/min, límite estándar en hemodiálisis y perfusión para evitar hemólisis).
-     * `50 RPM`: **Punto Nominal de Calibración (Ensayo 2)** (~680 mL/min).
-     * `75 RPM`: Flujo medio-alto (~1020 mL/min).
-     * `100 RPM 🧪`: **Límite de Diseño Factorial (Ensayo 3)** (~1360 mL/min para ensayo de fatiga con agua pura).
+   * `DETENIDA` (Gris): Driver en espera, sin conmutación.
+   * `EN MARCHA` (Verde): Tren de pulsos activo con perfil cinemático S-Curve.
+   * `INVIRTIENDO` (Ámbar): Transición segura de inversión de sentido.
+3. **Escalones Rápidos de Operación:**
+   * `25 RPM`: Purga inicial y verificación de hermeticidad.
+   * `35 RPM`: Flujo bajo de régimen (~476 mL/min).
+   * `44 RPM 🩸`: **Punto Crítico Clínico** (600 mL/min, umbral máximo de referencia en hemodiálisis).
+   * `50 RPM`: **Punto Nominal de Calibración** (~680 mL/min).
+   * `75 RPM`: Flujo medio-alto (~1020 mL/min).
+   * `100 RPM 🧪`: **Límite de Diseño Experimental** (~1360 mL/min para curvas con agua pura).
 4. **Botonera de Maniobra:**
-   * **▶ ARRANCAR:** Dispara la aceleración suave siguiendo una curva Sigmoide (S-Curve). Evita el golpe de ariete sobre la membrana capilar de ultrafiltración y previene la pérdida de pasos por inercia del motor.
-   * **⏹ PARAR:** Desacelera la bomba, detiene el tren de pulsos y **cierra automáticamente el ensayo en curso**, guardando sus métricas en el historial.
-   * **🔄 SENTIDO (HORARIO / ANTIHORARIO):** Conmuta el sentido de giro.  
-     * *Horario:* Modo Filtración habitual (la bomba impulsa líquido hacia el cartucho).  
-     * *Antihorario:* Modo Retrolavado (Backwash) o vaciado de líneas.
+   * **▶ ARRANCAR:** Genera una rampa suave sin picos de presión ni golpes de ariete sobre la membrana capilar FX100.
+   * **⏹ PARAR:** Frenado rápido controlado ($< 1.5\text{ s}$) y guardado automático de la corrida en el historial.
+   * **🔄 HORARIO / ANTIHORARIO:** Sentido horario para filtración tangencial directa; antihorario para retrolavado (backwash).
 
 ---
 
-## 3. Módulo 2: Instrumentación y Caudalímetros YF-S401
+## 3. Módulo 2: Instrumentación, Caudalímetros y Modo Seco
 
-Los sensores están dispuestos en **cascada vertical** para facilitar la lectura visual clara de la línea de entrada vs. la línea de salida.
+Disposición en cascada vertical con visualización en tiempo real del flujo de alimentación y permeado.
 
 ```
 +--------------------------------------------------------------+
-| 🌊 CAUDALÍMETROS YF-S401                 [Reset Volúmenes]   |
+| 🌊 CAUDALÍMETROS YF-S401     [🧪 Modo Seco]  [Reset Vol]     |
 |                                                              |
 | [ALIMENTACIÓN (GPIO 14)]                                     |
 |    680.4 mL/min                             1.240 L          |
-|    Frecuencia: 133.6 Hz          Factor K: 196.37 Hz/(L/min) |
+|    Frecuencia: 133.6 Hz          Factor K: 196.50 Hz/(L/min) |
 |                                                              |
 | [PERMEADO (GPIO 27)]                                         |
 |    102.1 mL/min                             0.185 L          |
-|    Frecuencia: 70.2 Hz           Flujo Darcy: 29.17 LMH      |
+|    Frecuencia: 20.1 Hz           Flujo Darcy: 29.17 LMH      |
 |                                                              |
 | [ BALANCE HIDRÁULICO ]                                       |
 |    Caudal Retentado (Qalim − Qperm):          578.3 mL/min   |
@@ -113,34 +109,25 @@ Los sensores están dispuestos en **cascada vertical** para facilitar la lectura
 +--------------------------------------------------------------+
 ```
 
-### Variables Medidas e Interpretación:
-* **Caudal Instantáneo ($Q$ en mL/min):** Calculado mediante el factor K calibrado a partir de la frecuencia de pulsos leída por hardware en ventana temporal de 500 ms con filtro móvil.
-* **Volumen Acumulado ($V$ en Litros):** Integración trapecial exacta de los pulsos del sensor. Ideal para comparar contra el volumen recogido en la probeta graduada.
-* **Frecuencia ($f$ en Hz):** Frecuencia pura entregada por el sensor Hall del caudalímetro. Permite auditar si el sensor gira libremente o tiene rozamiento.
-* **Flujo Volumétrico de Darcy ($J$ en $\text{LMH}$):**
-  $$\text{Flux Darcy } J = \frac{Q_{perm}\;[\text{L/h}]}{A_{membrana}\;[\text{m}^2]} = \frac{Q_{perm}\;[\text{mL/min}] \times 0.06}{0.21\;\text{m}^2}$$
-  Expresa el rendimiento real de permeación por unidad de área de la membrana capilar (área nominal de fibra hueca FX-100: $0.21\text{ m}^2$).
-* **Botón `[Reset Volúmenes]`:** Pone a cero los acumuladores de litros de ambos sensores sin detener la bomba. **Debe presionarse justo en el instante en que se coloca la probeta vacía bajo la descarga.**
-
-### Diagnóstico del Balance Hidráulico:
-1. **Caudal Retentado ($Q_{ret} = Q_{alim} - Q_{perm}$):** Flujo de agua concentrada que retorna al tanque de alimentación o recirculación.
-2. **Tasa de Recuperación ($Y\% = \frac{Q_{perm}}{Q_{alim}} \times 100$):** Porcentaje del agua alimentada que atraviesa los poros de la membrana.
-3. **Desviación Hidráulica ($\Delta\%$):**
-   $$\Delta\% = \frac{Q_{alim} - Q_{teorico\_bomba}}{Q_{teorico\_bomba}} \times 100$$
-   * $\Delta \approx 0\%$: Bomba y sensor de alimentación calibrados en perfecta sintonía.
-   * $\Delta < -5\%$: Posible ingreso de aire, manguera estrangulada, o deslizamiento del tubo de silicona en los rodillos.
-   * $\Delta > +5\%$: Descalibración de factor K o contrapresión que distorsiona la cilindrada.
-
-### Alertas Inteligentes del SCADA:
-* 🔴 **`SIN SEÑAL` (Badge rojo junto al sensor):** Se enciende automáticamente si la bomba gira a más de 15 RPM pero el caudalímetro registra 0 pulsos por más de 1 segundo (alerta de cable desconectado, rotor trabado por sedimento o burbuja atrapada).
-* ⚠️ **`ALERTA CRÍTICA: Cruce de sensores detectado`:** Aparece en banner rojo si $Q_{perm} > Q_{alim}$. Físicamente es imposible que salga más permeado del que ingresa; indica que se intercambiaron los cables de los sensores o las mangueras hidráulicas.
-* ⚠️ **`ALERTA: Caudal Alimentación excede límite (> 1600 mL/min)`:** Protección preventiva contra sobrepresión o rotura de cabezales.
+### Funciones y Controles:
+* **Botón `[🧪 Modo Seco]` (Novedad V5.2):**  
+  Permite certificar el Cero Hidráulico Anti-Ruido directamente desde la pantalla.
+  * Al hacer click, conmuta a **`⚠ Seco: ON`** (color ámbar) y aísla los acumuladores.
+  * Permite girar la bomba a 20, 50 y 80 RPM sin agua para verificar que el caudalímetro marque estrictamente **0.0 mL/min**.
+  * Al terminar, se vuelve a presionar para restaurar el modo normal con agua.
+* **Botón `[Reset Vol]`:** Restablece a 0.000 L los volúmenes acumulados en el instante de poner la probeta bajo la descarga.
+* **Flujo Darcy ($J$ en $\text{LMH}$):** Rendimiento por superficie de membrana ($2.2\text{ m}^2$ para FX100):
+  $$J = \frac{Q_{\text{perm}}\;[\text{L/h}]}{A_{\text{membrana}}\;[\text{m}^2]} = \frac{Q_{\text{perm}}\;[\text{mL/min}] \times 0.06}{2.2\text{ m}^2}$$
+* **Balance Hidráulico:**
+  * $Q_{\text{ret}} = Q_{\text{alim}} - Q_{\text{perm}}$ (Caudal retentado de recirculación).
+  * $Y\% = \frac{Q_{\text{perm}}}{Q_{\text{alim}}} \times 100$ (Tasa de recuperación de ultrafiltración).
+  * $\Delta\% = \frac{Q_{\text{alim}} - Q_{\text{bomba}}}{Q_{\text{bomba}}} \times 100$ (Desviación volumétrica respecto a la cilindrada).
 
 ---
 
 ## 4. Módulo 3: Modo Desarrollador (🛠️ Modo Dev / Calibración en Caliente)
 
-Se abre presionando el botón violeta **`🛠️ Modo Dev`** en la esquina superior derecha. Se cierra automáticamente al guardar con éxito.
+Se accede tocando el botón violeta **`🛠️ Modo Dev`**. Incluye ajuste táctil con botones `+` y `−`, calibrador directo por probeta y auto-tuning en régimen.
 
 ```
 +--------------------------------------------------------------+
@@ -148,172 +135,94 @@ Se abre presionando el botón violeta **`🛠️ Modo Dev`** en la esquina super
 |                                                              |
 | [⚡ AUTO-CALIBRACIÓN EN RÉGIMEN PERMANENTE]                  |
 |    🟢 Régimen Permanente Estable                             |
-|    Calcula automáticamente los factores K durante 15s.       |
-|    [=========================>            ] 65%              |
+|    Muestreo y promedio automático durante 15s estables.      |
 |    [ ▶ Iniciar Auto-Calibración (15s) ]  [ ✖ Cancelar ]      |
 |                                                              |
 | [🎯 CALIBRAR POR RPM & CAUDAL (PROBETA)]                     |
 |    RPM Ensayo:     Q Alim (mL/min):     Q Perm (mL/min):     |
-|    [   50.0  ]     [    680.0     ]     [    100.0     ]     |
+|    [   50.0  ]     [    680.0     ]     [     45.0     ]     |
 |    [ 🚀 Calcular y Guardar Calibración en ESP32 ]            |
 |                                                              |
 | [ PARÁMETROS INTERNOS DEL ESP32 ]                            |
-|    K Alimentación: [ 196.37 ]    K Permeado: [ 687.33 ]      |
-|    Cilindrada:     [  13.60 ]    Micropasos: [  3200  ]      |
+|    K Alimentación:  [ - ]  [ 196.50 ]  [ + ]                 |
+|    K Permeado:      [ - ]  [ 196.50 ]  [ + ]                 |
+|    Cilindrada Bomba:       [  13.60 ] mL/rev                 |
+|    Micropasos:             [  3200  ] pul/rev                |
 |                                                              |
 | [ 💾 Guardar en Flash ESP32 ]   [ ⚡ Aplicar Temporal ]       |
 | [ 🔄 Restablecer Valores de Fábrica ]                        |
 +--------------------------------------------------------------+
 ```
 
-Este módulo cuenta con **tres métodos de calibración**:
+### Opciones de Calibración:
 
-### Método A: Calibración Directa con Probeta (¡El Método Recomendado para Hoy!)
-Es el procedimiento más exacto y riguroso cuando se trabaja en el laboratorio con cronómetro y probeta:
-1. Poner la bomba a **50 RPM** y esperar a que el flujo sea estable.
-2. Medir con probeta y cronómetro el caudal real de alimentación (ej. $680.0\text{ mL/min}$).
-3. Si el permeado está conectado, medir también el caudal de permeado (ej. $100.0\text{ mL/min}$). Si el permeado está cerrado o recirculando, dejar el casillero en `0`.
-4. Ingresar los valores en los campos:
-   * **RPM Ensayo:** `50`
-   * **Q Alim (mL/min):** `680`
-   * **Q Perm (mL/min):** `100` (o `0` si no se ensaya)
-5. Presionar **`🚀 Calcular y Guardar Calibración en ESP32`**.
-6. **¿Qué hace el ESP32 en ese instante?**
-   * Recalcula la cilindrada exacta de la manguera: $\text{ml\_rev} = \frac{Q_{alim}}{\text{RPM}} = \frac{680}{50} = 13.60\text{ mL/rev}$.
-   * Lee la frecuencia actual del sensor $f_{alim}$ y recalcula: $K_{alim} = \frac{f_{alim} \times 1000}{Q_{alim}}$.
-   * Recalcula $K_{perm}$ a partir de $f_{perm}$ (si se ingresó permeado).
-   * **Guarda automáticamente los nuevos valores en la memoria Flash no volátil (`NVS`)**, de modo que permanecen guardados incluso si se apaga la planta.
+1. **Ajuste Fino en Vivo con Botones `[ − ]` y `[ + ]` (Novedad V5.2):**
+   * Cada pulsación varía el factor en $\pm 1.0\text{ Hz/(L/min)}$ e impacta **inmediatamente en RAM**.
+   * **Criterio Físico:** Al ser ambos caudalímetros el mismo modelo (**YF-S401**), ambos arrancan calibrados de fábrica en $196.50\text{ Hz/(L/min)}$. Se descartó definitivamente el valor preliminar histórico de 687.33.
+   * Mientras la probeta se llena, el operador toca `+` o `−` desde el celular hasta que el caudal digital coincida con el aforo físico.
+   * Para consolidar permanentemente tras apagar la planta: tocar **`💾 Guardar en Flash ESP32`**.
 
-### Método B: Auto-Calibración Inteligente en Régimen Permanente (15 segundos)
-* Pensado para cuando la cilindrada de la bomba ya se conoce y se desea reajustar los caudalímetros de forma autónoma.
-* Requiere que la bomba esté encendida.
-* El firmware monitorea la bandera `en_regimen` (asegura que las RPM hayan llegado al valor final de la rampa S-Curve).
-* Al presionar **`▶ Iniciar Auto-Calibración Automática (15s)`**, el microcontrolador muestrea la frecuencia durante 15 lecturas continuas, calcula el promedio y actualiza los factores K automáticamente.
+2. **Calibrador Automático por Probeta (Sección B):**
+   * Colocan las RPM (ej. 50), el caudal real en mL/min (volumen dividido minutos) y presionan **`🚀 Calcular y Guardar Calibración en ESP32`**.
+   * El ESP32 recalcula la cilindrada ($\text{ml/rev} = Q / \text{RPM}$) y los factores $K$ y los graba en memoria NVS.
 
-### Método C: Ajuste Manual Fino
-Permite tipear directamente los números:
-* **Factor K Alimentación:** Pulsos por litro por segundo escalados [Hz/(L/min)].
-* **Factor K Permeado:** Calibración específica del sensor de permeado.
-* **Cilindrada Bomba (mL/rev):** Volumen desplazado por el cabezal peristáltico en 1 vuelta completa.
-* **Micropasos (Pulsos/Rev):** Microstepping del driver DM542 (por defecto `3200` micropasos/vuelta).
-* **Botones:**
-  * `💾 Guardar en Flash ESP32`: Graba en NVS permanente y cierra el modo Dev.
-  * `⚡ Aplicar Temporal`: Aplica en la memoria RAM para probar sin alterar los valores guardados en disco.
-  * `🔄 Restablecer Valores de Fábrica`: Vuelve a los valores compilados por defecto en `config.h`.
+3. **Auto-Calibración en Régimen Estable (Sección A):**
+   * Con la bomba en marcha a velocidad constante y flujo estabilizado, presionar **`▶ Iniciar Auto-Calibración`**.
+   * El microcontrolador promedia 15 muestras consecutivas sin desvíos y actualiza los factores automáticamente.
 
 ---
 
-## 5. Módulo 4: Datalogger Multi-Sesión & Descarga a Excel (.CSV)
+## 5. Módulo 4: Datalogger Multi-Sesión y Doble Exportador (.CSV)
 
-El datalogger registra automáticamente todas las variables del proceso cada **1 segundo** en un buffer circular en la memoria RAM del ESP32.
+El datalogger registra automáticamente todas las variables del proceso cada segundo en un buffer circular en la memoria RAM del ESP32.
 
 ```
 +--------------------------------------------------------------+
 | 📊 HISTORIAL DE ENSAYOS & EXCEL (.CSV)     [🗑️ Limpiar Todo] |
 |                                                              |
-| Ensayo actual en curso:  Ensayo #2  (03:45 min)              |
-| Muestras registradas:    225 muestras guardadas              |
+| Ensayo actual en curso:  Ensayo #1  (02:15 min)              |
+| Muestras registradas:    135 muestras guardadas              |
 |                                                              |
 | Seleccionar Ensayo para Descargar:                           |
 | [ 📦 Todos los Ensayos (Histórico Completo)                ▼ ] |
 |                                                              |
-| [ 📥 Descargar Ensayo Seleccionado en Excel (.CSV) ]         |
+| [ 📥 Descargar Ensayo Seleccionado en Excel (.CSV - 16 cols)] |
+| [ 🔬 Descargar Registro Metrológico Completo (29 cols)     ] |
 |                                                              |
-| Corridas Registradas al Apagar Bomba:      2 ensayos         |
+| Corridas Registradas al Apagar Bomba:      1 ensayo          |
 | +----+----------+-----------+----------+----------+--------+ |
 | | ID | Consigna | Duración  | Muestras | Vol Perm | Acción | |
 | +----+----------+-----------+----------+----------+--------+ |
-| | #2 | 50.0 RPM | 03:45 min | 225      | 0.380 L  | [📥CSV]| |
-| | #1 | 25.0 RPM | 02:10 min | 130      | 0.150 L  | [📥CSV]| |
+| | #1 | 50.0 RPM | 02:00 min | 120      | 0.090 L  | [📥CSV]| |
 | +----+----------+-----------+----------+----------+--------+ |
 +--------------------------------------------------------------+
 ```
 
-### ¿Cómo Funciona la Segmentación Automática de Ensayos?
-1. **Inicio de Ensayo:** Cada vez que se presiona **`▶ ARRANCAR`**, el ESP32 inicia un nuevo ensayo con número correlativo (`Ensayo #1`, `Ensayo #2`, etc.) y resetea el cronómetro del ensayo.
-2. **Fin de Ensayo:** Al presionar **`⏹ PARAR`**, el microcontrolador archiva el ensayo finalizado con su duración total en segundos, cantidad de muestras y volumen acumulado, agregándolo a la tabla inferior.
-3. **Descarga Selectiva:**
-   * En el selector desplegable se puede elegir descargar **un solo ensayo en particular** (ej. solo el Ensayo #2 a 50 RPM) o bien **el histórico completo** con todas las corridas de la jornada.
-   * También se puede descargar directamente un ensayo de la tabla presionando su botón verde individual `[📥 CSV]`.
-4. **Compatibilidad con Microsoft Excel:**
-   * El archivo exportado incluye la directiva `sep=;` en la primera línea.
-   * Al hacer doble clic en Windows, **se abre directamente en Excel en columnas separadas**, sin necesidad de usar el asistente de importación de texto.
-   * Contiene encabezados de ingeniería detallados:
-     `Tiempo_s`, `RPM_Bomba`, `Q_Alimentacion_mLmin`, `Vol_Alimentacion_L`, `Q_PERMEADO_mLmin`, `Vol_PERMEADO_L`, `Q_Retentado_mLmin`, `Recuperacion_Y_Pct`, `Desviacion_Bomba_Alim_Pct`, `J_LMH`.
-5. **Botón `🗑️ Limpiar Todo`:** Vacía la memoria del datalogger para iniciar una nueva tanda de ensayos limpios sin mezclar datos anteriores.
+### Doble Descarga Disponible con 1 Click:
+
+1. **Botón Verde: `📥 Descargar Ensayo en Excel (.CSV - 16 cols)`**
+   * Archivo compatible directamente con Microsoft Excel o Google Sheets con separador de punto y coma (`sep=;`).
+   * Columnas de ingeniería: `Ensayo_ID`, `Tiempo_s`, `Tiempo_MinSec`, `RPM_Bomba`, `Estable_1_0`, `Q_Bomba_Teorico_mLmin`, `Frec_Alimentacion_Hz`, `Q_Alimentacion_mLmin`, `Vol_Alimentacion_L`, `Frec_PERMEADO_Hz`, `Q_PERMEADO_mLmin`, `Vol_PERMEADO_L`, `Q_Retentado_mLmin`, `Recuperacion_Y_Pct`, `Desviacion_Bomba_Alim_Pct`, `J_LMH`.
+2. **Botón Azul/Índigo: `🔬 Descargar Registro Metrológico Completo (29 cols)`**
+   * Archivo de auditoría científica para la defensa formal de la tesis.
+   * Contiene 29 columnas con marcas en microsegundos de hardware (`t_reg_us`), épocas de aislamiento, conteo bruto de flancos ISR (`flancosA`, `flancosP`), pulsos válidos (`aceptadosA`, `aceptadosP`), rechazos de glitches por filtro anti-EMI (`rechazosA`, `rechazosP`) y edad del último pulso en microsegundos.
 
 ---
 
-## 6. Procedimiento Rápido para los Ensayos de Calibración de Hoy
+## 6. Procedimiento Rápido para las Pruebas de Hoy en Laboratorio
 
-Para el trabajo conjunto con Owen y Antonella en el laboratorio:
+> [!TIP]
+> **Recordatorio Operativo:** No es necesario cargar planillas de Excel en vivo. Solo anoten en papel los mL de la probeta y los Hz de pantalla; el microcontrolador graba todo y se descarga al terminar.
 
-### Paso 1: Verificación Inicial
-1. Conectar la notebook al Wi-Fi `Bomba_Peristaltica_UF` (o dejarla con cable de red y Wi-Fi a la bomba).
-2. Abrir el navegador en `http://192.168.4.1/`.
-3. Verificar que los badges `SIN SEÑAL` estén apagados y la lectura marque `0.0`.
-
-### Paso 2: Ensayo 2 (Punto Fijo 50 RPM)
-1. Colocar las mangueras de descarga en probeta vacía.
-2. En el SCADA, seleccionar el botón `50 RPM`.
-3. Presionar `▶ ARRANCAR`. La bomba acelerará suavemente en 2.5 segundos.
-4. Presionar `[Reset Volúmenes]` apenas el flujo caiga dentro de la probeta para sincronizar volumen y tiempo.
-5. Dejar correr durante 2 minutos cronometrados.
-6. Presionar `⏹ PARAR`.
-7. Tomar la lectura de la probeta en mL y calcular el caudal real ($Q = \text{mL} / \text{min}$).
-8. Si se requiere ajustar factores, abrir `🛠️ Modo Dev`, colocar las RPM y el caudal de probeta medido, y presionar `🚀 Calcular y Guardar Calibración`.
-9. Presionar `[📥 CSV]` en la tabla del ensayo para guardar el registro digital en la notebook.
-
-### Paso 3: Ensayo 3 (Barrido Multifactorial 25 a 100 RPM)
-1. Repetir el procedimiento para 25, 35, 44, 75 y 100 RPM.
-2. Al finalizar todas las corridas, seleccionar en el desplegable `📦 Todos los Ensayos (Histórico Completo)` y presionar `📥 Descargar Ensayo Seleccionado en Excel (.CSV)`.
-3. Copiar las columnas a la planilla `PLANILLA_CALIBRACION_ENSAYOS_2_Y_3.xlsx` para graficar las curvas $Q \text{ vs. RPM}$ y obtener el $R^2$ de regresión lineal.
-
----
-
-## 7. Rutina de Banco Anti-Lecturas Fantasma (Q_Perm ≈ 0 sin flujo real)
-
-### Objetivo
-Validar que el canal de permeado no publique caudal falso cuando sólo se ensaya la línea de alimentación.
-
-### Paso 1: Preparación
-1. Conectar **sólo** el caudalímetro de alimentación en la hidráulica.
-2. Dejar el sensor de permeado conectado eléctricamente (GPIO 27), pero sin flujo real de permeado.
-3. Encender la planta y esperar **2 a 3 minutos** para estabilización.
-
-### Paso 2: Cero en reposo (bomba OFF, 5 min)
-1. Mantener la bomba detenida durante 5 minutos.
-2. Criterio esperado: `Q_Alim = 0` y `Q_Perm = 0` sostenido.
-3. Aceptación: sin picos persistentes; cualquier evento aislado debe volver a cero de inmediato.
-
-### Paso 3: Alimentación sola (bomba ON en 3 escalones)
-1. Correr ensayos de **25, 50 y 72 RPM**, durante **3 minutos** por escalón.
-2. Esperado:
-   - `Q_Alim > 0` y estable según RPM.
-   - `Q_Perm ≈ 0` durante todo el escalón.
-3. Revisar telemetría F/V/G (`flancos`, `válidos`, `glitches`):
-   - En permeado pueden aparecer flancos o glitches por ruido.
-   - Aun así, el caudal de permeado debe mantenerse en cero.
-
-### Paso 4: Prueba EMI intencional (2 min)
-1. Conmutar cargas cercanas y/o aproximar cableado de potencia del motor al mazo de sensores por 2 minutos.
-2. Esperado: no debe aparecer caudal falso sostenido en permeado.
-
-### Paso 5: Repetición cruzada de sensores
-1. Intercambiar físicamente sensores/canales una vez.
-2. Repetir Paso 2 y Paso 3.
-3. Objetivo: confirmar que la anomalía no “sigue al canal”.
-
-### Paso 6: Criterio de cierre
-En todas las corridas con solo alimentación, `Q_Perm` debe quedar en cero (salvo ruido transitorio breve sin persistencia).
-
-### Ajuste temporal de sensibilidad (sin recompilar)
-Si aparece ruido persistente en permeado, subir temporalmente el piso de detección de permeado (`qMinDetectable`) y repetir la prueba:
-
-- Estado actual: `GET /status` (campos `qmin_alim` y `qmin_perm`).
-- Ajuste temporal en caliente:  
-  `GET /set_dev?qminp=6.0`  (ejemplo: elevar permeado a 6.0 mL/min).
-- Ajuste temporal de alimentación si se requiere:  
-  `GET /set_dev?qmina=25.0`
-
-> Nota: estos ajustes son temporales en RAM y se pierden al reiniciar o al restablecer parámetros.
+1. **Paso 1: Puesta en marcha**  
+   Conectar el ESP32, encender la fuente de 48V y vincular el celular a la red Wi-Fi `Bomba_Peristaltica_UF`. El SCADA se abrirá automáticamente.
+2. **Paso 2: Certificación en seco (Anti-Ruido)**  
+   Con los sensores vacíos, tocar **`[🧪 Modo Seco]`** en el SCADA (el botón pasa a color ámbar **`⚠ Seco: ON`**). Hacer girar la bomba a 20, 50 y 80 RPM por 30s. Comprobar que el permeado marque estrictamente **0.0 mL/min**. Volver a tocar el botón para salir del modo seco.
+3. **Paso 3: Verificación rápida de alimentación (50 RPM)**  
+   Conectar mangueras con agua a probeta de 1000 mL, correr a 50 RPM durante 60 segundos y comprobar que el caudal ronde los $\approx 720\text{ mL/min}$.
+4. **Paso 4: Caracterización de permeado a bajo flujo**  
+   Conectar la membrana Fresenius FX100, regular la válvula de retentado para inducir filtración y recoger permeado en probeta de 100 mL durante 2 minutos.
+5. **Paso 5: Calibración de K en caliente**  
+   Calcular $K = \frac{F_{\text{prom}} \times 1000}{Q_{\text{real}}}$ y ajustarlo desde el celular con los botones **`[ − ]`** y **`[ + ]`** de la Sección C del Modo Dev. Presionar **`💾 Guardar en Flash ESP32`**.
+6. **Paso 6: Descarga de datos**  
+   Presionar **`📥 Descargar Ensayo en Excel`** y **`🔬 Descargar Registro Metrológico`** para guardar los archivos de la jornada.
