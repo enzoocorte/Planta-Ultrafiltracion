@@ -287,7 +287,10 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     <div class="card">
       <div class="row">
         <b style="font-size:12px; color:#fff">🌊 CAUDALÍMETROS YF-S401</b>
-        <button style="font-size:10px; padding:3px 8px" onclick="cmd('RESET_VOL')">Reset Volúmenes</button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button id="btn_modo_seco" style="font-size:10px; padding:3px 8px; background:#1e293b; border:1px solid #475569" onclick="toggleModoSeco()">🧪 Modo Seco</button>
+          <button style="font-size:10px; padding:3px 8px" onclick="cmd('RESET_VOL')">Reset Vol</button>
+        </div>
       </div>
 
       <div class="sens">
@@ -413,11 +416,19 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       <div class="input-grid">
         <div class="input-group">
           <label>Factor K Alimentación [Hz/(L/min)]:</label>
-          <input type="number" id="inp_ka" step="0.01" value="154.62">
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_ka', -1.0)">−</button>
+            <input type="number" id="inp_ka" step="0.1" value="154.62" style="width:100%; text-align:center;">
+            <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_ka', +1.0)">+</button>
+          </div>
         </div>
         <div class="input-group">
           <label>Factor K PERMEADO [Hz/(L/min)]:</label>
-          <input type="number" id="inp_kp" step="0.01" value="55.00">
+          <div style="display:flex; gap:4px; align-items:center;">
+            <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_kp', -1.0)">−</button>
+            <input type="number" id="inp_kp" step="0.1" value="55.00" style="width:100%; text-align:center;">
+            <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjVal('inp_kp', +1.0)">+</button>
+          </div>
         </div>
         <div class="input-group">
           <label>Cilindrada Bomba (mL/rev):</label>
@@ -462,7 +473,10 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
         </div>
 
         <button class="btn-excel" onclick="descargarExcel()">
-          📥 Descargar Ensayo Seleccionado en Excel (.CSV)
+          📥 Descargar Ensayo Seleccionado en Excel (.CSV - 16 cols)
+        </button>
+        <button style="background:#4338ca; color:#ffffff; padding:10px; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; border-radius:8px; border:none; width:100%; cursor:pointer; margin-top:6px;" onclick="descargarMetrologia()">
+          🔬 Descargar Registro Metrológico Completo (29 cols)
         </button>
       </div>
 
@@ -616,6 +630,25 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       window.location.href = '/export_csv?ensayo=' + id;
     }
 
+    function descargarMetrologia() {
+      window.location.href = '/export_metrologia';
+    }
+
+    let modoSecoActivo = false;
+    function toggleModoSeco() {
+      let nuevo = !modoSecoActivo;
+      cmd(nuevo ? 'MODO_SECO_ON' : 'MODO_SECO_OFF');
+      showToast(nuevo ? "🧪 Modo Seco ACTIVADO (Test Cero/Anti-Ruido)" : "💧 Modo Normal RESTAURADO");
+    }
+
+    function adjVal(id, delta) {
+      let el = $(id);
+      let v = parseFloat(el.value) || 0;
+      v = Math.max(0.1, Math.round((v + delta) * 10) / 10);
+      el.value = v.toFixed(2);
+      guardarParametros(0);
+    }
+
     function clearLog() {
       if (confirm("¿Deseas reiniciar todo el historial de ensayos y registros?")) {
         fetch('/clear_csv').then(() => {
@@ -651,6 +684,14 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           }
           $('ba').classList.toggle('vis', !d.alim_ok);
           $('bp').classList.toggle('vis', !d.perm_ok);
+
+          modoSecoActivo = !!d.modo_seco;
+          const bms = $('btn_modo_seco');
+          if (bms) {
+            bms.innerText = modoSecoActivo ? '⚠ Seco: ON' : '🧪 Modo Seco';
+            bms.style.background = modoSecoActivo ? '#b45309' : '#1e293b';
+            bms.style.borderColor = modoSecoActivo ? '#f59e0b' : '#475569';
+          }
           $('va').innerText = d.q_alim.toFixed(1);
           $('fa').innerText = d.f_alim.toFixed(1) + ' Hz';
           $('la').innerText = d.vol_alim.toFixed(3) + ' L';
