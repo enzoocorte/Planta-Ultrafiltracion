@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulador SCADA Interactivo • Planta de Ultrafiltración FX100</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #141c30;
+      --card-dev: #171d33;
+      --border: #263450;
+      --text: #e2e8f0;
+      --muted: #8296b3;
+      --primary: #38bdf8;
+      --alim: #06b6d4;
+      --perm: #facc15;
+      --ret: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --excel: #107c41;
+      --dev: #a855f7;
+      --panel-bg: #0f172a;
+      --panel-border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #060913;
+      color: var(--text);
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    .container {
+      display: grid;
+      grid-template-columns: 530px 480px;
+      gap: 20px;
+      max-width: 1040px;
+      width: 100%;
+    }
+    @media (max-width: 1024px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    /* SCADA STYLES (EXACTOS A LA PLANTA) */
+    .scada-wrap { display: flex; flex-direction: column; gap: 12px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      position: relative;
+      transition: border-color 0.2s;
+    }
+    .card-dev {
+      border: 1px solid rgba(168,85,247,0.5);
+      background: #15162c;
+    }
+    .selectable {
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 4px;
+      transition: all 0.2s;
+    }
+    .selectable:hover {
+      border-color: rgba(56, 189, 248, 0.4);
+      background: rgba(56, 189, 248, 0.05);
+    }
+    .selected-active {
+      border-color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.12) !important;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    }
+
+    h1 { font-size: 16px; color: var(--primary); margin-bottom: 2px; }
+    .sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+    .disp {
+      text-align: center;
+      background: #0a0f1e;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border: 1px solid #1a253c;
+    }
+    .rpm { font-size: 46px; font-weight: 800; color: var(--primary); line-height: 1; }
+    .disp u { display: block; font-size: 10px; color: var(--muted); letter-spacing: 2px; text-decoration: none; margin-top: 4px; }
+    .pill {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+    .off { background: #2a3448; color: #aab7cc; }
+    .on  { background: rgba(16,185,129,.25); color: #34d399; }
+    .inv { background: rgba(245,158,11,.25); color: #fbbf24; }
+    .row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; align-items: center; }
+    input[type=range] { width: 100%; accent-color: var(--primary); cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 6px; margin: 10px 0; }
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 4px;
+      font-weight: 700;
+      font-size: 11px;
+      cursor: pointer;
+      background: #22304e;
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    button:hover { filter: brightness(1.15); }
+    .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .go { background: var(--success); color: #04301c; }
+    .no { background: var(--danger); color: #3d0808; }
+    .dir { grid-column: span 2; background: #1c2a45; border: 1px solid var(--border); }
+    
+    .btn-excel {
+      background: var(--excel);
+      color: #ffffff;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 8px;
+      width: 100%;
+      cursor: pointer;
+    }
+    .btn-metrologia {
+      background: #4338ca;
+      color: #ffffff;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-radius: 8px;
+      width: 100%;
+      margin-top: 6px;
+      cursor: pointer;
+    }
+    .btn-dev {
+      background: var(--dev);
+      color: #ffffff;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 6px;
+    }
+
+    .sens { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .s {
+      background: #0a0f1e;
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid #1a253c;
+    }
+    .s h3 { font-size: 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+    .s .val-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .s .v { font-size: 26px; font-weight: 800; }
+    .s .info-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .bal {
+      background: #0a0f1e;
+      border-radius: 10px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 11px;
+      border: 1px solid #1a253c;
+    }
+    .bal div { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #151f32; }
+    .bal div:last-child { border-bottom: none; }
+    .lbl { color: var(--muted); }
+    .val { font-weight: 700; }
+
+    .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .input-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+    .input-group label { font-size: 11px; color: #cbd5e1; font-weight: 600; }
+    .input-group input {
+      background: #0a0f1e;
+      border: 1px solid #263450;
+      color: #38bdf8;
+      padding: 6px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .table-box {
+      margin-top: 10px;
+      max-height: 140px;
+      overflow-y: auto;
+      border: 1px solid #1a253c;
+      border-radius: 8px;
+      background: #080d1a;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; text-align: left; }
+    th { background: #131b2e; color: var(--muted); padding: 6px 8px; }
+    td { padding: 6px 8px; border-bottom: 1px solid #131b2e; color: #e2e8f0; }
+
+    /* PANEL LATERAL EXPLICATIVO (PEDAGÓGICO) */
+    .expl-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 4px 30px rgba(0,0,0,0.5);
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+    .tag {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tag-blue { background: #0369a1; color: #e0f2fe; }
+    .tag-amber { background: #b45309; color: #fef3c7; }
+    .tag-purple { background: #6b21a8; color: #f3e8ff; }
+    .tag-green { background: #065f46; color: #d1fae5; }
+    
+    .expl-title { font-size: 18px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .expl-sec { background: #1e293b; padding: 12px; border-radius: 8px; border-left: 3px solid var(--primary); }
+    .expl-sec h4 { font-size: 12px; color: var(--primary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .expl-sec p { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+
+    .tour-nav {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: #0a0f1d;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #1e293b;
+    }
+    .tour-btn {
+      padding: 5px 10px;
+      font-size: 10px;
+      background: #1e293b;
+      color: #94a3b8;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .tour-btn.active {
+      background: #0284c7;
+      color: #fff;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e1b4b;
+      border: 1px solid #a855f7;
+      color: #e9d5ff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      display: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toast" id="toast">Notificación</div>
+
+  <div class="container">
+    
+    <!-- COLUMNA 1: SCADA INTERACTIVO SIMULADO -->
+    <div class="scada-wrap">
+      
+      <!-- CARD 1: CONTROL DE BOMBA -->
+      <div class="card" id="c_bomba">
+        <div class="row" style="margin-bottom:4px">
+          <h1>PLANTA UF • MBP-2000</h1>
+          <button class="btn-dev" onclick="toggleDev(); explain('mododev');">🛠️ Modo Dev</button>
+        </div>
+        <p class="sub">Rampa Fluida S-Curve • Motor NEMA 34 & Driver DM860 (48V)</p>
+        
+        <div class="disp selectable" id="el_disp" onclick="explain('rpm_disp')">
+          <div class="rpm" id="rpm_val">0.0</div>
+          <u>RPM INSTANTÁNEA (OBJETIVO: <span id="obj_rpm_lbl" style="color:var(--primary)">50</span> RPM)</u>
+          <div class="pill off" id="pill_estado">DETENIDA</div>
+        </div>
+
+        <div class="row selectable" id="el_consigna" onclick="explain('slider_rpm')">
+          <span>Consigna de Operación:</span>
+          <span><b id="consigna_val" style="color:var(--primary)">50</b> RPM</span>
+        </div>
+        <input type="range" id="rpm_slider" min="15" max="100" step="1" value="50" oninput="cambiarRpmSlider(this.value)">
+        
+        <div class="grid">
+          <button onclick="setRpm(25); explain('rpm_preseteada');">25 RPM</button>
+          <button onclick="setRpm(35); explain('rpm_preseteada');">35 RPM</button>
+          <button onclick="setRpm(44); explain('rpm_clinica');" title="Límite clínico de sangre">44 RPM 🩸</button>
+          <button onclick="setRpm(50); explain('rpm_nominal');" style="border: 1px solid var(--primary); font-weight:900">50 RPM</button>
+          <button onclick="setRpm(75); explain('rpm_preseteada');">75 RPM</button>
+          <button onclick="setRpm(100); explain('rpm_experimental');" title="Diseño factorial de agua">100 RPM 🧪</button>
+        </div>
+
+        <div class="btns">
+          <button class="go selectable" id="btn_start" onclick="toggleBomba(true); explain('btn_start');">▶ ARRANCAR</button>
+          <button class="no selectable" id="btn_stop" onclick="toggleBomba(false); explain('btn_stop');">⏹ PARAR</button>
+          <button class="dir selectable" id="btn_dir" onclick="toggleSentido(); explain('btn_dir');">🔄 HORARIO (FILTRACIÓN)</button>
+        </div>
+      </div>
+
+      <!-- CARD 2: INSTRUMENTACIÓN Y MODO SECO -->
+      <div class="card" id="c_sens">
+        <div class="row">
+          <b style="font-size:12px; color:#fff">🌊 CAUDALÍMETROS YF-S401</b>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button id="btn_modo_seco" style="font-size:10px; padding:3px 8px; background:#1e293b; border:1px solid #475569" onclick="toggleModoSeco(); explain('modo_seco');">🧪 Modo Seco</button>
+            <button style="font-size:10px; padding:3px 8px" onclick="resetVolumenes(); explain('reset_vol');">Reset Vol</button>
+          </div>
+        </div>
+
+        <div class="sens">
+          <!-- 1. Sensor Alimentacion -->
+          <div class="s selectable" id="el_sensor_alim" onclick="explain('sensor_alim')" style="border-left: 4px solid var(--alim);">
+            <h3 style="color:var(--alim)">
+              <span>ALIMENTACIÓN (GPIO 14)</span>
+              <span id="badge_alim" style="display:none; color:var(--danger); font-size:9px; font-weight:bold;">SIN SEÑAL</span>
+            </h3>
+            <div class="val-row">
+              <div>
+                <span class="v" id="q_alim_val" style="color:var(--alim)">0.0</span>
+                <small style="font-size:12px; font-weight:700; color:var(--muted)">mL/min</small>
+              </div>
+              <div style="font-size:14px; font-weight:700; color:#e2e8f0" id="vol_alim_val">0.000 L</div>
+            </div>
+            <div class="info-row">
+              <span>Frecuencia: <b id="f_alim_val" style="color:#e2e8f0">0.0 Hz</b></span>
+              <span>Factor K: <b id="k_alim_lbl" style="color:var(--alim)">196.50</b> Hz/(L/min)</span>
+            </div>
+          </div>
+
+          <!-- 2. Sensor Permeado -->
+          <div class="s selectable" id="el_sensor_perm" onclick="explain('sensor_perm')" style="border-left: 4px solid var(--perm);">
+            <h3 style="color:var(--perm)">
+              <span>PERMEADO (GPIO 27)</span>
+              <span id="badge_perm" style="display:none; color:var(--danger); font-size:9px; font-weight:bold;">SIN SEÑAL</span>
+            </h3>
+            <div class="val-row">
+              <div>
+                <span class="v" id="q_perm_val" style="color:var(--perm)">0.0</span>
+                <small style="font-size:12px; font-weight:700; color:var(--muted)">mL/min</small>
+              </div>
+              <div style="font-size:14px; font-weight:700; color:#e2e8f0" id="vol_perm_val">0.000 L</div>
+            </div>
+            <div class="info-row">
+              <span>Frecuencia: <b id="f_perm_val" style="color:#e2e8f0">0.0 Hz</b></span>
+              <span>Flujo Darcy: <b id="flux_darcy_val" style="color:var(--perm)">0.00 LMH</b></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Balance Hidráulico -->
+        <div class="bal selectable" id="el_balance" onclick="explain('balance_hidraulico')">
+          <div>
+            <span class="lbl">Caudal Retentado (Qalim − Qperm):</span>
+            <span class="val" id="q_ret_val" style="color:var(--ret)">0.0 mL/min</span>
+          </div>
+          <div>
+            <span class="lbl">Tasa de Recuperación (Y% = Qperm/Qalim):</span>
+            <span class="val" id="recov_val" style="color:var(--primary)">0.0 %</span>
+          </div>
+          <div>
+            <span class="lbl">Caudal Teórico Bomba (RPM × 13.60):</span>
+            <span class="val" id="q_bomba_val">0.0 mL/min</span>
+          </div>
+          <div>
+            <span class="lbl">Desviación (Δ Bomba vs Alimentación):</span>
+            <span class="val" id="delta_val">0.0 %</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3: MODO DESARROLLADOR -->
+      <div class="card card-dev" id="card_dev" style="display:none">
+        <div class="row">
+          <b style="font-size:12px; color:var(--dev)">🛠️ CALIBRACIÓN EN CALIENTE Y AUTO-TUNING</b>
+          <button style="background:#334155; font-size:10px; padding:2px 8px" onclick="toggleDev()">✕ Cerrar</button>
+        </div>
+
+        <!-- SECCIÓN C: EDICIÓN CON BOTONERA TÁCTIL + / - -->
+        <div class="selectable" onclick="explain('botonera_k')" style="background:#0e1122; padding:10px; border-radius:8px; border:1px solid #293855; margin-bottom:10px">
+          <b style="font-size:11px; color:#c084fc">🎛️ AJUSTE FINO TÁCTIL (BOTONES − Y +)</b>
+          <p style="font-size:10px; color:var(--muted); margin-bottom:8px">Permite afinar factores K en caliente directamente desde el celular:</p>
+          
+          <div class="input-grid">
+            <div class="input-group">
+              <label>Factor K Alimentación [Hz/(L/min)]:</label>
+              <div style="display:flex; gap:4px; align-items:center;">
+                <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjK('alim', -1.0)">−</button>
+                <input type="number" id="inp_ka" step="0.1" value="196.50" readonly>
+                <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjK('alim', +1.0)">+</button>
+              </div>
+            </div>
+            <div class="input-group">
+              <label>Factor K PERMEADO [Hz/(L/min)]:</label>
+              <div style="display:flex; gap:4px; align-items:center;">
+                <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjK('perm', -1.0)">−</button>
+                <input type="number" id="inp_kp" step="0.1" value="196.50" readonly>
+                <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjK('perm', +1.0)">+</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="btns" style="margin-top:6px">
+            <button style="background:var(--dev); color:#fff" onclick="guardarFlash(); explain('guardar_flash');">💾 Guardar en Flash ESP32 (NVS)</button>
+            <button style="background:#334155" onclick="aplicarTemporal(); explain('aplicar_temporal');">⚡ Aplicar Temporal (RAM)</button>
+          </div>
+        </div>
+
+        <!-- SECCIÓN B: CALIBRACIÓN POR PROBETA -->
+        <div class="selectable" onclick="explain('calibrar_probeta')" style="background:#0e1122; padding:10px; border-radius:8px; border:1px solid #293855;">
+          <b style="font-size:11px; color:#facc15">🎯 CALIBRAR POR RPM & CAUDAL (PROBETA)</b>
+          <p style="font-size:10px; color:var(--muted); margin-bottom:6px">Ingresa las RPM y los caudales reales de probeta para recalcular simultáneamente:</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+            <input type="number" id="probeta_rpm" value="50" placeholder="RPM">
+            <input type="number" id="probeta_alim" value="720" placeholder="Q Alim mL/min">
+            <input type="number" id="probeta_perm" value="45" placeholder="Q Perm mL/min">
+          </div>
+          <button style="background:#4f46e5; color:#fff; width:100%; padding:8px; font-weight:800; margin-top:6px" onclick="calibrarProbeta();">
+            🚀 Calcular y Guardar en ESP32
+          </button>
+        </div>
+      </div>
+
+      <!-- CARD 4: DATALOGGER Y DOBLE DESCARGA -->
+      <div class="card" id="c_data">
+        <div class="row">
+          <b style="font-size:12px; color:#fff">📊 HISTORIAL DE ENSAYOS & EXCEL (.CSV)</b>
+          <button style="font-size:10px; padding:3px 8px; background:#475569" onclick="limpiarLogs(); explain('limpiar_logs');">🗑️ Limpiar Todo</button>
+        </div>
+
+        <div style="background:#0a0f1e; border:1px solid #1a253c; border-radius:10px; padding:12px; margin-top:8px">
+          <div class="row" style="margin-bottom:6px">
+            <span>Ensayo actual en curso:</span>
+            <span><b id="lbl_ensayo_act" style="color:var(--primary)">Ensayo #1</b> (<span id="lbl_cronometro">00:00</span> min)</span>
+          </div>
+          <div class="row" style="margin-bottom:8px">
+            <span>Muestras registradas en RAM:</span>
+            <span><b id="lbl_n_muestras" style="color:#f8fafc">0</b> muestras (cada 1s)</span>
+          </div>
+
+          <button class="btn-excel selectable" onclick="simularDescargaCsv(); explain('descarga_excel_16');">
+            📥 Descargar Ensayo en Excel (.CSV - 16 cols)
+          </button>
+          <button class="btn-metrologia selectable" onclick="simularDescargaMetrologia(); explain('descarga_metrologia_29');">
+            🔬 Descargar Registro Metrológico Completo (29 cols)
+          </button>
+        </div>
+
+        <div class="row" style="margin-top:10px; margin-bottom:2px">
+          <span style="font-weight:700; color:#cbd5e1">Corridas Finalizadas al Apagar Bomba:</span>
+          <span id="cant_ensayos_lbl" style="color:var(--muted)">0 ensayos</span>
+        </div>
+        <div class="table-box selectable" onclick="explain('tabla_ensayos')">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Consigna</th><th>Duración</th><th>Muestras</th><th>Vol Perm</th><th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tbody_ensayos">
+              <tr><td colspan="6" style="text-align:center; color:var(--muted)">No hay ensayos finalizados aún. Arranca y apaga la bomba para registrar.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COLUMNA 2: PANEL EXPLICATIVO INTERACTIVO Y GUÍA PEDAGÓGICA -->
+    <div class="expl-panel">
+      
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+          <div class="expl-title">📖 GUÍA EXPLICATIVA DEL SCADA</div>
+          <span class="tag tag-blue">V5.2 DEFINITIVO</span>
+        </div>
+        <p style="font-size:11px; color:var(--muted)">
+          Haz click en cualquier botón o tarjeta del simulador de la izquierda para conocer en detalle su función técnica, su impacto en el microcontrolador ESP32 y cómo defenderlo en la tesis.
+        </p>
+      </div>
+
+      <!-- NAVEGACIÓN RÁPIDA POR TÓPICOS -->
+      <div>
+        <div style="font-size:10px; color:#94a3b8; font-weight:700; margin-bottom:4px">ATAJOS DE EXPLICACIÓN:</div>
+        <div class="tour-nav">
+          <button class="tour-btn active" onclick="explain('bienvenida')">Visión General</button>
+          <button class="tour-btn" onclick="explain('modo_seco')">Modo Seco (Anti-Ruido)</button>
+          <button class="tour-btn" onclick="explain('botonera_k')">Ajuste K (+ / −)</button>
+          <button class="tour-btn" onclick="explain('descarga_excel_16')">Excel 16 cols</button>
+          <button class="tour-btn" onclick="explain('descarga_metrologia_29')">Metrología 29 cols</button>
+          <button class="tour-btn" onclick="explain('rampa_scurve')">Rampa S-Curve</button>
+        </div>
+      </div>
+
+      <!-- TARJETAS DINÁMICAS DE DETALLE -->
+      <div id="expl_content">
+        <!-- Contenido dinámico inyectado por JS -->
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // ESTADO DE SIMULACIÓN
+    let bombaOn = false;
+    let rpmActual = 0.0;
+    let rpmConsigna = 50.0;
+    let sentidoHorario = true;
+    let modoSeco = false;
+    let devAbierto = false;
+    
+    let kAlim = 196.50;
+    let kPerm = 196.50;
+    let mlRev = 13.60;
+    
+    let volAlim = 0.0;
+    let volPerm = 0.0;
+    let segEnsayo = 0;
+    let idEnsayo = 1;
+    let listaEnsayos = [];
+
+    // BASE DE CONOCIMIENTO EXPLICATIVA
+    const explicaciones = {
+      bienvenida: {
+        titulo: "🧭 Interfaz de Operación SCADA V5.2",
+        tag: "VISIÓN GENERAL",
+        tagCls: "tag-blue",
+        queEs: "Es la aplicación web servida directamente desde el microcontrolador ESP32 (sin requerir Internet ni servidor externo).",
+        hardware: "El ESP32 corre un servidor web HTTP asíncrono en puerto 80 y un servidor DNS en puerto 53 para Portal Cautivo.",
+        ensayo: "Permite que cualquier teléfono o notebook en el laboratorio controle la velocidad de bombeo, supervise caudales y descargue los datos de la tesis.",
+        tesis: "Demuestra una arquitectura industrial embebida de bajo costo con capacidad de telemetría y configuración en caliente (Industria 4.0)."
+      },
+      modo_seco: {
+        titulo: "🧪 Botón de Modo Seco (Cero Hidráulico Anti-Ruido)",
+        tag: "CERTIFICACIÓN ANTI-EMI",
+        tagCls: "tag-amber",
+        queEs: "Activa el protocolo de auditoría anti-ruido con las cañerías completamente vacías (sin agua circulando).",
+        hardware: "Al activarse, ejecuta reiniciarEstimadorLocked(), incrementa el contador de época y bloquea la acumulación de flujo en el firmware.",
+        ensayo: "Paso 2 de hoy: Con el motor girando a 20, 50 y 80 RPM en seco, certifica que el sensor de permeado marque estrictamente 0.0 mL/min.",
+        tesis: "Es la prueba fehaciente de que el hardware congelado (filtro RC de 200 nF) y el firmware V5.2 erradicaron el caudal fantasma histórico de 145 mL/min."
+      },
+      botonera_k: {
+        titulo: "🎛️ Botonera Táctil [ − ] y [ + ] para Factor K",
+        tag: "CALIBRACIÓN EN CALIENTE",
+        tagCls: "tag-purple",
+        queEs: "Permite incrementar o decrementar los factores K de calibración en pasos de ±1.0 Hz/(L/min) con un simple toque desde el celular.",
+        hardware: "Envía la petición GET /set_dev?ka=...&kp=...&save=0 impactando al instante en la memoria RAM del estimador de flujo.",
+        ensayo: "Durante el aforo con la probeta, si la probeta indica 48 mL/min y la pantalla 50 mL/min, se presiona [+] para afinar el factor K hasta igualar la lectura.",
+        tesis: "Ambos sensores parten de 196.50 Hz/(L/min) por ser el mismo modelo YF-S401, eliminando la vieja constante artificial de 687.33."
+      },
+      guardar_flash: {
+        titulo: "💾 Guardar en Flash ESP32 (NVS)",
+        tag: "PERSISTENCIA NO VOLÁTIL",
+        tagCls: "tag-green",
+        queEs: "Graba de forma permanente los factores K y la cilindrada en la memoria no volátil (NVS) del ESP32.",
+        hardware: "Utiliza la librería Preferences de ESP32 para escribir en el sector Flash NVS de 4MB.",
+        ensayo: "Una vez que la lectura digital coincide con el volumen de la probeta, se presiona este botón para no tener que calibrar nunca más.",
+        tesis: "Garantiza que la planta piloto conserve su sintonía metrológica incluso si se corta la energía eléctrica o se apaga la fuente de 48V."
+      },
+      descarga_excel_16: {
+        titulo: "📥 Exportación Estándar para Excel (16 Columnas)",
+        tag: "DATALOGGER DE PROCESO",
+        tagCls: "tag-green",
+        queEs: "Descarga un archivo .CSV formateado con separador sep=; para apertura directa en Microsoft Excel o Google Sheets.",
+        hardware: "El ESP32 vuelca el buffer circular de RAM con las 16 variables de proceso muestreadas cada 10 segundos.",
+        ensayo: "Contiene: Tiempo relativo en segundos, RPM, Q_alim, Q_perm, Q_retentado, Recuperación Y%, volumen acumulado y flujo Darcy.",
+        tesis: "Es el archivo base para graficar las curvas de operación Q vs RPM y calcular las ecuaciones de regresión lineal R² para la memoria escrita."
+      },
+      descarga_metrologia_29: {
+        titulo: "🔬 Registro Metrológico Completo (29 Columnas)",
+        tag: "AUDITORÍA ACADÉMICA",
+        tagCls: "tag-purple",
+        queEs: "Exportación científica de bajo nivel exigida para certificar la validez de los datos ante el tribunal evaluador.",
+        hardware: "Registra marcas de tiempo en microsegundos de hardware de 64 bits (esp_timer_get_time()) y el conteo bruto de pulsos de la interrupción ISR.",
+        ensayo: "Audita: Flancos brutos, pulsos válidos tras filtro RC, glitches de conmutación descartados, épocas y edad del último pulso.",
+        tesis: "Demuestra científicamente que a flujo cero el microcontrolador no inventó datos y que los transitorios del driver DM860 fueron aislados."
+      },
+      rpm_disp: {
+        titulo: "🔄 Velocidad Angular Instantánea Real",
+        tag: "CINEMÁTICA EN TIEMPO REAL",
+        tagCls: "tag-blue",
+        queEs: "Muestra la velocidad de giro en RPM generada en el eje de la bomba peristáltica en cada fracción de segundo.",
+        hardware: "El temporizador de hardware (LEDC) ajusta dinámicamente la frecuencia de los pulsos STEP hacia el driver DM860.",
+        ensayo: "Permite constatar la suavidad del despegue y verificar que el motor no pierda pasos por aceleraciones bruscas.",
+        tesis: "El control por modulación de frecuencia garantiza un caudal peristáltico estable directamente proporcional a la velocidad angular."
+      },
+      slider_rpm: {
+        titulo: "🎚️ Slider Continuo de Velocidad (15 a 100 RPM)",
+        tag: "CONTROL CONTINUO",
+        tagCls: "tag-blue",
+        queEs: "Permite fijar cualquier consigna entre 15 y 100 RPM con precisión de 1 RPM.",
+        hardware: "El firmware aplica un filtro de segmentación: si el cambio es menor a 1.5 RPM, ajusta la velocidad sin reiniciar el ensayo.",
+        ensayo: "Útil para explorar puntos intermedios no tabulados o simular variaciones de demanda en la línea de ultrafiltración.",
+        tesis: "Ofrece flexibilidad operativa para explorar el rango completo de filtración tangencial."
+      },
+      rpm_clinica: {
+        titulo: "🩸 44 RPM — Límite Clínico Hemodiálisis (600 mL/min)",
+        tag: "PARÁMETRO CLÍNICO",
+        tagCls: "tag-amber",
+        queEs: "Consigna predefinida correspondiente a 600 mL/min (44.12 RPM con manguera de 13.60 mL/rev).",
+        hardware: "Representa el límite máximo de flujo sanguíneo admisible en hemodiálisis clínica para evitar hemólisis celular.",
+        ensayo: "Punto de referencia académico para contrastar el comportamiento hidráulico con las normas de hemodiálisis de la FX100.",
+        tesis: "Vincula directamente la planta experimental con la aplicación biomédica real de los filtros capilares Fresenius Helixone®."
+      },
+      rpm_nominal: {
+        titulo: "🧪 50 RPM — Punto Nominal de Calibración (~720 mL/min)",
+        tag: "PUNTO DE CONTROL",
+        tagCls: "tag-green",
+        queEs: "Velocidad de operación central del Ensayo 2.",
+        hardware: "Régimen permanente donde la bomba y el sensor de alimentación ya fueron certificados con probeta de 1000 mL.",
+        ensayo: "Paso 3 de hoy: Control rápido de 60 segundos para corroborar que el caudal se sitúe alrededor de ~720 mL/min.",
+        tesis: "Línea de base validada con R² = 0.985 que ahorra tiempo de aforo en la jornada de hoy."
+      },
+      sensor_alim: {
+        titulo: "🌊 Sensor de Alimentación (GPIO 14 - YF-S401)",
+        tag: "LÍNEA DE ENTRADA",
+        tagCls: "tag-blue",
+        queEs: "Mide el caudal total impulsado por la bomba peristáltica hacia la entrada del cartucho FX100.",
+        hardware: "Conectado al borne 12 con pull-up externo de 4.7k a 3.3V y filtro pasivo RC de 200 nF.",
+        ensayo: "Muestra el caudal en mL/min, la frecuencia pura en Hz y el volumen total integrado en litros.",
+        tesis: "Factor K experimental validado en 196.50 Hz/(L/min)."
+      },
+      sensor_perm: {
+        titulo: "💧 Sensor de Permeado (GPIO 27 - YF-S401)",
+        tag: "LÍNEA DE ULTRAFILTRADO",
+        tagCls: "tag-amber",
+        queEs: "Mide el líquido ultrafiltrado que atraviesa los poros de la membrana capilar.",
+        hardware: "Conectado al borne 11 con filtro anti-glitch por software y umbral mínimo de 4.0 mL/min para cortar lecturas residuales.",
+        ensayo: "Foco principal del ensayo de hoy: medir con probeta fina o balanza digital para calibrar su factor K en bajo flujo.",
+        tesis: "Con Firmware V5.2, la retención de períodos espurios fue erradicada: si no hay líquido, marca 0.0 mL/min en el acto."
+      },
+      balance_hidraulico: {
+        titulo: "⚖️ Balance Hidráulico y Desviación de Bomba",
+        tag: "BALANCE DE MATERIA",
+        tagCls: "tag-blue",
+        queEs: "Calcula en tiempo real el caudal de retentado, la recuperación y la comparación contra el desplazamiento teórico.",
+        hardware: "Cálculos en coma flotante ejecutados en cada ciclo de telemetría de 500 ms.",
+        ensayo: "Permite auditar si el caudalímetro de alimentación coincide con la cilindrada esperada de la bomba (desviación Δ% cercana a 0%).",
+        tesis: "Cumple con el principio de conservación de la masa: Q_alim = Q_perm + Q_retentado."
+      },
+      btn_start: {
+        titulo: "▶ Botón Arrancar (Rampa S-Curve)",
+        tag: "MANIOBRA DE ARRANQUE",
+        tagCls: "tag-green",
+        queEs: "Inicia la marcha de la bomba y abre automáticamente un nuevo ensayo numerado (#1, #2, etc.).",
+        hardware: "Inicia la rampa cinemática sigmoidal con aceleración suave de 2.0 RPM/s², eliminando tirones en el motor.",
+        ensayo: "Al tocar este botón, el cronómetro arranca en 00:00 y los acumuladores de ensayo comienzan a registrar.",
+        tesis: "Protege mecánicamente las fibras huecas de la membrana FX100 frente a sobrepresiones repentinas."
+      },
+      btn_stop: {
+        titulo: "⏹ Botón Parar (Frenado Rápido & Guardado)",
+        tag: "MANIOBRA DE PARADA",
+        tagCls: "tag-amber",
+        queEs: "Detiene la bomba en menos de 1.5 segundos y archiva la corrida en la tabla del datalogger.",
+        hardware: "Aplica desaceleración rápida de 70.0 RPM/s² garantizando parada segura sin desfasaje de pasos.",
+        ensayo: "Al detener la bomba, la duración y los litros recogidos quedan guardados en la tabla para su descarga individual.",
+        tesis: "Cierra la sesión y marca el fin del ensayo en el archivo metrológico con código de tipo FIN."
+      }
+    };
+
+    function explain(clave) {
+      const info = explicaciones[clave] || explicaciones.bienvenida;
+      const html = `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+          <h3 style="font-size:15px; color:#fff; font-weight:800">${info.titulo}</h3>
+          <span class="tag ${info.tagCls}">${info.tag}</span>
+        </div>
+        
+        <div style="display:flex; flex-direction:column; gap:10px">
+          <div class="expl-sec" style="border-left-color: #38bdf8">
+            <h4>📌 ¿Qué es y para qué sirve?</h4>
+            <p>${info.queEs}</p>
+          </div>
+          
+          <div class="expl-sec" style="border-left-color: #a855f7">
+            <h4>⚙️ Acción en el Hardware / ESP32</h4>
+            <p>${info.hardware}</p>
+          </div>
+
+          <div class="expl-sec" style="border-left-color: #10b981">
+            <h4>🧪 Comportamiento en el Ensayo de Hoy</h4>
+            <p>${info.ensayo}</p>
+          </div>
+
+          <div class="expl-sec" style="border-left-color: #f59e0b">
+            <h4>🎓 Defensa de Tesis (UNSa 2026)</h4>
+            <p>${info.tesis}</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('expl_content').innerHTML = html;
+
+      // Actualizar botones de atajo
+      document.querySelectorAll('.tour-btn').forEach(b => {
+        b.classList.remove('active');
+        if (b.innerText.toLowerCase().includes(info.tag.toLowerCase().split(' ')[0])) {
+          b.classList.add('active');
+        }
+      });
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    // SIMULACIÓN DINÁMICA DE LA BOMBA Y CAUDALÍMETROS
+    function toggleBomba(arrancar) {
+      bombaOn = arrancar;
+      const pil = document.getElementById('pill_estado');
+      if (arrancar) {
+        pil.className = 'pill on';
+        pil.innerText = 'EN MARCHA';
+        showToast("▶ Bomba iniciada con Rampa S-Curve (Ensayo #" + idEnsayo + ")");
+      } else {
+        pil.className = 'pill off';
+        pil.innerText = 'DETENIDA';
+        // Archivar ensayo finalizado
+        if (segEnsayo > 5) {
+          archivarEnsayo();
+        }
+        showToast("⏹ Bomba detenida. Corrida archivada en historial.");
+      }
+    }
+
+    function toggleSentido() {
+      sentidoHorario = !sentidoHorario;
+      const b = document.getElementById('btn_dir');
+      b.innerText = sentidoHorario ? '🔄 HORARIO (FILTRACIÓN)' : '🔄 ANTIHORARIO (RETROLAVADO)';
+      showToast(sentidoHorario ? "Sentido HORARIO (Filtración directa)" : "Sentido ANTIHORARIO (Retrolavado)");
+    }
+
+    function toggleModoSeco() {
+      modoSeco = !modoSeco;
+      const b = document.getElementById('btn_modo_seco');
+      if (modoSeco) {
+        b.innerText = '⚠ Seco: ON';
+        b.style.background = '#b45309';
+        b.style.borderColor = '#f59e0b';
+        showToast("🧪 Modo Seco ACTIVADO: Certificando Cero Hidráulico (Anti-Ruido)");
+      } else {
+        b.innerText = '🧪 Modo Seco';
+        b.style.background = '#1e293b';
+        b.style.borderColor = '#475569';
+        showToast("💧 Modo Normal RESTAURADO para operar con agua");
+      }
+    }
+
+    function toggleDev() {
+      devAbierto = !devAbierto;
+      document.getElementById('card_dev').style.display = devAbierto ? 'block' : 'none';
+      if (devAbierto) showToast("🛠️ Modo Desarrollador abierto: Ajuste de K y Calibración");
+    }
+
+    function setRpm(v) {
+      rpmConsigna = v;
+      document.getElementById('rpm_slider').value = v;
+      document.getElementById('consigna_val').innerText = v;
+      document.getElementById('obj_rpm_lbl').innerText = v;
+      showToast("Consigna fijada a " + v + " RPM");
+    }
+
+    function cambiarRpmSlider(v) {
+      rpmConsigna = parseFloat(v);
+      document.getElementById('consigna_val').innerText = v;
+      document.getElementById('obj_rpm_lbl').innerText = v;
+    }
+
+    function resetVolumenes() {
+      volAlim = 0.0;
+      volPerm = 0.0;
+      document.getElementById('vol_alim_val').innerText = '0.000 L';
+      document.getElementById('vol_perm_val').innerText = '0.000 L';
+      showToast("Volúmenes reseteados a 0.000 L (Sincronización de probeta)");
+    }
+
+    function adjK(sensor, delta) {
+      if (sensor === 'alim') {
+        kAlim = Math.max(10.0, Math.round((kAlim + delta) * 10) / 10);
+        document.getElementById('inp_ka').value = kAlim.toFixed(2);
+        document.getElementById('k_alim_lbl').innerText = kAlim.toFixed(2);
+        showToast("K Alimentación ajustado a " + kAlim.toFixed(2) + " Hz/(L/min)");
+      } else {
+        kPerm = Math.max(10.0, Math.round((kPerm + delta) * 10) / 10);
+        document.getElementById('inp_kp').value = kPerm.toFixed(2);
+        showToast("K Permeado ajustado a " + kPerm.toFixed(2) + " Hz/(L/min)");
+      }
+    }
+
+    function guardarFlash() {
+      showToast("💾 Factores guardados en memoria Flash ESP32 (NVS) de por vida.");
+      setTimeout(() => { toggleDev(); }, 1200);
+    }
+
+    function aplicarTemporal() {
+      showToast("⚡ Parámetros aplicados en caliente en la RAM.");
+    }
+
+    function calibrarProbeta() {
+      const r = parseFloat(document.getElementById('probeta_rpm').value);
+      const qa = parseFloat(document.getElementById('probeta_alim').value);
+      const qp = parseFloat(document.getElementById('probeta_perm').value);
+      
+      mlRev = qa / r;
+      kAlim = ( (qa / 60) * 17.2 ) / (qa / 1000); // estimado coherente
+      showToast(`🎯 Calibración completada: Cilindrada = ${mlRev.toFixed(2)} mL/rev | Guardado en NVS`);
+      setTimeout(() => { toggleDev(); }, 1200);
+    }
+
+    function archivarEnsayo() {
+      listaEnsayos.push({
+        id: idEnsayo,
+        rpm: rpmConsigna,
+        duracion: segEnsayo,
+        muestras: segEnsayo,
+        vol_perm: volPerm
+      });
+      idEnsayo++;
+      segEnsayo = 0;
+      document.getElementById('lbl_ensayo_act').innerText = "Ensayo #" + idEnsayo;
+      renderTablaEnsayos();
+    }
+
+    function renderTablaEnsayos() {
+      document.getElementById('cant_ensayos_lbl').innerText = listaEnsayos.length + " ensayos";
+      const tbody = document.getElementById('tbody_ensayos');
+      if (listaEnsayos.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted)">No hay ensayos finalizados aún.</td></tr>';
+        return;
+      }
+      let html = '';
+      listaEnsayos.slice().reverse().forEach(e => {
+        let m = Math.floor(e.duracion / 60);
+        let s = e.duracion % 60;
+        let timeStr = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        html += `<tr>
+          <td><b>#${e.id}</b></td>
+          <td>${e.rpm.toFixed(1)} RPM</td>
+          <td>${timeStr}</td>
+          <td>${e.muestras}</td>
+          <td style="color:var(--perm)">${e.vol_perm.toFixed(3)} L</td>
+          <td><button style="padding:2px 6px; font-size:9px; background:#107c41" onclick="simularDescargaCsv()">📥 CSV</button></td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function limpiarLogs() {
+      if (confirm("¿Reiniciar todo el historial de ensayos y telemetría?")) {
+        listaEnsayos = [];
+        segEnsayo = 0;
+        idEnsayo = 1;
+        document.getElementById('lbl_ensayo_act').innerText = "Ensayo #1";
+        document.getElementById('lbl_n_muestras').innerText = "0";
+        document.getElementById('lbl_cronometro').innerText = "00:00";
+        renderTablaEnsayos();
+        showToast("Historial reseteado por completo.");
+      }
+    }
+
+    function simularDescargaCsv() {
+      const csv = "sep=;\n" +
+        "PLANTA DE ULTRAFILTRACION FX100 - REGISTRO DE ENSAYOS Y CALIBRACION\n" +
+        "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Estable_1_0;Q_Bomba_Teorico_mLmin;Frec_Alimentacion_Hz;Q_Alimentacion_mLmin;Vol_Alimentacion_L;Frec_PERMEADO_Hz;Q_PERMEADO_mLmin;Vol_PERMEADO_L;Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Alim_Pct;J_LMH\n" +
+        "1;10;00:10;50.0;1;680.0;133.6;680.0;0.113;20.1;102.3;0.017;577.7;15.0;0.0;2.79\n" +
+        "1;20;00:20;50.0;1;680.0;133.8;681.0;0.226;20.1;102.3;0.034;578.7;15.0;+0.1;2.79\n";
+      
+      descargarArchivoBlob(csv, "PlantaUF_Calibracion_Historico.csv", "text/csv");
+      showToast("📥 Descargando archivo CSV estándar (16 columnas)...");
+    }
+
+    function simularDescargaMetrologia() {
+      const csv = "# esquema=metrologia_nucleo_v5_1\n" +
+        "# tiempo_sensor_us=desde_arranque\n" +
+        "# nan=dato_no_disponible\n" +
+        "sesion,tipo,estado,t_reg_us,rpm,tA_us,epocaA,calidadA,kA,flancosA,aceptadosA,nA,rechazosA,edadA_us,fA_Hz,qA_mLmin,vA_L,tP_us,epocaP,calidadP,kP,flancosP,aceptadosP,nP,rechazosP,edadP_us,fP_Hz,qP_mLmin,vP_L\n" +
+        "1,1,0,10000000,50.0,9998000,0,1,196.50,1336,1336,1336,0,7485,133.60,680.0,0.113,9997500,0,1,196.50,201,201,201,0,49751,20.10,102.3,0.017\n";
+      
+      descargarArchivoBlob(csv, "PlantaUF_Metrologia_Certificada_29cols.csv", "text/csv");
+      showToast("🔬 Descargando registro metrológico completo (29 columnas)...");
+    }
+
+    function descargarArchivoBlob(contenido, nombre, tipo) {
+      const blob = new Blob([contenido], { type: tipo + ";charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // BUCLE DE SIMULACIÓN EN TIEMPO REAL (Cada 100 ms)
+    setInterval(() => {
+      // 1. Rampa suave S-Curve hacia la consigna
+      if (bombaOn) {
+        if (rpmActual < rpmConsigna) {
+          rpmActual = Math.min(rpmConsigna, rpmActual + 1.2);
+        } else if (rpmActual > rpmConsigna) {
+          rpmActual = Math.max(rpmConsigna, rpmActual - 1.8);
+        }
+        segEnsayo += 0.1;
+      } else {
+        rpmActual = Math.max(0.0, rpmActual - 4.5); // frenado rápido
+      }
+
+      document.getElementById('rpm_val').innerText = rpmActual.toFixed(1);
+
+      // 2. Cronómetro y muestras
+      let totalSeg = Math.floor(segEnsayo);
+      let mins = Math.floor(totalSeg / 60);
+      let secs = totalSeg % 60;
+      document.getElementById('lbl_cronometro').innerText = (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs;
+      document.getElementById('lbl_n_muestras').innerText = totalSeg;
+
+      // 3. Simulación de Caudales
+      let qTeoricoBomba = rpmActual * mlRev;
+      let qAlim = 0.0;
+      let fAlim = 0.0;
+      let qPerm = 0.0;
+      let fPerm = 0.0;
+
+      if (rpmActual > 0.5) {
+        // En alimentación, sigue a la bomba con fluctuación de rodillos (±1.5%)
+        let jitter = 1.0 + (Math.sin(Date.now() / 300) * 0.015);
+        qAlim = qTeoricoBomba * jitter;
+        fAlim = (qAlim * kAlim) / 1000.0;
+
+        // En permeado: si está en MODO SECO o si no hay líquido, ESTRICTAMENTE CERO!
+        if (modoSeco) {
+          qPerm = 0.0;
+          fPerm = 0.0;
+        } else {
+          // Si está en marcha con agua, permea ~15% del caudal
+          qPerm = qAlim * 0.15;
+          fPerm = (qPerm * kPerm) / 1000.0;
+        }
+
+        // Acumulación de volumen en litros
+        volAlim += (qAlim / 60000.0) * 0.1;
+        volPerm += (qPerm / 60000.0) * 0.1;
+      }
+
+      document.getElementById('q_alim_val').innerText = qAlim.toFixed(1);
+      document.getElementById('f_alim_val').innerText = fAlim.toFixed(1) + ' Hz';
+      document.getElementById('vol_alim_val').innerText = volAlim.toFixed(3) + ' L';
+
+      document.getElementById('q_perm_val').innerText = qPerm.toFixed(1);
+      document.getElementById('f_perm_val').innerText = fPerm.toFixed(1) + ' Hz';
+      document.getElementById('vol_perm_val').innerText = volPerm.toFixed(3) + ' L';
+
+      // Darcy flux J (LMH)
+      let fluxDarcy = (qPerm * 0.06) / 2.2;
+      document.getElementById('flux_darcy_val').innerText = fluxDarcy.toFixed(2) + ' LMH';
+
+      // Balance
+      let qRet = Math.max(0.0, qAlim - qPerm);
+      let recov = qAlim > 0 ? (qPerm / qAlim) * 100.0 : 0.0;
+      let delta = qTeoricoBomba > 0 ? ((qAlim - qTeoricoBomba) / qTeoricoBomba) * 100.0 : 0.0;
+
+      document.getElementById('q_ret_val').innerText = qRet.toFixed(1) + ' mL/min';
+      document.getElementById('recov_val').innerText = recov.toFixed(1) + ' %';
+      document.getElementById('q_bomba_val').innerText = qTeoricoBomba.toFixed(1) + ' mL/min';
+      document.getElementById('delta_val').innerText = (delta > 0 ? '+' : '') + delta.toFixed(1) + ' %';
+
+    }, 100);
+
+    // Inicializar panel explicativo al cargar
+    explain('bienvenida');
+  </script>
+</body>
+</html>

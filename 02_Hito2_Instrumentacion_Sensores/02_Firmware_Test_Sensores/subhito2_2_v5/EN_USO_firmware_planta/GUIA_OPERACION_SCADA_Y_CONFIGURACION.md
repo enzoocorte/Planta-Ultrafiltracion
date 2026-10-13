@@ -214,7 +214,13 @@ El datalogger registra automáticamente todas las variables del proceso cada seg
 > [!TIP]
 > **Recordatorio Operativo:** No es necesario cargar planillas de Excel en vivo. Solo anoten en papel los mL de la probeta y los Hz de pantalla; el microcontrolador graba todo y se descarga al terminar.
 
-1. **Paso 1: Puesta en marcha**  
+1. **Paso 0: Compilación y Carga del Firmware (Arduino IDE):**  
+   * Abrir `subhito2_2_v5/EN_USO_firmware_planta/EN_USO_firmware_planta.ino`.  
+   * Seleccionar placa `ESP32 Dev Module` y el puerto COM activo.  
+   * Verificar partición: `Default 4MB with spiffs` o `Minimal SPIFFS`.  
+   * Presionar **Subir (Upload / Ctrl+U)** (mantener pulsado `BOOT` si dice `Connecting...`).  
+   * Verificar en Monitor Serial (115200 baudios) que indique: `[HTTP] Servidor Web SCADA iniciado con exito en puerto 80`.
+2. **Paso 1: Puesta en marcha del hardware**  
    Conectar el ESP32, encender la fuente de 48V y vincular el celular a la red Wi-Fi `Bomba_Peristaltica_UF`. El SCADA se abrirá automáticamente.
 2. **Paso 2: Certificación en seco (Anti-Ruido)**  
    Con los sensores vacíos, tocar **`[🧪 Modo Seco]`** en el SCADA (el botón pasa a color ámbar **`⚠ Seco: ON`**). Hacer girar la bomba a 20, 50 y 80 RPM por 30s. Comprobar que el permeado marque estrictamente **0.0 mL/min**. Volver a tocar el botón para salir del modo seco.

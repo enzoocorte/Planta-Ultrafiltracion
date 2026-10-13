@@ -55,6 +55,40 @@ Para garantizar rigor académico y descartar cualquier fuente de acoplamiento el
 
 ## 4. PROCEDIMIENTO OPERATIVO PASO A PASO EN EL LABORATORIO
 
+### PASO 0: Compilación y Flasheo del Firmware en el ESP32
+Antes de encender la planta física, cargar la versión definitiva en el microcontrolador:
+
+1. **Abrir el Proyecto en Arduino IDE:**
+   * Archivo $\rightarrow$ Abrir $\rightarrow$ `subhito2_2_v5/EN_USO_firmware_planta/EN_USO_firmware_planta.ino`.
+2. **Seleccionar Placa y Puerto:**
+   * **Placa:** `ESP32 Dev Module` (o `esp32:esp32:esp32`).
+   * **Puerto:** Seleccionar el puerto COM activo (ej. `COM3` o `COM4`).
+   * **Ajustes de Placa (Menú Herramientas):**
+     * *CPU Frequency:* `240MHz (WiFi/BT)`
+     * *Flash Frequency:* `80MHz`
+     * *Flash Mode:* `QIO`
+     * *Flash Size:* `4MB (32Mb)`
+     * *Partition Scheme:* `Default 4MB with spiffs (1.2MB APP / 1.5MB SPIFFS)` o `Minimal SPIFFS (Large APPS with OTA)`
+     * *Upload Speed:* `921600` (bajar a `115200` si el cable USB presenta pérdidas)
+3. **Compilar y Subir (`Ctrl + U`):**
+   * Presionar el botón circular **Subir (Upload / Flecha hacia la derecha)**.
+   * *Tip de Flasheo:* Si la consola se queda en `Connecting........_____.....`, mantener presionado el botón físico **`BOOT`** en el ESP32 hasta que inicie el porcentaje de escritura (`Writing at 0x... 10%... 100%`).
+4. **Verificación en Monitor Serial (`Ctrl + Shift + M` a 115200 baudios):**
+   * Al terminar, debe imprimir el banner de arranque:
+     ```text
+     ==================================================
+      PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   
+      Rampa S-Curve, Auto-Calibracion & Datalogger     
+     ==================================================
+     [WIFI] Punto de Acceso Estable Creado:
+            SSID: Bomba_Peristaltica_UF | Pass: plantapiloto2
+            IP AP: http://192.168.4.1
+     [DNS] Servidor DNS Captive Portal activo en puerto 53 (Anti-Desconexion)
+     [HTTP] Servidor Web SCADA iniciado con exito en puerto 80.
+     ```
+
+---
+
 ### PASO 1: Puesta en Marcha y Portal Cautivo Automático
 1. Conectar el ESP32 a la PC por cable USB.
 2. Abrir el Monitor Serial de Arduino IDE a **115200 baudios**.
