@@ -43,20 +43,26 @@ public:
     Caudalimetro::Muestra p;
   };
 
-  static constexpr size_t   MAX_FILAS = 300;
+  static constexpr size_t   MAX_FILAS = 150;
   static constexpr uint16_t MAX_SESIONES = 20;
   static constexpr int64_t  INTERVALO_LOG_US = 10000000; // 10 segundos
 
-  RegistroEnsayos() {
-    _filas = new (std::nothrow) Fila[MAX_FILAS]{};
-  }
+  RegistroEnsayos() : _filas(nullptr) {}
 
   ~RegistroEnsayos() {
     delete[] _filas;
+    _filas = nullptr;
   }
 
   RegistroEnsayos(const RegistroEnsayos&) = delete;
   RegistroEnsayos& operator=(const RegistroEnsayos&) = delete;
+
+  bool begin() {
+    if (!_filas) {
+      _filas = new (std::nothrow) Fila[MAX_FILAS]{};
+    }
+    return _filas != nullptr;
+  }
 
   bool     disponible()          const { return _filas != nullptr; }
   bool     activo()              const { return _activo; }
@@ -72,7 +78,10 @@ public:
   }
 
   bool iniciar(Caudalimetro& a, Caudalimetro& p, double rpm, bool bombaEmpuja) {
-    if (!_filas || _activo || _sesion >= MAX_SESIONES || _n + 2 > MAX_FILAS ||
+    if (!_filas) {
+      if (!begin()) return false;
+    }
+    if (_activo || _sesion >= MAX_SESIONES || _n + 2 > MAX_FILAS ||
         !std::isfinite(rpm) || rpm < 0.0) {
       return false;
     }

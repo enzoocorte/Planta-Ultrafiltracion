@@ -336,6 +336,8 @@ void setup() {
   const bool pwmReposo =
       pwmAdjunto && ledcWrite(PIN_PUL, 0);
 
+  registro.begin();
+
   listo = ka && kp && okAlim && okPerm &&
           registro.disponible() && pwmReposo;
 

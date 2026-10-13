@@ -715,6 +715,7 @@ void setup() {
     Serial.println("⚠️ [ERROR CRÍTICO] Fallo en la inicialización de caudalímetros");
   }
   bomba.begin();
+  registroEnsayos.begin();
 
   // 3. Configuración Wi-Fi Robusta (AP Dedicado Anti-Desconexión)
   WiFi.disconnect(true);           // Limpiar estados previos
