@@ -418,7 +418,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           <label>Factor K Alimentación [Hz/(L/min)]:</label>
           <div style="display:flex; gap:4px; align-items:center;">
             <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_ka', -1.0)">−</button>
-            <input type="number" id="inp_ka" step="0.1" value="154.62" style="width:100%; text-align:center;">
+            <input type="number" id="inp_ka" step="0.1" value="196.50" style="width:100%; text-align:center;">
             <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_ka', +1.0)">+</button>
           </div>
         </div>
@@ -426,7 +426,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           <label>Factor K PERMEADO [Hz/(L/min)]:</label>
           <div style="display:flex; gap:4px; align-items:center;">
             <button type="button" style="padding:6px 10px; font-size:14px; font-weight:900; background:#334155" onclick="adjVal('inp_kp', -1.0)">−</button>
-            <input type="number" id="inp_kp" step="0.1" value="55.00" style="width:100%; text-align:center;">
+            <input type="number" id="inp_kp" step="0.1" value="196.50" style="width:100%; text-align:center;">
             <button type="button" style="padding:6px 10px; font-weight:900; background:#334155" onclick="adjVal('inp_kp', +1.0)">+</button>
           </div>
         </div>

@@ -106,10 +106,10 @@ constexpr ConfigSensor SENSOR_ALIM_CFG = {
   1360.0                   // Q máximo del intervalo calibrado (mL/min)
 };
 
-// Sensor de Permeado: calibración provisional; requiere banco gravimétrico independiente
+// Sensor de Permeado: mismo modelo de caudalímetro YF-S401 que alimentación; ajuste fino en banco
 constexpr ConfigSensor SENSOR_PERM_CFG = {
   PIN_SENSOR_PERMEADO,     // Pin 27
-  687.33,                  // K de fábrica / preliminar
+  196.50,                  // K nominal base (idéntico modelo YF-S401; ajustable desde SCADA)
   600,                     // Ancho mínimo de nivel LOW (600 us)
   600,                     // Ancho mínimo de nivel HIGH (600 us)
   2500,                    // Período mínimo admisible (2500 us = 400 Hz)
@@ -123,7 +123,7 @@ constexpr ConfigSensor SENSOR_PERM_CFG = {
 
 // Constantes globales de K para compatibilidad con NVS
 constexpr float K_ALIMENTACION = 196.50f;
-constexpr float K_PERMEADO     = 687.33f;
+constexpr float K_PERMEADO     = 196.50f;
 
 // ------------------------------------------------------------------------------
 // 5. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN Y AUTO-CALIBRACIÓN

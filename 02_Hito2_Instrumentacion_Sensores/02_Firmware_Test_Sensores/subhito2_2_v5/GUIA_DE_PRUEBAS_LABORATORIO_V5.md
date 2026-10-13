@@ -126,9 +126,16 @@ Existen 3 alternativas directas según la preferencia de trabajo en el laborator
 3. **Opción 3: Ajuste Fino en Vivo con Botones `[ − ]` y `[ + ]` (Novedad V5.2)**  
    En el SCADA $\rightarrow$ **`🛠️ Modo Dev`** $\rightarrow$ **Sección C (Edición Directa de Parámetros)**:
    * Cada factor ($K_{\text{alim}}$ y $K_{\text{perm}}$) dispone de botones táctiles **`[ − ]`** y **`[ + ]`**.
+   * **Criterio Físico:** Como ambos caudalímetros son exactamente el mismo modelo (**YF-S401**), ambos factores $K$ deben ser del mismo orden de magnitud ($K_{\text{alim}} \approx 196.50$, $K_{\text{perm}} \approx 180 - 196$). Se descarta el valor histórico de $687.33$, que era un remanente provisional de ensayos previos con ruido.
    * Cada pulsación ajusta en $\pm 1.0\text{ Hz/(L/min)}$ e impacta **inmediatamente en la RAM del ESP32 en caliente**.
    * Permite que el operador en el celular presione `+` o `−` mientras mira la probeta hasta que el display digital marque exactamente los mL/min que caen en la probeta.
    * Una vez calibrado a gusto, tocan **`💾 Guardar en Flash ESP32`** para que el valor quede grabado en memoria NVS de por vida.
+
+> **💡 ¿HACE FALTA LLENAR PLANILLAS EXCEL DURANTE EL ENSAYO?**  
+> **NO.** Durante las pruebas en el laboratorio **no abran ni llenen planillas a mano**.  
+> 1. El ESP32 tiene un datalogger interno que registra automáticamente todo segundo a segundo en RAM.  
+> 2. Durante la prueba física, solo anoten en un cuaderno/celular dos datos por corrida: **los mL medidos en la probeta** y la **frecuencia en Hz** que mostraba la pantalla.  
+> 3. Al terminar la sesión, descargan el archivo con un solo click desde el botón verde del SCADA (`📥 Descargar Ensayo en Excel`), y luego en la computadora abren el Excel para generar los gráficos y anexos de la tesis con tranquilidad.
 
 ---
 
