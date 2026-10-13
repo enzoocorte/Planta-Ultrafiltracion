@@ -467,6 +467,10 @@ void handleSetDev() {
 
 // Iniciar Auto-Calibración Inteligente en Régimen Permanente
 void handleIniciarAutoCal() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"Bloqueado durante ensayo activo\"}");
+    return;
+  }
   if (!bomba.enMarcha()) {
     server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Enciende la bomba primero\"}");
     return;
@@ -539,6 +543,10 @@ void handleCalibrarRpmQ() {
 
 // Restablecer parámetros de fábrica
 void handleResetDev() {
+  if (registroEnsayos.activo() || bomba.enMarcha()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"Bloqueado durante operacion o ensayo activo\"}");
+    return;
+  }
   sensorAlimentacion.setK(K_ALIMENTACION);
   sensorPermeado.setK(K_PERMEADO);
   bomba.setMlPorVuelta(ML_POR_VUELTA);

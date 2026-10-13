@@ -55,37 +55,48 @@ Para garantizar rigor académico y descartar cualquier fuente de acoplamiento el
 
 ## 4. PROCEDIMIENTO OPERATIVO PASO A PASO EN EL LABORATORIO
 
-### PASO 0: Compilación y Flasheo del Firmware en el ESP32
-Antes de encender la planta física, cargar la versión definitiva en el microcontrolador:
+### PASO 0: Selección de Variante de Firmware y Compilación en ESP32
 
-1. **Abrir el Proyecto en Arduino IDE:**
-   * Archivo $\rightarrow$ Abrir $\rightarrow$ `subhito2_2_v5/EN_USO_firmware_planta/EN_USO_firmware_planta.ino`.
+Para maximizar la confiabilidad y seguir las recomendaciones de la auditoría metrológica, el equipo dispone de **dos opciones de firmware**:
+
+#### 🔹 OPCIÓN A (Recomendada para Calibración Inicial con Probeta): `banco_calibracion_serial.ino`
+* **Ubicación:** `subhito2_2_v5/banco_calibracion_serial/banco_calibracion_serial.ino`
+* **Propósito:** Aforo volumétrico estricto con probeta graduada ($1000\text{ mL}$ y $100\text{ mL}$) y cronómetro, libre de sobrecargas de Wi-Fi, latencias HTTP o escrituras en memoria Flash NVS.
+* **Control:** Directamente por **Monitor Serial a 115200 baudios** con comandos unicarácter:
+  * `S`: Arrancar motor a $25.0\text{ RPM}$ (esperar a que la rampa alcance régimen estacionario).
+  * `I`: Iniciar recogida en probeta y cronómetro (registra t=0 de ventana y pulsos brutos).
+  * `F`: Finalizar recogida en probeta al alcanzar la marca (cierra ventana metrológica con exactitud de flanco).
+  * `P`: Parar motor con rampa de frenado controlada.
+  * `E`: Exportar CSV metrológico con todas las columnas de flancos y pulsos.
+  * `C`: Limpiar buffer de ensayos para una nueva serie.
+  * `X`: Parada inmediata por software (enclavamiento).
+
+#### 🔹 OPCIÓN B (Firmware Completo con SCADA Web & Wi-Fi): `EN_USO_firmware_planta.ino`
+* **Ubicación:** `subhito2_2_v5/EN_USO_firmware_planta/EN_USO_firmware_planta.ino`
+* **Propósito:** Operación integral de planta, visualización gráfica en tiempo real, tacómetros, calibración interactiva y exportación web.
+
+---
+
+### Parámetros de Compilación en Arduino IDE:
+1. **Abrir el Sketch Elegido:**
+   * Para calibración directa de probeta: Abrir `subhito2_2_v5/banco_calibracion_serial/banco_calibracion_serial.ino`.
+   * Para operación de planta con SCADA: Abrir `subhito2_2_v5/EN_USO_firmware_planta/EN_USO_firmware_planta.ino`.
 2. **Seleccionar Placa y Puerto:**
-   * **Placa:** `ESP32 Dev Module` (o `esp32:esp32:esp32`).
+   * **Placa:** `ESP32 Dev Module` (núcleo `esp32:esp32` versión 3.x).
    * **Puerto:** Seleccionar el puerto COM activo (ej. `COM3` o `COM4`).
    * **Ajustes de Placa (Menú Herramientas):**
      * *CPU Frequency:* `240MHz (WiFi/BT)`
      * *Flash Frequency:* `80MHz`
      * *Flash Mode:* `QIO`
      * *Flash Size:* `4MB (32Mb)`
-     * *Partition Scheme:* `Default 4MB with spiffs (1.2MB APP / 1.5MB SPIFFS)` o `Minimal SPIFFS (Large APPS with OTA)`
-     * *Upload Speed:* `921600` (bajar a `115200` si el cable USB presenta pérdidas)
+     * *Partition Scheme:* `Default 4MB with spiffs (1.2MB APP / 1.5MB SPIFFS)` o `Minimal SPIFFS`
+     * *Upload Speed:* `921600` (bajar a `115200` si hay fallas de cable)
 3. **Compilar y Subir (`Ctrl + U`):**
-   * Presionar el botón circular **Subir (Upload / Flecha hacia la derecha)**.
-   * *Tip de Flasheo:* Si la consola se queda en `Connecting........_____.....`, mantener presionado el botón físico **`BOOT`** en el ESP32 hasta que inicie el porcentaje de escritura (`Writing at 0x... 10%... 100%`).
+   * Presionar **Subir (Upload)**.
+   * *Tip de Flasheo:* Si la consola se queda en `Connecting........_____.....`, mantener presionado el botón físico **`BOOT`** en el ESP32 hasta que inicie la escritura (`Writing at 0x...`).
 4. **Verificación en Monitor Serial (`Ctrl + Shift + M` a 115200 baudios):**
-   * Al terminar, debe imprimir el banner de arranque:
-     ```text
-     ==================================================
-      PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   
-      Rampa S-Curve, Auto-Calibracion & Datalogger     
-     ==================================================
-     [WIFI] Punto de Acceso Estable Creado:
-            SSID: Bomba_Peristaltica_UF | Pass: plantapiloto2
-            IP AP: http://192.168.4.1
-     [DNS] Servidor DNS Captive Portal activo en puerto 53 (Anti-Desconexion)
-     [HTTP] Servidor Web SCADA iniciado con exito en puerto 80.
-     ```
+   * Si se flasheó la **Opción A (Serial)**: Imprime el menú de calibración `# BANCO DE CALIBRACION METROLOGICA V5.2 — SERIAL MONITOR`.
+   * Si se flasheó la **Opción B (SCADA)**: Imprime el banner con IP `192.168.4.1` y servidor web iniciado.
 
 ---
 

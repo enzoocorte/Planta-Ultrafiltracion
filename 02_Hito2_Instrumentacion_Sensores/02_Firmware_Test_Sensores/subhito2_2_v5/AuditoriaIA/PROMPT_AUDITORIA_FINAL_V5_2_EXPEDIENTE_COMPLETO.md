@@ -29,7 +29,7 @@ Por favor, analiza este expediente técnico completo y emite tu dictamen para **
 
 ---
 
-### 2. MATRIZ DE RESOLUCIÓN INTEGRAL DE LOS 10 HALLAZGOS DE AUDITORÍA (RONDAS 9 Y 10)
+### 2. MATRIZ DE RESOLUCIÓN INTEGRAL DE LOS 10 HALLAZGOS DE AUDITORÍA (RONDAS 9, 10 Y 11)
 
 En las revisiones previas, señalaste observaciones técnicas críticas. Cada una de ellas ha sido abordada y resuelta en el código adjunto:
 
@@ -38,13 +38,15 @@ En las revisiones previas, señalaste observaciones técnicas críticas. Cada un
 | **1** | **Bug JavaScript en SCADA:** `$('lbl_kp')` no existía en el DOM, provocando excepción unhandled que congelaba la telemetría periódica. | Se incorporó el elemento `<b id="lbl_kp">` en la tarjeta de Permeado del SCADA, visualizando su factor K en tiempo real sin excepciones. | `index_html.cpp` (l. 331) |
 | **2** | **Carrera crítica en lectura de 64 bits en tara (`resetVolumen`):** `_pulsosOffset = _pulsosMedicion;` se ejecutaba fuera de la sección crítica. | Lectura protegida con spinlock SMP: `portENTER_CRITICAL(&_mux); _pulsosOffset = _pulsosMedicion; portEXIT_CRITICAL(&_mux);`. | `caudalimetro.cpp` (`resetVolumen`) |
 | **3** | **Trazabilidad de calibración NVS en `setup()`:** `declararCalibrado(true)` en `setup()` pisaba la invalidación legítima de `setK(ka)` de NVS. | Se eliminó la llamada redundante en `setup()`. Los parámetros cargados desde NVS permanecen estrictamente como `calibracionDocumentada = false`. | `EN_USO_firmware_planta.ino` (`setup`) |
-| **4** | **Cambio de K alteraba volumen acumulado y no cambiaba época:** `setK()` permitía cambiar K sin cerrar época ni proteger la sesión. | 1) `setK()` ahora incrementa `_epoca++` y limpia acumuladores (`reiniciarEstimadorLocked()`).<br>2) Se prohíbe reconfigurar K mientras hay un ensayo activo (`registroEnsayos.activo() -> HTTP 409`). | `caudalimetro.cpp` (`setK`), `EN_USO_firmware_planta.ino` |
-| **5** | **Validación previa en endpoints REST:** Se aplicaban parámetros parciales antes de comprobar errores. | Los endpoints `/set_dev` y `/calibrar_rpm_q` validan exhaustivamente todos los rangos (`ka, kp, ml, pul`) antes de aplicar o persistir en Flash NVS. | `EN_USO_firmware_planta.ino` |
+| **4** | **Cambio de K alteraba volumen acumulado y no cambiaba época:** `setK()` permitía cambiar K sin cerrar época ni proteger la sesión. | 1) `setK()` ahora incrementa `_epoca++`, inicia nueva época de volumen conservando contadores brutos y resetea estimadores con `reiniciarEstimadorLocked()`.<br>2) Se prohíbe reconfigurar K mientras hay un ensayo activo (`registroEnsayos.activo() -> HTTP 409`). | `caudalimetro.cpp` (`setK`), `EN_USO_firmware_planta.ino` |
+| **5** | **Validación previa en endpoints REST:** Se aplicaban parámetros parciales antes de comprobar errores. | Los endpoints `/set_dev`, `/reset_dev`, `/iniciar_auto_cal` y `/calibrar_rpm_q` validan exhaustivamente todos los rangos y bloquean reconfiguraciones en marcha o ensayo activo. | `EN_USO_firmware_planta.ino` |
 | **6** | **Streaming HTTP metrológico mezclaba `WiFiClient` con chunked:** `sendContent` tras socket TCP rompía el framing HTTP. | Se implementó la clase adaptadora `ServerPrintAdapter : public Print` que escribe buffers formateados exclusivamente mediante `server.sendContent()`. | `EN_USO_firmware_planta.ino` |
 | **7** | **Exportación metrológica con sesión activa:** `/export_metrologia` enviaba HTTP 200 y fallaba silenciosamente si había sesión activa. | Si `registroEnsayos.activo()`, responde `HTTP 409 Conflict` avisando que se debe detener la bomba para exportar. | `EN_USO_firmware_planta.ino` |
 | **8** | **Retorno ignorado en LEDC:** `ledcChangeFrequency` o `ledcSetup` podían retornar 0 por error y se actualizaba `_fActual`. | Se verifica `uint32_t retF = ledcChangeFrequency(...); if (retF > 0) _fActual = retF;` garantizando consistencia del estado del temporizador. | `Bomba.cpp` (`tick`) |
-| **9** | **RPM dinámicas en bordes de ensayo:** `iniciar` recibía consigna teórica y `finalizar` recibía 0.0 durante el frenado. | Ambos eventos registran ahora la velocidad cinemática instantánea real del eje: `bomba.rpmActual()`. | `EN_USO_firmware_planta.ino` (l. 788-798) |
-| **10** | **Retención de último período en bajo flujo:** El estimador no inventa flujo a velocidad cero. | Solo se calcula caudal recíproco si `hayPeriodosNuevos = (periodos > 0 && suma > 0)` en la ventana. Sin pulsos nuevos, la velocidad instantánea cae a 0.0 mL/min. | `caudalimetro.cpp` (l. 220-235) |
+| **9** | **RPM dinámicas en bordes de ensayo:** `iniciar` recibía consigna teórica y `finalizar` recibía 0.0 durante el frenado. | Ambos eventos registran ahora la velocidad cinemática instantánea real del eje: `bomba.rpmActual()`. | `EN_USO_firmware_planta.ino` |
+| **10** | **Retención de último período en bajo flujo:** El estimador no inventa flujo a velocidad cero. | Solo se calcula caudal recíproco si `hayPeriodosNuevos = (periodos > 0 && suma > 0)` en la ventana. Sin pulsos nuevos, la velocidad instantánea cae a 0.0 mL/min. | `caudalimetro.cpp` |
+| **11** | **Atributo IRAM en llamada desde ISR:** `reiniciarEstimadorLocked()` se ejecuta desde la interrupción. | Se añadió el atributo `ARDUINO_ISR_ATTR` en la declaración y definición de `reiniciarEstimadorLocked()`. | `caudalimetro.h`, `caudalimetro.cpp` |
+| **12** | **Reserva dinámica en `RegistroEnsayos`:** `malloc` sin llamada a constructores. | Se reemplazó por `new (std::nothrow) Fila[MAX_FILAS]{}`, destructor `delete[]`, copia eliminada y bandera `FALLO_CONTROL`. | `registro_ensayos.h` |
 
 ---
 
@@ -194,254 +196,12 @@ constexpr const char* SSID_AP  = "Bomba_Peristaltica_UF";
 constexpr const char* PASS_AP  = "plantapiloto2";
 constexpr const char* SSID_STA = "Box804";
 constexpr const char* PASS_STA = "plantapiloto2";
+
 ```
 
-#### ARCHIVO 2: Bomba.h
-```cpp
-#pragma once
-#include <Arduino.h>
-#include <cmath>
-#include "config.h"
+---
 
-// ==============================================================================
-// CLASE BOMBA PERISTÁLTICA — DECLARACIÓN
-// - Control de frecuencia por hardware LEDC PWM (Driver DM860)
-// - Rampa Cuadrática S-Curve de arranque suave (sin golpe de torque)
-// - Parada rápida en < 1.5s
-// ==============================================================================
-
-class Bomba {
-public:
-  void begin();
-  void arrancar();
-  void detener();
-  void paradaEmergencia();       // Corte instantáneo físico y enclavado (< 1 ms, sin rampa)
-  void rearmarEmergencia();      // Rearme manual tras condición segura
-  bool setRPM(float rpm);
-  void toggleSentido();
-
-  float rpmActual() const           { return _actual; }
-  float rpmObjetivo() const         { return _objetivo; }
-  bool  enMarcha() const            { return _enMarcha; }
-  bool  invirtiendo() const         { return _invirtiendo; }
-  bool  sentidoHorario() const      { return _horario; }
-  bool  enEmergencia() const        { return _enEmergencia; }
-  bool  enRegimenEstable() const    { return (_enMarcha && !_enEmergencia && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
-  float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
-
-  void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
-  float getMlPorVuelta() const      { return _mlPorVuelta; }
-
-  void     setPulsosPorRev(uint16_t p) { if (p >= 200) _pulsosPorRev = p; }
-  uint16_t getPulsosPorRev() const     { return _pulsosPorRev; }
-
-  void tick(float dt);
-
-private:
-  void fijarSentido(bool horario);
-
-  bool _enMarcha = false;
-  bool _horario = true;
-  bool _invirtiendo = false;
-  bool _enEmergencia = false;
-
-  float _objetivo = RPM_INICIO;
-  float _actual = 0.0f;
-  float _rpmGuardada = RPM_INICIO;
-  uint32_t _fActual = 0;
-
-  float    _mlPorVuelta  = ML_POR_VUELTA;
-  uint16_t _pulsosPorRev = PULSOS_POR_REV;
-};
-```
-
-#### ARCHIVO 3: Bomba.cpp
-```cpp
-#include "Bomba.h"
-
-// ==============================================================================
-// IMPLEMENTACIÓN DE LA CLASE BOMBA
-// Generación PWM por hardware LEDC con frecuencia mínima segura (>= 50 Hz)
-// ==============================================================================
-
-void Bomba::begin() {
-  pinMode(PIN_DIR, OUTPUT);
-  pinMode(PIN_ENA, OUTPUT);
-  digitalWrite(PIN_ENA, LOW); // ENA en LOW: Driver DM860 habilitado normalmente
-  fijarSentido(true); // Sentido horario por defecto
-
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-  ledcAttach(PIN_PUL, 800, 10);
-  ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF (motor libre)
-#else
-  ledcSetup(0, 800, 10);
-  ledcAttachPin(PIN_PUL, 0);
-  ledcWrite(0, 0);
-#endif
-}
-
-void Bomba::arrancar() {
-  if (_enEmergencia) return; // Bloqueado si hay alarma de sobrepresión/emergencia activa
-  _enMarcha = true;
-  digitalWrite(PIN_ENA, LOW); // Asegura habilitación
-  if (_objetivo < RPM_MIN) {
-    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
-  }
-}
-
-void Bomba::detener() {
-  _enMarcha = false;
-  _invirtiendo = false;
-  if (_objetivo >= RPM_MIN) {
-    _rpmGuardada = _objetivo;
-  }
-}
-
-void Bomba::paradaEmergencia() {
-  _enEmergencia = true;
-  _enMarcha = false;
-  _invirtiendo = false;
-  _actual = 0.0f;
-  _objetivo = 0.0f;
-  _fActual = 0;
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-  ledcWrite(PIN_PUL, 0);
-#else
-  ledcWrite(0, 0);
-#endif
-  digitalWrite(PIN_ENA, HIGH); // Corte físico instantáneo en el DM860 (< 1 ms)
-}
-
-void Bomba::rearmarEmergencia() {
-  _enEmergencia = false;
-  digitalWrite(PIN_ENA, LOW);
-  _actual = 0.0f;
-  _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
-}
-
-bool Bomba::setRPM(float rpm) {
-  if (!std::isfinite(rpm) || _enEmergencia) return false;
-  float r = constrain(rpm, RPM_MIN, RPM_MAX);
-  if (_invirtiendo) {
-    _rpmGuardada = r;   // Almacena consigna si el usuario mueve slider durante el frenado de inversión
-  } else {
-    _objetivo = r;
-    _rpmGuardada = r;
-  }
-  return true;
-}
-
-void Bomba::toggleSentido() {
-  if (_invirtiendo || _enEmergencia) return;
-  if (_actual < 1.0f) {
-    fijarSentido(!_horario);
-  } else {
-    _invirtiendo = true;
-    _rpmGuardada = (_objetivo >= RPM_MIN) ? _objetivo : RPM_INICIO;
-    _objetivo = 0.0f;
-  }
-}
-
-void Bomba::fijarSentido(bool horario) {
-  _horario = horario;
-  digitalWrite(PIN_DIR, horario ? LOW : HIGH);
-}
-
-void Bomba::tick(float dt) {
-  if (_enEmergencia) {
-    _actual = 0.0f;
-    _fActual = 0;
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    ledcWrite(PIN_PUL, 0);
-#else
-    ledcWrite(0, 0);
-#endif
-    digitalWrite(PIN_ENA, HIGH);
-    return;
-  }
-
-  float objetivo = _enMarcha ? _objetivo : 0.0f;
-
-  if (_actual < objetivo) {
-    // Si la bomba está arrancando desde 0, iniciamos suavemente en 1.0 RPM (53 Hz LEDC)
-    if (_actual < 1.0f) {
-      _actual = 1.0f;
-    }
-    
-    // Rampa de aceleración progresiva
-    float tasaAcel = ACEL_NOMINAL_RPM_S;
-    if (_actual < 10.0f) {
-      tasaAcel = ACEL_ARRANQUE_RPM_S + (_actual / 10.0f) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
-    }
-    float delta = objetivo - _actual;
-    if (delta < 3.0f) {
-      tasaAcel = fmaxf(0.8f, tasaAcel * (delta / 3.0f));
-    }
-    _actual = fminf(objetivo, _actual + tasaAcel * dt);
-
-  } else if (_actual > objetivo) {
-    // Desaceleración / Frenado
-    if (!_enMarcha) {
-      // PARADA RÁPIDA: Frenado ágil en menos de 1.5s
-      _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
-      if (_actual < 1.0f) {
-        _actual = 0.0f;
-      }
-    } else {
-      // Reducción suave de velocidad en marcha
-      float tasaDecel = DESACEL_AJUSTE_RPM_S;
-      float delta = _actual - objetivo;
-      if (delta < 3.0f) {
-        tasaDecel = fmaxf(1.0f, tasaDecel * (delta / 3.0f));
-      }
-      _actual = fmaxf(objetivo, _actual - tasaDecel * dt);
-    }
-  }
-
-  // Al llegar a 0 RPM durante una inversión: cortar pulsos, conmutar DIR con margen de seguridad y re-acelerar
-  if (_invirtiendo && _actual <= 0.1f) {
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    ledcWrite(PIN_PUL, 0);
-#else
-    ledcWrite(0, 0);
-#endif
-    _fActual = 0;
-    fijarSentido(!_horario);
-    _invirtiendo = false;
-    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
-  }
-
-  // Generación de pulsos PWM por hardware LEDC
-  if (_actual >= 1.0f) {
-    uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
-    if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
-
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    if (f != _fActual) { 
-      uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10); 
-      if (retF > 0) _fActual = retF;
-    }
-    ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
-#else
-    if (f != _fActual) { 
-      uint32_t retF = ledcSetup(0, f, 10); 
-      if (retF > 0) _fActual = retF;
-    }
-    ledcWrite(0, 512);
-#endif
-  } else if (_fActual != 0) {
-    // Corte inmediato de pulsos al detenerse
-#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF
-#else
-    ledcWrite(0, 0);
-#endif
-    _fActual = 0;
-  }
-}
-```
-
-#### ARCHIVO 4: caudalimetro.h
+#### ARCHIVO 2: caudalimetro.h
 ```cpp
 #pragma once
 // ==============================================================================
@@ -549,7 +309,7 @@ public:
 private:
   static void ARDUINO_ISR_ATTR isrPuente(void* arg);
   void ARDUINO_ISR_ATTR isr();
-  void reiniciarEstimadorLocked();
+  void ARDUINO_ISR_ATTR reiniciarEstimadorLocked();
 
   ConfigSensor _cfg;
   const char*  _nombre;
@@ -595,9 +355,12 @@ private:
   bool     _falloAlimentacion = false;
   Muestra  _ultimaMuestra;
 };
+
 ```
 
-#### ARCHIVO 5: caudalimetro.cpp
+---
+
+#### ARCHIVO 3: caudalimetro.cpp
 ```cpp
 #include "caudalimetro.h"
 #include <math.h>
@@ -612,7 +375,7 @@ Caudalimetro::Caudalimetro(const ConfigSensor& config, const char* nombre, bool 
   : _cfg(config), _nombre(nombre), _esAlimentacion(esAlimentacion) {
 }
 
-void Caudalimetro::reiniciarEstimadorLocked() {
+void ARDUINO_ISR_ATTR Caudalimetro::reiniciarEstimadorLocked() {
   _altoConocido           = false;
   _candidato              = false;
   _hayAnterior            = false;
@@ -625,13 +388,39 @@ void Caudalimetro::reiniciarEstimadorLocked() {
 }
 
 bool Caudalimetro::setK(double nuevoK) {
-  if (!std::isfinite(nuevoK) || nuevoK < 0.1) return false;
+  if (!std::isfinite(nuevoK) || nuevoK < 10.0 || nuevoK > 1000.0) {
+    return false;
+  }
+
   portENTER_CRITICAL(&_mux);
   _cfg.k_Hz_por_Lmin = nuevoK;
   _cfg.calibracionDocumentada = false;
-  ++_epoca; // Cada cambio de factor K inicia una nueva época metrológica
+  ++_epoca;
+
+  // Nueva época de volumen: los contadores brutos se conservan
+  _pulsosOffset = _pulsosMedicion;
+  _anteriorMedicion = _pulsosMedicion;
+
   reiniciarEstimadorLocked();
+
+  if (_iniciado) {
+    _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
+    _inicioNivel_us = esp_timer_get_time();
+  }
   portEXIT_CRITICAL(&_mux);
+
+  _volumenEstimadoAcumulado_L = 0.0;
+  _qSuavizadoDisplay = 0.0f;
+  _inicioSinPulso_us = -1;
+  _falloAlimentacion = false;
+
+  // No publicar como actual una muestra de la época anterior
+  _ultimaMuestra = Muestra{};
+  _ultimaMuestra.k = nuevoK;
+  _ultimaMuestra.frecuencia_Hz = NAN;
+  _ultimaMuestra.q_mLmin = NAN;
+  _ultimaMuestra.volumenEstimado_L = NAN;
+
   return true;
 }
 
@@ -914,106 +703,12 @@ double Caudalimetro::caudalMedio_mLmin(const Muestra& inicial, const Muestra& fi
   const int64_t  dt = final.t_us - inicial.t_us;
   return ((double)dn * 1.0e9) / (inicial.k * (double)dt);
 }
+
 ```
 
-#### ARCHIVO 6: darcy.h
-```cpp
-#pragma once
-// ==============================================================================
-// MODELO DE TRANSPORTE Y RESISTENCIAS EN SERIE (LEY DE DARCY) — MEMBRANA FX100
-// Diseñado para la Tesis de Grado (Antonella Guitián & Owen Cañizares / Codir. Ing. Enzo)
-// ==============================================================================
+---
 
-#include <Arduino.h>
-#include <cmath>
-#include "config.h"
-
-struct ResultadoDarcy {
-  float J_LMH;       // Flujo de permeado volumétrico específico [L / (m² · h)]
-  float J20_LMH;     // Flujo normalizado a 20 °C [LMH]
-  float mu_Pas;      // Viscosidad dinámica del agua a temperatura T [Pa · s]
-  float TCF;         // Factor de corrección por temperatura (mu(T) / mu_20)
-  float R_total;     // Resistencia hidráulica total [m^-1]
-  float R_adicional; // Resistencia hidráulica adicional aparente (torta + polarización) [m^-1]
-  float TMP_bar;     // Presión transmembrana efectiva [bar]
-  bool  valido;      // Estado de cálculo válido
-};
-
-class ModeloDarcy {
-public:
-  static constexpr float MU20 = 1.002e-3f; // Pa · s (Agua destilada a 20.0 °C)
-
-  // Viscosidad dinámica del agua mediante ecuación de Vogel (válida 5 a 60 °C)
-  static float viscosidadAgua(float temp_C) {
-    float t_segura = constrain(temp_C, 5.0f, 60.0f);
-    const float T_K = t_segura + 273.15f;
-    return 2.414e-5f * powf(10.0f, 247.8f / (T_K - 140.0f));
-  }
-
-  void  setRm(float rm) { if (std::isfinite(rm) && rm > 1e11f && rm < 1e16f) _Rm = rm; }
-  float Rm() const      { return _Rm; }
-
-  // Cálculo hidráulico en tiempo real
-  ResultadoDarcy calcular(float qPerm_mLmin, float tmp_bar, float temp_C = 20.0f) const {
-    ResultadoDarcy r{};
-    if (!std::isfinite(tmp_bar) || !std::isfinite(temp_C) || !std::isfinite(qPerm_mLmin)) {
-      return r;
-    }
-    if (tmp_bar < 0.01f || qPerm_mLmin < 0.5f) {
-      return r;
-    }
-
-    float t_val = constrain(temp_C, 5.0f, 60.0f);
-    r.TMP_bar = tmp_bar;
-    r.mu_Pas  = viscosidadAgua(t_val);
-    r.TCF     = r.mu_Pas / MU20;
-
-    // J [LMH] = Q [L/h] / Area [m²] = (qPerm [mL/min] * 0.06) / 2.2 m²
-    r.J_LMH   = (qPerm_mLmin * 0.06f) / AREA_MEMBRANA_M2;
-    r.J20_LMH = r.J_LMH * r.TCF;
-
-    // J en unidades SI [m/s]: 1 LMH = 1 / 3.6e6 m/s
-    const float J_SI   = r.J_LMH / 3.6e6f;
-    const float TMP_Pa = tmp_bar * 100000.0f;
-
-    // Ley de Darcy: J = TMP / (mu * R_total) => R_total = TMP / (mu * J)
-    if (J_SI > 1e-12f && r.mu_Pas > 1e-6f) {
-      r.R_total     = TMP_Pa / (r.mu_Pas * J_SI);
-      r.R_adicional = r.R_total - _Rm;
-      r.valido      = std::isfinite(r.R_total) && std::isfinite(r.R_adicional);
-    }
-
-    return r;
-  }
-
-  // Calibración experimental de Rm con agua limpia (regresión lineal J vs TMP sin ordenada al origen)
-  void acumularPuntoAguaLimpia(float J_SI, float TMP_Pa) {
-    _sumJP += J_SI * TMP_Pa;
-    _sumPP += TMP_Pa * TMP_Pa;
-  }
-
-  bool finalizarCalibracionRm(float temp_C = 20.0f) {
-    if (_sumPP <= 0.0f || _sumJP <= 0.0f) return false;
-    const float Lp = _sumJP / _sumPP; // Permeabilidad hidráulica en m / (s · Pa)
-    const float mu = viscosidadAgua(temp_C);
-    _Rm = 1.0f / (mu * Lp);
-    _sumJP = 0.0f;
-    _sumPP = 0.0f;
-    return true;
-  }
-
-private:
-  // Resistencia intrínseca nominal de la membrana FX100 Helixone® (K_UF = 73 mL/h*mmHg, 2.2 m²).
-  // Según ISO 8637, K_UF se especifica a 37 °C (mu_37 = 0.6915 mPa·s).
-  // Lp = (73 mL/h/mmHg) / (2.2 m² * 3600 s/h * 133.322 Pa/mmHg) = 6.9135e-11 m/(s·Pa)
-  // Rm_nominal = 1 / (mu_37 * Lp) = 2.09e13 m^-1 (a 20 °C daría 1.44e13 m^-1, subestimado 31%).
-  float _Rm = 2.09e13f; 
-  float _sumJP = 0.0f;
-  float _sumPP = 0.0f;
-};
-```
-
-#### ARCHIVO 7: registro_ensayos.h
+#### ARCHIVO 4: registro_ensayos.h
 ```cpp
 #pragma once
 // ==============================================================================
@@ -1033,6 +728,8 @@ private:
 #include "caudalimetro.h"
 #include "config.h"
 
+#include <new>
+
 class RegistroEnsayos {
 public:
   enum class Tipo : uint8_t {
@@ -1042,9 +739,10 @@ public:
   };
 
   enum Estado : uint16_t {
-    NORMAL       = 0,
-    CAMBIO_EPOCA = (1U << 0),
-    OMISIONES    = (1U << 1)
+    NORMAL        = 0,
+    CAMBIO_EPOCA  = (1U << 0),
+    OMISIONES     = (1U << 1),
+    FALLO_CONTROL = (1U << 2)
   };
 
   struct Fila {
@@ -1062,20 +760,28 @@ public:
   static constexpr int64_t  INTERVALO_LOG_US = 10000000; // 10 segundos
 
   RegistroEnsayos() {
-    _filas = (Fila*)malloc(MAX_FILAS * sizeof(Fila));
-    if (_filas) {
-      for (size_t i = 0; i < MAX_FILAS; ++i) {
-        _filas[i] = Fila{};
-      }
-    }
+    _filas = new (std::nothrow) Fila[MAX_FILAS]{};
   }
 
+  ~RegistroEnsayos() {
+    delete[] _filas;
+  }
+
+  RegistroEnsayos(const RegistroEnsayos&) = delete;
+  RegistroEnsayos& operator=(const RegistroEnsayos&) = delete;
+
+  bool     disponible()          const { return _filas != nullptr; }
   bool     activo()              const { return _activo; }
   bool     incompleto()          const { return _incompleto; }
   size_t   cantidad()            const { return _n; }
   uint64_t intervalosOmitidos()  const { return _omitidos; }
   uint16_t sesionActual()        const { return _sesion; }
   const Fila* fila(size_t i)     const { return (_filas && i < _n) ? &_filas[i] : nullptr; }
+
+  void marcarFalloControl() {
+    _incompleto = true;
+    _estadoSesion |= FALLO_CONTROL;
+  }
 
   bool iniciar(Caudalimetro& a, Caudalimetro& p, double rpm, bool bombaEmpuja) {
     if (!_filas || _activo || _sesion >= MAX_SESIONES || _n + 2 > MAX_FILAS ||
@@ -1259,9 +965,263 @@ private:
     imprimirReal(s, m.volumenEstimado_L);
   }
 };
+
 ```
 
-#### ARCHIVO 8: index_html.h
+---
+
+#### ARCHIVO 5: Bomba.h
+```cpp
+#pragma once
+#include <Arduino.h>
+#include <cmath>
+#include "config.h"
+
+// ==============================================================================
+// CLASE BOMBA PERISTÁLTICA — DECLARACIÓN
+// - Control de frecuencia por hardware LEDC PWM (Driver DM860)
+// - Rampa Cuadrática S-Curve de arranque suave (sin golpe de torque)
+// - Parada rápida en < 1.5s
+// ==============================================================================
+
+class Bomba {
+public:
+  void begin();
+  void arrancar();
+  void detener();
+  void paradaEmergencia();       // Corte instantáneo físico y enclavado (< 1 ms, sin rampa)
+  void rearmarEmergencia();      // Rearme manual tras condición segura
+  bool setRPM(float rpm);
+  void toggleSentido();
+
+  float rpmActual() const           { return _actual; }
+  float rpmObjetivo() const         { return _objetivo; }
+  bool  enMarcha() const            { return _enMarcha; }
+  bool  invirtiendo() const         { return _invirtiendo; }
+  bool  sentidoHorario() const      { return _horario; }
+  bool  enEmergencia() const        { return _enEmergencia; }
+  bool  enRegimenEstable() const    { return (_enMarcha && !_enEmergencia && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
+  float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
+
+  void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
+  float getMlPorVuelta() const      { return _mlPorVuelta; }
+
+  void     setPulsosPorRev(uint16_t p) { if (p >= 200) _pulsosPorRev = p; }
+  uint16_t getPulsosPorRev() const     { return _pulsosPorRev; }
+
+  void tick(float dt);
+
+private:
+  void fijarSentido(bool horario);
+
+  bool _enMarcha = false;
+  bool _horario = true;
+  bool _invirtiendo = false;
+  bool _enEmergencia = false;
+
+  float _objetivo = RPM_INICIO;
+  float _actual = 0.0f;
+  float _rpmGuardada = RPM_INICIO;
+  uint32_t _fActual = 0;
+
+  float    _mlPorVuelta  = ML_POR_VUELTA;
+  uint16_t _pulsosPorRev = PULSOS_POR_REV;
+};
+
+```
+
+---
+
+#### ARCHIVO 6: Bomba.cpp
+```cpp
+#include "Bomba.h"
+
+// ==============================================================================
+// IMPLEMENTACIÓN DE LA CLASE BOMBA
+// Generación PWM por hardware LEDC con frecuencia mínima segura (>= 50 Hz)
+// ==============================================================================
+
+void Bomba::begin() {
+  pinMode(PIN_DIR, OUTPUT);
+  pinMode(PIN_ENA, OUTPUT);
+  digitalWrite(PIN_ENA, LOW); // ENA en LOW: Driver DM860 habilitado normalmente
+  fijarSentido(true); // Sentido horario por defecto
+
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+  ledcAttach(PIN_PUL, 800, 10);
+  ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF (motor libre)
+#else
+  ledcSetup(0, 800, 10);
+  ledcAttachPin(PIN_PUL, 0);
+  ledcWrite(0, 0);
+#endif
+}
+
+void Bomba::arrancar() {
+  if (_enEmergencia) return; // Bloqueado si hay alarma de sobrepresión/emergencia activa
+  _enMarcha = true;
+  digitalWrite(PIN_ENA, LOW); // Asegura habilitación
+  if (_objetivo < RPM_MIN) {
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+  }
+}
+
+void Bomba::detener() {
+  _enMarcha = false;
+  _invirtiendo = false;
+  if (_objetivo >= RPM_MIN) {
+    _rpmGuardada = _objetivo;
+  }
+}
+
+void Bomba::paradaEmergencia() {
+  _enEmergencia = true;
+  _enMarcha = false;
+  _invirtiendo = false;
+  _actual = 0.0f;
+  _objetivo = 0.0f;
+  _fActual = 0;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+  ledcWrite(PIN_PUL, 0);
+#else
+  ledcWrite(0, 0);
+#endif
+  digitalWrite(PIN_ENA, HIGH); // Corte físico instantáneo en el DM860 (< 1 ms)
+}
+
+void Bomba::rearmarEmergencia() {
+  _enEmergencia = false;
+  digitalWrite(PIN_ENA, LOW);
+  _actual = 0.0f;
+  _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+}
+
+bool Bomba::setRPM(float rpm) {
+  if (!std::isfinite(rpm) || _enEmergencia) return false;
+  float r = constrain(rpm, RPM_MIN, RPM_MAX);
+  if (_invirtiendo) {
+    _rpmGuardada = r;   // Almacena consigna si el usuario mueve slider durante el frenado de inversión
+  } else {
+    _objetivo = r;
+    _rpmGuardada = r;
+  }
+  return true;
+}
+
+void Bomba::toggleSentido() {
+  if (_invirtiendo || _enEmergencia) return;
+  if (_actual < 1.0f) {
+    fijarSentido(!_horario);
+  } else {
+    _invirtiendo = true;
+    _rpmGuardada = (_objetivo >= RPM_MIN) ? _objetivo : RPM_INICIO;
+    _objetivo = 0.0f;
+  }
+}
+
+void Bomba::fijarSentido(bool horario) {
+  _horario = horario;
+  digitalWrite(PIN_DIR, horario ? LOW : HIGH);
+}
+
+void Bomba::tick(float dt) {
+  if (_enEmergencia) {
+    _actual = 0.0f;
+    _fActual = 0;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
+    digitalWrite(PIN_ENA, HIGH);
+    return;
+  }
+
+  float objetivo = _enMarcha ? _objetivo : 0.0f;
+
+  if (_actual < objetivo) {
+    // Si la bomba está arrancando desde 0, iniciamos suavemente en 1.0 RPM (53 Hz LEDC)
+    if (_actual < 1.0f) {
+      _actual = 1.0f;
+    }
+    
+    // Rampa de aceleración progresiva
+    float tasaAcel = ACEL_NOMINAL_RPM_S;
+    if (_actual < 10.0f) {
+      tasaAcel = ACEL_ARRANQUE_RPM_S + (_actual / 10.0f) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
+    }
+    float delta = objetivo - _actual;
+    if (delta < 3.0f) {
+      tasaAcel = fmaxf(0.8f, tasaAcel * (delta / 3.0f));
+    }
+    _actual = fminf(objetivo, _actual + tasaAcel * dt);
+
+  } else if (_actual > objetivo) {
+    // Desaceleración / Frenado
+    if (!_enMarcha) {
+      // PARADA RÁPIDA: Frenado ágil en menos de 1.5s
+      _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
+      if (_actual < 1.0f) {
+        _actual = 0.0f;
+      }
+    } else {
+      // Reducción suave de velocidad en marcha
+      float tasaDecel = DESACEL_AJUSTE_RPM_S;
+      float delta = _actual - objetivo;
+      if (delta < 3.0f) {
+        tasaDecel = fmaxf(1.0f, tasaDecel * (delta / 3.0f));
+      }
+      _actual = fmaxf(objetivo, _actual - tasaDecel * dt);
+    }
+  }
+
+  // Al llegar a 0 RPM durante una inversión: cortar pulsos, conmutar DIR con margen de seguridad y re-acelerar
+  if (_invirtiendo && _actual <= 0.1f) {
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
+    _fActual = 0;
+    fijarSentido(!_horario);
+    _invirtiendo = false;
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+  }
+
+  // Generación de pulsos PWM por hardware LEDC
+  if (_actual >= 1.0f) {
+    uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
+    if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
+
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    if (f != _fActual) { 
+      uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10); 
+      if (retF > 0) _fActual = retF;
+    }
+    ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
+#else
+    if (f != _fActual) { 
+      uint32_t retF = ledcSetup(0, f, 10); 
+      if (retF > 0) _fActual = retF;
+    }
+    ledcWrite(0, 512);
+#endif
+  } else if (_fActual != 0) {
+    // Corte inmediato de pulsos al detenerse
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF
+#else
+    ledcWrite(0, 0);
+#endif
+    _fActual = 0;
+  }
+}
+
+```
+
+---
+
+#### ARCHIVO 7: index_html.h
 ```cpp
 #pragma once
 #include <Arduino.h>
@@ -1274,9 +1234,12 @@ private:
 // ==============================================================================
 
 extern const char INDEX_HTML[] PROGMEM;
+
 ```
 
-#### ARCHIVO 9: index_html.cpp
+---
+
+#### ARCHIVO 8: index_html.cpp
 ```cpp
 #include "index_html.h"
 
@@ -2105,7 +2068,110 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
 </body>
 </html>
 )html";
+
 ```
+
+---
+
+#### ARCHIVO 9: darcy.h
+```cpp
+#pragma once
+// ==============================================================================
+// MODELO DE TRANSPORTE Y RESISTENCIAS EN SERIE (LEY DE DARCY) — MEMBRANA FX100
+// Diseñado para la Tesis de Grado (Antonella Guitián & Owen Cañizares / Codir. Ing. Enzo)
+// ==============================================================================
+
+#include <Arduino.h>
+#include <cmath>
+#include "config.h"
+
+struct ResultadoDarcy {
+  float J_LMH;       // Flujo de permeado volumétrico específico [L / (m² · h)]
+  float J20_LMH;     // Flujo normalizado a 20 °C [LMH]
+  float mu_Pas;      // Viscosidad dinámica del agua a temperatura T [Pa · s]
+  float TCF;         // Factor de corrección por temperatura (mu(T) / mu_20)
+  float R_total;     // Resistencia hidráulica total [m^-1]
+  float R_adicional; // Resistencia hidráulica adicional aparente (torta + polarización) [m^-1]
+  float TMP_bar;     // Presión transmembrana efectiva [bar]
+  bool  valido;      // Estado de cálculo válido
+};
+
+class ModeloDarcy {
+public:
+  static constexpr float MU20 = 1.002e-3f; // Pa · s (Agua destilada a 20.0 °C)
+
+  // Viscosidad dinámica del agua mediante ecuación de Vogel (válida 5 a 60 °C)
+  static float viscosidadAgua(float temp_C) {
+    float t_segura = constrain(temp_C, 5.0f, 60.0f);
+    const float T_K = t_segura + 273.15f;
+    return 2.414e-5f * powf(10.0f, 247.8f / (T_K - 140.0f));
+  }
+
+  void  setRm(float rm) { if (std::isfinite(rm) && rm > 1e11f && rm < 1e16f) _Rm = rm; }
+  float Rm() const      { return _Rm; }
+
+  // Cálculo hidráulico en tiempo real
+  ResultadoDarcy calcular(float qPerm_mLmin, float tmp_bar, float temp_C = 20.0f) const {
+    ResultadoDarcy r{};
+    if (!std::isfinite(tmp_bar) || !std::isfinite(temp_C) || !std::isfinite(qPerm_mLmin)) {
+      return r;
+    }
+    if (tmp_bar < 0.01f || qPerm_mLmin < 0.5f) {
+      return r;
+    }
+
+    float t_val = constrain(temp_C, 5.0f, 60.0f);
+    r.TMP_bar = tmp_bar;
+    r.mu_Pas  = viscosidadAgua(t_val);
+    r.TCF     = r.mu_Pas / MU20;
+
+    // J [LMH] = Q [L/h] / Area [m²] = (qPerm [mL/min] * 0.06) / 2.2 m²
+    r.J_LMH   = (qPerm_mLmin * 0.06f) / AREA_MEMBRANA_M2;
+    r.J20_LMH = r.J_LMH * r.TCF;
+
+    // J en unidades SI [m/s]: 1 LMH = 1 / 3.6e6 m/s
+    const float J_SI   = r.J_LMH / 3.6e6f;
+    const float TMP_Pa = tmp_bar * 100000.0f;
+
+    // Ley de Darcy: J = TMP / (mu * R_total) => R_total = TMP / (mu * J)
+    if (J_SI > 1e-12f && r.mu_Pas > 1e-6f) {
+      r.R_total     = TMP_Pa / (r.mu_Pas * J_SI);
+      r.R_adicional = r.R_total - _Rm;
+      r.valido      = std::isfinite(r.R_total) && std::isfinite(r.R_adicional);
+    }
+
+    return r;
+  }
+
+  // Calibración experimental de Rm con agua limpia (regresión lineal J vs TMP sin ordenada al origen)
+  void acumularPuntoAguaLimpia(float J_SI, float TMP_Pa) {
+    _sumJP += J_SI * TMP_Pa;
+    _sumPP += TMP_Pa * TMP_Pa;
+  }
+
+  bool finalizarCalibracionRm(float temp_C = 20.0f) {
+    if (_sumPP <= 0.0f || _sumJP <= 0.0f) return false;
+    const float Lp = _sumJP / _sumPP; // Permeabilidad hidráulica en m / (s · Pa)
+    const float mu = viscosidadAgua(temp_C);
+    _Rm = 1.0f / (mu * Lp);
+    _sumJP = 0.0f;
+    _sumPP = 0.0f;
+    return true;
+  }
+
+private:
+  // Resistencia intrínseca nominal de la membrana FX100 Helixone® (K_UF = 73 mL/h*mmHg, 2.2 m²).
+  // Según ISO 8637, K_UF se especifica a 37 °C (mu_37 = 0.6915 mPa·s).
+  // Lp = (73 mL/h/mmHg) / (2.2 m² * 3600 s/h * 133.322 Pa/mmHg) = 6.9135e-11 m/(s·Pa)
+  // Rm_nominal = 1 / (mu_37 * Lp) = 2.09e13 m^-1 (a 20 °C daría 1.44e13 m^-1, subestimado 31%).
+  float _Rm = 2.09e13f; 
+  float _sumJP = 0.0f;
+  float _sumPP = 0.0f;
+};
+
+```
+
+---
 
 #### ARCHIVO 10: EN_USO_firmware_planta.ino
 ```cpp
@@ -2578,6 +2644,10 @@ void handleSetDev() {
 
 // Iniciar Auto-Calibración Inteligente en Régimen Permanente
 void handleIniciarAutoCal() {
+  if (registroEnsayos.activo()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"Bloqueado durante ensayo activo\"}");
+    return;
+  }
   if (!bomba.enMarcha()) {
     server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Enciende la bomba primero\"}");
     return;
@@ -2650,6 +2720,10 @@ void handleCalibrarRpmQ() {
 
 // Restablecer parámetros de fábrica
 void handleResetDev() {
+  if (registroEnsayos.activo() || bomba.enMarcha()) {
+    server.send(409, "application/json", "{\"status\":\"error\",\"msg\":\"Bloqueado durante operacion o ensayo activo\"}");
+    return;
+  }
   sensorAlimentacion.setK(K_ALIMENTACION);
   sensorPermeado.setK(K_PERMEADO);
   bomba.setMlPorVuelta(ML_POR_VUELTA);
@@ -2995,13 +3069,7 @@ void loop() {
     }
   }
 }
+
 ```
 
 ---
-
-### 4. PREGUNTAS CLAVE PARA EL DICTAMEN DE AUDITORÍA
-En función del expediente completo adjunto y de las correcciones implementadas:
-1. **Seguridad en Concurrencia:** ¿Consideras que la protección con spinlocks FreeRTOS (`portENTER_CRITICAL` / `portEXIT_CRITICAL`) en la ISR y en las lecturas de 64 bits (`_pulsosMedicion`, `_pulsosOffset`, muestras atómicas) es robusta y previene carreras de datos?
-2. **Robustez de la Interfaz SCADA y Endpoints REST:** ¿El SCADA y los manejadores HTTP garantizan que las solicitudes se procesen sin excepciones JavaScript y sin riesgo de corromper la memoria NVS durante una corrida experimental?
-3. **Manejo Metrológico de Sesiones:** ¿La separación entre eventos `INICIO`, `PERIODICA` y `FIN`, la reserva de plaza fija en el buffer y el bloqueo de reconfiguración en sesión activa aseguran la trazabilidad de los datos recolectados en laboratorio?
-4. **Dictamen Técnico:** ¿Apruebas este firmware V5.2 para proceder con la compilación en Arduino IDE / ESP32 y la ejecución de la campaña experimental supervisada en banco de laboratorio?

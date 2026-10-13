@@ -104,7 +104,7 @@ public:
 private:
   static void ARDUINO_ISR_ATTR isrPuente(void* arg);
   void ARDUINO_ISR_ATTR isr();
-  void reiniciarEstimadorLocked();
+  void ARDUINO_ISR_ATTR reiniciarEstimadorLocked();
 
   ConfigSensor _cfg;
   const char*  _nombre;

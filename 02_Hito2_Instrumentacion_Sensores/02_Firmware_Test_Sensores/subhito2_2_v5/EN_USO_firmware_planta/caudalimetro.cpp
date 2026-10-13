@@ -11,7 +11,7 @@ Caudalimetro::Caudalimetro(const ConfigSensor& config, const char* nombre, bool 
   : _cfg(config), _nombre(nombre), _esAlimentacion(esAlimentacion) {
 }
 
-void Caudalimetro::reiniciarEstimadorLocked() {
+void ARDUINO_ISR_ATTR Caudalimetro::reiniciarEstimadorLocked() {
   _altoConocido           = false;
   _candidato              = false;
   _hayAnterior            = false;
@@ -24,13 +24,39 @@ void Caudalimetro::reiniciarEstimadorLocked() {
 }
 
 bool Caudalimetro::setK(double nuevoK) {
-  if (!std::isfinite(nuevoK) || nuevoK < 0.1) return false;
+  if (!std::isfinite(nuevoK) || nuevoK < 10.0 || nuevoK > 1000.0) {
+    return false;
+  }
+
   portENTER_CRITICAL(&_mux);
   _cfg.k_Hz_por_Lmin = nuevoK;
   _cfg.calibracionDocumentada = false;
-  ++_epoca; // Cada cambio de factor K inicia una nueva época metrológica
+  ++_epoca;
+
+  // Nueva época de volumen: los contadores brutos se conservan
+  _pulsosOffset = _pulsosMedicion;
+  _anteriorMedicion = _pulsosMedicion;
+
   reiniciarEstimadorLocked();
+
+  if (_iniciado) {
+    _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
+    _inicioNivel_us = esp_timer_get_time();
+  }
   portEXIT_CRITICAL(&_mux);
+
+  _volumenEstimadoAcumulado_L = 0.0;
+  _qSuavizadoDisplay = 0.0f;
+  _inicioSinPulso_us = -1;
+  _falloAlimentacion = false;
+
+  // No publicar como actual una muestra de la época anterior
+  _ultimaMuestra = Muestra{};
+  _ultimaMuestra.k = nuevoK;
+  _ultimaMuestra.frecuencia_Hz = NAN;
+  _ultimaMuestra.q_mLmin = NAN;
+  _ultimaMuestra.volumenEstimado_L = NAN;
+
   return true;
 }
 

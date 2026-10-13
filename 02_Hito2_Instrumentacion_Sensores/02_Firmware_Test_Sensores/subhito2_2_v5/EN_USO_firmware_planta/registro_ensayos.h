@@ -16,6 +16,8 @@
 #include "caudalimetro.h"
 #include "config.h"
 
+#include <new>
+
 class RegistroEnsayos {
 public:
   enum class Tipo : uint8_t {
@@ -25,9 +27,10 @@ public:
   };
 
   enum Estado : uint16_t {
-    NORMAL       = 0,
-    CAMBIO_EPOCA = (1U << 0),
-    OMISIONES    = (1U << 1)
+    NORMAL        = 0,
+    CAMBIO_EPOCA  = (1U << 0),
+    OMISIONES     = (1U << 1),
+    FALLO_CONTROL = (1U << 2)
   };
 
   struct Fila {
@@ -45,20 +48,28 @@ public:
   static constexpr int64_t  INTERVALO_LOG_US = 10000000; // 10 segundos
 
   RegistroEnsayos() {
-    _filas = (Fila*)malloc(MAX_FILAS * sizeof(Fila));
-    if (_filas) {
-      for (size_t i = 0; i < MAX_FILAS; ++i) {
-        _filas[i] = Fila{};
-      }
-    }
+    _filas = new (std::nothrow) Fila[MAX_FILAS]{};
   }
 
+  ~RegistroEnsayos() {
+    delete[] _filas;
+  }
+
+  RegistroEnsayos(const RegistroEnsayos&) = delete;
+  RegistroEnsayos& operator=(const RegistroEnsayos&) = delete;
+
+  bool     disponible()          const { return _filas != nullptr; }
   bool     activo()              const { return _activo; }
   bool     incompleto()          const { return _incompleto; }
   size_t   cantidad()            const { return _n; }
   uint64_t intervalosOmitidos()  const { return _omitidos; }
   uint16_t sesionActual()        const { return _sesion; }
   const Fila* fila(size_t i)     const { return (_filas && i < _n) ? &_filas[i] : nullptr; }
+
+  void marcarFalloControl() {
+    _incompleto = true;
+    _estadoSesion |= FALLO_CONTROL;
+  }
 
   bool iniciar(Caudalimetro& a, Caudalimetro& p, double rpm, bool bombaEmpuja) {
     if (!_filas || _activo || _sesion >= MAX_SESIONES || _n + 2 > MAX_FILAS ||
