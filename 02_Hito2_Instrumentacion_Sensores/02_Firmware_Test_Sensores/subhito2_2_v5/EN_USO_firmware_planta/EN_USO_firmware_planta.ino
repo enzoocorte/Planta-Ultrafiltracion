@@ -504,8 +504,8 @@ void handleCalibrarRpmQ() {
   float qa  = server.arg("qa").toFloat();
   float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
 
-  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp)) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o <= 0\"}");
+  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp) || qp < 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o fuera de rango\"}");
     return;
   }
 
@@ -515,17 +515,24 @@ void handleCalibrarRpmQ() {
     bomba.setMlPorVuelta(nuevaCilindrada);
   }
 
-  // 2. Factores K basados en frecuencia actual
-  float fa = sensorAlimentacion.frecuencia_Hz();
-  float fp = sensorPermeado.frecuencia_Hz();
+  // 2. Frecuencias observadas (pasadas por SCADA) o instantaneas en vivo
+  float fa = server.hasArg("fa") ? server.arg("fa").toFloat() : sensorAlimentacion.frecuencia_Hz();
+  float fp = server.hasArg("fp") ? server.arg("fp").toFloat() : sensorPermeado.frecuencia_Hz();
+
+  bool kaOk = false;
+  bool kpOk = false;
 
   if (fa > 1.0f) {
     float nuevoKa = (fa * 1000.0f) / qa;
-    sensorAlimentacion.setK(nuevoKa);
+    if (nuevoKa >= 10.0f && nuevoKa <= 1000.0f) {
+      kaOk = sensorAlimentacion.setK(nuevoKa);
+    }
   }
   if (qp > 0.0f && fp > 0.3f) {
     float nuevoKp = (fp * 1000.0f) / qp;
-    sensorPermeado.setK(nuevoKp);
+    if (nuevoKp >= 10.0f && nuevoKp <= 1000.0f) {
+      kpOk = sensorPermeado.setK(nuevoKp);
+    }
   }
 
   guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
@@ -535,7 +542,9 @@ void handleCalibrarRpmQ() {
   json += "\"status\":\"ok\",";
   json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
   json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
-  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2);
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2) + ",";
+  json += "\"ka_actualizado\":" + String(kaOk ? "true" : "false") + ",";
+  json += "\"kp_actualizado\":" + String(kpOk ? "true" : "false");
   json += "}";
 
   server.send(200, "application/json", json);

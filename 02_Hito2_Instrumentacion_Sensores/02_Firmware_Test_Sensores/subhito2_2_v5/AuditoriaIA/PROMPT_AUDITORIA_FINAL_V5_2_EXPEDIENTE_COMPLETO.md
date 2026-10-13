@@ -1785,6 +1785,8 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     const $ = id => document.getElementById(id);
     let devOpen = false;
     let rawStatus = {};
+    let lastStableFa = 0;
+    let lastStableFp = 0;
 
     function toggleDev() {
       devOpen = !devOpen;
@@ -1845,8 +1847,15 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
         return;
       }
 
+      let fa = (rawStatus && rawStatus.f_alim > 1.0) ? rawStatus.f_alim : lastStableFa;
+      let fp = (rawStatus && rawStatus.f_perm > 0.3) ? rawStatus.f_perm : lastStableFp;
+
       let url = `/calibrar_rpm_q?rpm=${rpm}&qa=${qa}`;
-      if (qp > 0) url += `&qp=${qp}`;
+      if (fa > 1.0) url += `&fa=${fa.toFixed(2)}`;
+      if (qp > 0) {
+        url += `&qp=${qp}`;
+        if (fp > 0.3) url += `&fp=${fp.toFixed(2)}`;
+      }
 
       fetch(url)
         .then(r => r.json())
@@ -1858,7 +1867,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           setTimeout(() => {
             devOpen = false;
             $('card_dev').style.display = 'none';
-          }, 1200);
+          }, 1500);
         })
         .catch(() => alert("Error al comunicar con ESP32"));
     }
@@ -1982,6 +1991,9 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           $('vp').innerText = d.q_perm.toFixed(1);
           $('fp').innerText = d.f_perm.toFixed(1) + ' Hz';
           $('lp').innerText = d.vol_perm.toFixed(3) + ' L';
+
+          if (d.f_alim && d.f_alim > 1.0) lastStableFa = d.f_alim;
+          if (d.f_perm && d.f_perm > 0.3) lastStableFp = d.f_perm;
           if ($('j_lmh')) $('j_lmh').innerText = (d.j_lmh || 0).toFixed(2) + ' LMH';
           $('qr').innerText = d.q_ret.toFixed(1) + ' mL/min';
           $('rv').innerText = d.recov.toFixed(1) + ' %';
@@ -2681,8 +2693,8 @@ void handleCalibrarRpmQ() {
   float qa  = server.arg("qa").toFloat();
   float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
 
-  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp)) {
-    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o <= 0\"}");
+  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp) || qp < 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos o fuera de rango\"}");
     return;
   }
 
@@ -2692,17 +2704,24 @@ void handleCalibrarRpmQ() {
     bomba.setMlPorVuelta(nuevaCilindrada);
   }
 
-  // 2. Factores K basados en frecuencia actual
-  float fa = sensorAlimentacion.frecuencia_Hz();
-  float fp = sensorPermeado.frecuencia_Hz();
+  // 2. Frecuencias observadas (pasadas por SCADA) o instantaneas en vivo
+  float fa = server.hasArg("fa") ? server.arg("fa").toFloat() : sensorAlimentacion.frecuencia_Hz();
+  float fp = server.hasArg("fp") ? server.arg("fp").toFloat() : sensorPermeado.frecuencia_Hz();
+
+  bool kaOk = false;
+  bool kpOk = false;
 
   if (fa > 1.0f) {
     float nuevoKa = (fa * 1000.0f) / qa;
-    sensorAlimentacion.setK(nuevoKa);
+    if (nuevoKa >= 10.0f && nuevoKa <= 1000.0f) {
+      kaOk = sensorAlimentacion.setK(nuevoKa);
+    }
   }
   if (qp > 0.0f && fp > 0.3f) {
     float nuevoKp = (fp * 1000.0f) / qp;
-    sensorPermeado.setK(nuevoKp);
+    if (nuevoKp >= 10.0f && nuevoKp <= 1000.0f) {
+      kpOk = sensorPermeado.setK(nuevoKp);
+    }
   }
 
   guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
@@ -2712,7 +2731,9 @@ void handleCalibrarRpmQ() {
   json += "\"status\":\"ok\",";
   json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
   json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
-  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2);
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2) + ",";
+  json += "\"ka_actualizado\":" + String(kaOk ? "true" : "false") + ",";
+  json += "\"kp_actualizado\":" + String(kpOk ? "true" : "false");
   json += "}";
 
   server.send(200, "application/json", json);
