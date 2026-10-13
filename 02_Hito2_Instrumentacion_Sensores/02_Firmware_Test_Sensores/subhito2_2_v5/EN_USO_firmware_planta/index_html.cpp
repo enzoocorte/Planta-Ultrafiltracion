@@ -268,12 +268,12 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       <input type="range" id="sl" min="15" max="100" step="1" value="25">
       
       <div class="grid">
-        <button onclick="setR(25)">25 RPM</button>
-        <button onclick="setR(35)">35 RPM</button>
-        <button onclick="setR(44)" title="Límite clínico de sangre 600 mL/min">44 RPM 🩸</button>
-        <button onclick="setR(50)" style="border: 1px solid var(--primary); font-weight: 900;">50 RPM</button>
-        <button onclick="setR(75)">75 RPM</button>
-        <button onclick="setR(100)" title="Diseño factorial de agua (1360 mL/min)">100 RPM 🧪</button>
+        <button class="rpm-btn" data-rpm="25" onclick="setR(25)">25 RPM</button>
+        <button class="rpm-btn" data-rpm="35" onclick="setR(35)">35 RPM</button>
+        <button class="rpm-btn" data-rpm="44" onclick="setR(44)" title="Límite clínico de sangre 600 mL/min">44 RPM 🩸</button>
+        <button class="rpm-btn" data-rpm="50" onclick="setR(50)">50 RPM</button>
+        <button class="rpm-btn" data-rpm="75" onclick="setR(75)">75 RPM</button>
+        <button class="rpm-btn" data-rpm="100" onclick="setR(100)" title="Diseño factorial de agua (1360 mL/min)">100 RPM 🧪</button>
       </div>
 
       <div class="btns">
@@ -388,26 +388,52 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       </div>
 
       <!-- SECCIÓN B: CALIBRACIÓN EXACTA POR RPM Y CAUDALES MEDIDOS -->
-      <div style="background:#0e1122; padding:10px; border-radius:8px; border:1px solid #293855; margin-bottom:10px">
-        <b style="font-size:11px; color:#facc15">🎯 CALIBRAR POR RPM & CAUDAL (PROBETA)</b>
-        <p style="font-size:10px; color:var(--muted); margin-bottom:6px">Ingresa las RPM y los caudales reales medidos para recalcular cilindrada y K simultáneamente:</p>
+      <div style="background:#0e1122; padding:12px; border-radius:10px; border:1px solid #293855; margin-bottom:10px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px">
+          <b style="font-size:12px; color:#facc15">🎯 CALIBRAR POR RPM & CAUDAL DE PROBETA</b>
+          <span style="font-size:9px; background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:4px">Cálculo en ESP32</span>
+        </div>
+        <p style="font-size:10px; color:var(--muted); margin-bottom:8px">Ingresa las RPM y los caudales reales medidos con probeta para recalcular simultáneamente la cilindrada y los factores K:</p>
         
-        <div class="input-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-          <div class="input-group">
-            <label style="font-size:10px">RPM Ensayo:</label>
-            <input type="number" id="cal_rpm" value="50.0" step="1">
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <!-- 1. RPM -->
+          <div style="display:flex; align-items:center; justify-content:space-between; background:#141c30; padding:6px 10px; border-radius:8px; border-left:3px solid var(--primary)">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:#e2e8f0">1. Velocidad de Bomba</div>
+              <div style="font-size:9px; color:var(--muted)">RPM del ensayo cronometrado</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px">
+              <input type="number" id="cal_rpm" value="50.0" step="1" style="width:70px; background:#0a0f1e; border:1px solid #263450; color:#38bdf8; padding:5px; border-radius:6px; font-size:12px; font-weight:700; text-align:center;">
+              <span style="font-size:10px; color:var(--muted)">RPM</span>
+            </div>
           </div>
-          <div class="input-group">
-            <label style="font-size:10px">Q Alim (mL/min):</label>
-            <input type="number" id="cal_q_alim" value="680.0" step="5">
+
+          <!-- 2. Q Alimentación -->
+          <div style="display:flex; align-items:center; justify-content:space-between; background:#141c30; padding:6px 10px; border-radius:8px; border-left:3px solid var(--alim)">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:var(--alim)">2. Caudal Alimentación (Q alim)</div>
+              <div style="font-size:9px; color:var(--muted)">Medido en probeta 1000 mL (vol / min)</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px">
+              <input type="number" id="cal_q_alim" value="720.0" step="5" style="width:70px; background:#0a0f1e; border:1px solid #263450; color:var(--alim); padding:5px; border-radius:6px; font-size:12px; font-weight:700; text-align:center;">
+              <span style="font-size:10px; color:var(--muted)">mL/min</span>
+            </div>
           </div>
-          <div class="input-group">
-            <label style="font-size:10px">Q Perm (mL/min):</label>
-            <input type="number" id="cal_q_perm" value="100.0" step="5">
+
+          <!-- 3. Q Permeado -->
+          <div style="display:flex; align-items:center; justify-content:space-between; background:#141c30; padding:6px 10px; border-radius:8px; border-left:3px solid var(--perm)">
+            <div>
+              <div style="font-size:11px; font-weight:700; color:var(--perm)">3. Caudal Permeado (Q perm)</div>
+              <div style="font-size:9px; color:var(--muted)">Medido en probeta 100 mL (o 0 si no se midió)</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px">
+              <input type="number" id="cal_q_perm" value="45.0" step="1" style="width:70px; background:#0a0f1e; border:1px solid #263450; color:var(--perm); padding:5px; border-radius:6px; font-size:12px; font-weight:700; text-align:center;">
+              <span style="font-size:10px; color:var(--muted)">mL/min</span>
+            </div>
           </div>
         </div>
 
-        <button style="background:#4f46e5; color:#fff; width:100%; padding:8px; font-weight:800; margin-top:2px" onclick="calibrarPorRpmYQ()">
+        <button style="background:#4f46e5; color:#fff; width:100%; padding:9px; font-weight:800; font-size:11px; border-radius:6px; margin-top:8px" onclick="calibrarPorRpmYQ()">
           🚀 Calcular y Guardar Calibración en ESP32
         </button>
       </div>
@@ -526,11 +552,21 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       setTimeout(() => { t.style.display = 'none'; }, 4000);
     }
 
+    function updateRpmHighlight(v) {
+      document.querySelectorAll('.rpm-btn').forEach(btn => {
+        const isMatch = Math.abs(parseFloat(btn.dataset.rpm) - parseFloat(v)) < 0.1;
+        btn.style.border = isMatch ? '1px solid var(--primary)' : '1px solid transparent';
+        btn.style.background = isMatch ? '#1a2c4e' : '#22304e';
+        btn.style.color = isMatch ? 'var(--primary)' : 'var(--text)';
+      });
+    }
+
     function cmd(act) { fetch('/cmd?act=' + act); }
     function setR(v) {
       $('sl').value = v;
       $('lc').innerText = v;
       $('obj_rpm_lbl').innerText = v;
+      updateRpmHighlight(v);
       fetch('/set?rpm=' + v);
     }
 
@@ -661,6 +697,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     $('sl').oninput = e => {
       $('lc').innerText = e.target.value;
       $('obj_rpm_lbl').innerText = e.target.value;
+      updateRpmHighlight(e.target.value);
     };
     $('sl').onchange = e => setR(e.target.value);
 
@@ -672,6 +709,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           rawStatus = d;
           $('rpm').innerText = d.rpm.toFixed(1);
           $('obj_rpm_lbl').innerText = d.obj_rpm.toFixed(0);
+          updateRpmHighlight(d.obj_rpm);
           $('ip').innerText = d.ip;
           $('pil').className = 'pill ' + (d.inv ? 'inv' : d.on ? 'on' : 'off');
           $('pil').innerText = d.inv ? 'INVIRTIENDO' : d.on ? 'EN MARCHA' : 'DETENIDA';
