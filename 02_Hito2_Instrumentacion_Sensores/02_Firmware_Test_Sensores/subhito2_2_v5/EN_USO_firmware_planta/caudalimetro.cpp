@@ -46,6 +46,7 @@ bool Caudalimetro::declararCalibrado(bool valido) {
 }
 
 void Caudalimetro::resetVolumen() {
+  _pulsosOffset = _pulsosMedicion;
   _volumenEstimadoAcumulado_L = 0.0;
 }
 
@@ -244,8 +245,9 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
     }
   }
 
-  // Volumen totalizado exacto a partir del totalizador de pulsos acumulados (sin errores de redondeo)
-  m.volumenEstimado_L = (double)m.pulsosMedicion / (60.0 * m.k);
+  // Volumen totalizado exacto a partir del totalizador de pulsos acumulados menos el offset de tara
+  const uint64_t pulsosNetos = (m.pulsosMedicion > _pulsosOffset) ? (m.pulsosMedicion - _pulsosOffset) : 0;
+  m.volumenEstimado_L = (double)pulsosNetos / (60.0 * m.k);
   _volumenEstimadoAcumulado_L = m.volumenEstimado_L;
 
   const bool nuevos = (m.pulsosMedicion != _anteriorMedicion);

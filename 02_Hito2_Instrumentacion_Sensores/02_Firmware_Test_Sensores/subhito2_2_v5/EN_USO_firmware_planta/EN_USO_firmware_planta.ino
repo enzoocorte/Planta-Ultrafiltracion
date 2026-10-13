@@ -589,6 +589,34 @@ void handleClearCSV() {
   server.send(200, "text/plain", "LOGS_CLEARED");
 }
 
+// Adaptador de Print para streaming HTTP chunked seguro en WebServer (Auditoría GPT Astra)
+class ServerPrintAdapter : public Print {
+public:
+  WebServer& _s;
+  char _buf[256];
+  size_t _idx = 0;
+
+  ServerPrintAdapter(WebServer& s) : _s(s) {}
+
+  size_t write(uint8_t c) override {
+    _buf[_idx++] = (char)c;
+    if (_idx >= sizeof(_buf) - 1 || c == '\n') {
+      _buf[_idx] = '\0';
+      _s.sendContent(_buf, _idx);
+      _idx = 0;
+    }
+    return 1;
+  }
+
+  void flush() {
+    if (_idx > 0) {
+      _buf[_idx] = '\0';
+      _s.sendContent(_buf, _idx);
+      _idx = 0;
+    }
+  }
+};
+
 // Exportación CSV con Esquema Metrológico Certificado (GPT Astra)
 void handleExportMetrologia() {
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
@@ -596,8 +624,9 @@ void handleExportMetrologia() {
   server.sendHeader("Content-Disposition", "attachment; filename=\"PlantaUF_Metrologia_Certificada.csv\"");
   server.sendHeader("Connection", "close");
   server.send(200, "text/csv; charset=UTF-8", "");
-  WiFiClient client = server.client();
-  registroEnsayos.exportarCSV(client);
+  ServerPrintAdapter adapter(server);
+  registroEnsayos.exportarCSV(adapter);
+  adapter.flush();
   server.sendContent("");
 }
 

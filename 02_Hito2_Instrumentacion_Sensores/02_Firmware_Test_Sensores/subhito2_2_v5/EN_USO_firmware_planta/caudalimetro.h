@@ -137,6 +137,7 @@ private:
 
   // Variables privadas de la tarea principal
   uint64_t _anteriorMedicion = 0;
+  uint64_t _pulsosOffset = 0;
   uint32_t _flancosVentana = 0;
   uint32_t _validosVentana = 0;
   uint32_t _rechazosVentana = 0;
