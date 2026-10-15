@@ -158,17 +158,23 @@ void Bomba::tick(float dt) {
     if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
 
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    if (f != _fActual) { 
+    if (_fActual == 0) {
+      _fActual = f;
+      ledcAttach(PIN_PUL, f, 10);
+      ledcWrite(PIN_PUL, 512); // Iniciar generacion al 50% duty
+    } else if (abs((int32_t)f - (int32_t)_fActual) >= 2) { 
       uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10); 
       if (retF > 0) _fActual = retF;
     }
-    ledcWrite(PIN_PUL, 512); // Ciclo de trabajo 50%
 #else
-    if (f != _fActual) { 
+    if (_fActual == 0) {
+      _fActual = f;
+      ledcSetup(0, f, 10);
+      ledcWrite(0, 512);
+    } else if (abs((int32_t)f - (int32_t)_fActual) >= 2) { 
       uint32_t retF = ledcSetup(0, f, 10); 
       if (retF > 0) _fActual = retF;
     }
-    ledcWrite(0, 512);
 #endif
   } else if (_fActual != 0) {
     // Corte inmediato de pulsos al detenerse

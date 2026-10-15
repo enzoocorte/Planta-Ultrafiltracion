@@ -1,0 +1,1004 @@
+/* ==============================================================================
+ * PLANTA PILOTO DE ULTRAFILTRACIÓN — TESIS INGENIERÍA INDUSTRIAL (UNSa 2026)
+ * Tesistas: Antonella Guitián & Owen Cañizares | Codirector: Ing. Enzo Corte
+ * Firmware de Control, Medición Continua en Tiempo Real y Monitoreo de Torta
+ *
+ * FUNCIONES CLAVE PARA EL SEGUIMIENTO DE FORMACIÓN DE TORTA (FOULING):
+ * 1. Medición en Tiempo Real Continua (sin probeta):
+ *    - Calcula segundo a segundo Q_Alim(t) y Q_Perm(t) con filtro anti-EMI.
+ * 2. Monitoreo de Merma de Caudal por Formación de Torta:
+ *    - Captura automáticamente el caudal inicial limpio (Q_Alim_0 y Q_Perm_0) al
+ *      alcanzar el régimen estable (y permite fijarlo manualmente con un botón).
+ *    - Calcula en vivo el porcentaje de caída/merma de Alimentación (% Merma Alim)
+ *      por incremento de contrapresión, el porcentaje de merma de Permeado
+ *      (% Merma Perm) y el Flujo Normalizado J/J0 (%) a medida que crece la torta.
+ * 3. Modo Híbrido en Permeado (Sensor en Tiempo Real + Asistencia por Probeta):
+ *    - Si en el tramo final de ensuciamiento el caudal de permeado cae por debajo
+ *      del umbral mecánico de giro de la turbina YF-S401 (< 10 mL/min), el operador
+ *      puede ingresar un valor puntual medido con probeta en vivo sin detener el
+ *      ensayo para que quede registrado en las curvas y en el archivo Excel (.CSV).
+ * ============================================================================== */
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <DNSServer.h>
+#include <Preferences.h>
+#include "config.h"
+#include "caudalimetro.h"
+#include "registro_ensayos.h"
+#include "Bomba.h"
+#include "darcy.h"
+#include "index_html.h"
+
+DNSServer dnsServer;
+constexpr uint16_t DNS_PORT = 53;
+
+// ------------------------------------------------------------------------------
+// ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y MONITOREO DE TORTA
+// ------------------------------------------------------------------------------
+struct RegistroCalibracion {
+  uint16_t id_ensayo;
+  uint32_t t_relativo_s;
+  float    rpm;
+  bool     en_regimen;
+  float    q_bomba;
+  float    f_alim;
+  float    q_alim;
+  float    q_alim_ref;     // Caudal inicial de referencia con filtro limpio (Q_Alim_0)
+  float    merma_alim_pct; // % de merma de alimentación por contrapresión de la torta
+  float    vol_alim;
+  float    f_perm;
+  float    q_perm;
+  float    q_perm_ref;     // Caudal inicial de permeado con filtro limpio (Q_Perm_0)
+  float    merma_perm_pct; // % de merma de permeado por ensuciamiento (1 - J/J0)
+  float    j_sobre_j0_pct; // Flujo normalizado J(t)/J0 en %
+  bool     perm_manual;    // false = Sensor YF-S401 en tiempo real, true = Asistido por probeta
+  float    vol_perm;
+  float    q_ret;
+  float    recov;
+  float    delta;
+  float    k_alim;
+  float    k_perm;
+  float    j_lmh;
+};
+
+struct EnsayoInfo {
+  uint16_t id;
+  float    rpm_consigna;
+  uint32_t t_inicio_ms;
+  uint32_t duracion_s;
+  uint16_t muestras;
+  float    vol_alim;
+  float    vol_perm;
+  float    merma_alim_final;
+  float    merma_perm_final;
+};
+
+// Buffer circular en RAM (250 registros = 41.6 minutos a 1 muestra cada 10 s)
+RegistroCalibracion bufferLog[MAX_REGISTROS];
+size_t bufferHead = 0;
+size_t bufferCount = 0;
+
+EnsayoInfo listaEnsayos[MAX_ENSAYOS];
+size_t numEnsayos = 0;
+uint16_t ensayoActualId = 1;
+
+// Variables de estado del ensayo actual
+uint32_t tInicioEnsayo_ms = 0;
+float volAlimInicioEnsayo = 0.0f;
+float volPermInicioEnsayo = 0.0f;
+bool  bombaEnMarchaAnterior = false;
+
+// Variables de Seguimiento de Formación de Torta (Merma en Tiempo Real)
+float   qAlimRef_mLmin   = 0.0f;  // Q_Alim_0 (filtro limpio a las RPM actuales)
+float   qPermRef_mLmin   = 0.0f;  // Q_Perm_0 (filtro limpio a las RPM actuales)
+float   mermaAlim_pct    = 0.0f;  // % caída de Q_Alim respecto a Q_Alim_0
+float   mermaPerm_pct    = 0.0f;  // % caída de Q_Perm respecto a Q_Perm_0
+float   jSobreJ0_pct     = 100.0f;// % Flujo relativo J(t)/J0
+uint8_t segEstablesRef   = 0;     // Contador para fijar Q0 automáticamente tras 5s en régimen
+
+// Soporte para lectura híbrida de Permeado (Sensor en vivo + Asistencia manual a muy bajo caudal)
+bool    usarPermManual   = false;
+float   qPermManual_mLmin = 0.0f;
+double  volPermManualAcum_L = 0.0;
+
+// Variables de Auto-Calibración en Marcha
+bool    autoCalibrando = false;
+uint8_t autoCalMuestras = 0;
+float   autoCalSumFrecAlim = 0.0f;
+float   autoCalSumFrecPerm = 0.0f;
+String  autoCalMensaje = "";
+
+// Instanciación de componentes principales
+Caudalimetro sensorAlimentacion(SENSOR_ALIM_CFG, "ALIMENTACION", true);
+Caudalimetro sensorPermeado(SENSOR_PERM_CFG, "PERMEADO", false);
+RegistroEnsayos registroEnsayos;
+Bomba bomba;
+WebServer server(80);
+Preferences prefs;
+
+// Variables hidráulicas calculadas cada 1 segundo
+float qAlimEfectivo_mLmin = 0.0f;
+float qPermEfectivo_mLmin = 0.0f;
+float qRet_mLmin = 0.0f;
+float recuperacion = 0.0f;
+float deltaBomba = 0.0f;
+float jLMH_actual = 0.0f;
+bool  flagCruceSensores = false;
+
+ModeloDarcy modeloDarcy;
+ResultadoDarcy resultadoDarcy;
+
+uint32_t tLoop = 0;
+uint32_t tCaudal = 0;
+uint32_t tDatalogger = 0;
+
+// ------------------------------------------------------------------------------
+// GESTIÓN DE PREFERENCES (MEMORIA FLASH NVS CON AUTO-SANACIÓN)
+// ------------------------------------------------------------------------------
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+  prefs.putFloat("k_alim", ka);
+  prefs.putFloat("k_perm", kp);
+  prefs.putFloat("ml_rev", ml);
+  prefs.putUShort("pul_rev", pul);
+  Serial.println("[NVS] Parametros guardados en memoria Flash con exito.");
+}
+
+void cargarParametrosNVS() {
+  prefs.begin("planta_uf", false);
+  uint8_t ver = prefs.getUChar("cal_ver", 0);
+  float ka = prefs.getFloat("k_alim", K_ALIMENTACION);
+  float kp = prefs.getFloat("k_perm", K_PERMEADO);
+  float ml = prefs.getFloat("ml_rev", ML_POR_VUELTA);
+  uint16_t pul = prefs.getUShort("pul_rev", PULSOS_POR_REV);
+
+  bool actualizarNvs = (ver != VERSION_CALIBRACION);
+  if (!std::isfinite(ka) || ka < 50.0f || ka > 500.0f || actualizarNvs) { ka = K_ALIMENTACION; actualizarNvs = true; }
+  if (!std::isfinite(kp) || kp < 50.0f || kp > 500.0f || actualizarNvs) { kp = K_PERMEADO;     actualizarNvs = true; }
+  if (!std::isfinite(ml) || ml < 2.0f  || ml > 40.0f  || actualizarNvs) { ml = ML_POR_VUELTA;  actualizarNvs = true; }
+  if (pul < 200 || pul > 25600)                                         { pul = PULSOS_POR_REV; actualizarNvs = true; }
+
+  if (actualizarNvs) {
+    Serial.println("[NVS] Aplicando calibracion oficial Ensayos 2 y 3 (K=205.98 Hz/(L/min), Cilindrada=13.55 mL/rev)...");
+    prefs.putUChar("cal_ver", VERSION_CALIBRACION);
+    guardarParametrosNVS(ka, kp, ml, pul);
+  }
+
+  sensorAlimentacion.setK(ka);
+  sensorPermeado.setK(kp);
+  bomba.setMlPorVuelta(ml);
+  bomba.setPulsosPorRev(pul);
+
+  Serial.printf("\n[NVS] Parametros activos: K_Alim=%.2f | K_Perm=%.2f | mL/rev=%.4f | Pul/Rev=%u\n",
+                ka, kp, ml, pul);
+}
+
+double volumenPermeadoTotal_L() {
+  return sensorPermeado.volumen_L() + volPermManualAcum_L;
+}
+
+// Verifica si la bomba está realmente girando e impulsando fluido:
+// Como el motor paso a paso no tiene encoder, la confirmación física de que el driver DM860
+// y el motor están encendidos y girando es la presencia de pulsos en el caudalímetro de alimentación
+// (salvo que el operador active explícitamente el Modo Seco para pruebas de motor en vacío).
+bool bombaGirandoReal() {
+  return bomba.enMarcha();
+}
+
+float rpmRealConfirmada() {
+  return bombaGirandoReal() ? bomba.rpmActual() : 0.0f;
+}
+
+float caudalTeoricoConfirmado_mLmin() {
+  return bombaGirandoReal() ? bomba.caudalTeorico_mLmin() : 0.0f;
+}
+
+// ------------------------------------------------------------------------------
+// FUNCIÓN PARA GUARDAR MUESTRA EN EL DATALOGGER (CADA 10 SEGUNDOS)
+// ------------------------------------------------------------------------------
+void guardarMuestraDatalogger() {
+  if (tInicioEnsayo_ms == 0) {
+    tInicioEnsayo_ms = millis();
+  }
+
+  uint32_t t_rel_s = (millis() - tInicioEnsayo_ms) / 1000;
+
+  RegistroCalibracion reg;
+  reg.id_ensayo      = ensayoActualId;
+  reg.t_relativo_s   = t_rel_s;
+  reg.rpm            = rpmRealConfirmada();
+  reg.en_regimen     = bomba.enRegimenEstable();
+  reg.q_bomba        = caudalTeoricoConfirmado_mLmin();
+  reg.f_alim         = sensorAlimentacion.frecuencia_Hz();
+  reg.q_alim         = qAlimEfectivo_mLmin;
+  reg.q_alim_ref     = qAlimRef_mLmin;
+  reg.merma_alim_pct = mermaAlim_pct;
+  reg.vol_alim       = sensorAlimentacion.volumen_L();
+  reg.f_perm         = sensorPermeado.frecuencia_Hz();
+  reg.q_perm         = qPermEfectivo_mLmin;
+  reg.q_perm_ref     = qPermRef_mLmin;
+  reg.merma_perm_pct = mermaPerm_pct;
+  reg.j_sobre_j0_pct = jSobreJ0_pct;
+  reg.perm_manual    = usarPermManual;
+  reg.vol_perm       = (float)volumenPermeadoTotal_L();
+  reg.q_ret          = qRet_mLmin;
+  reg.recov          = recuperacion;
+  reg.delta          = deltaBomba;
+  reg.k_alim         = sensorAlimentacion.getK();
+  reg.k_perm         = sensorPermeado.getK();
+  reg.j_lmh          = jLMH_actual;
+
+  bufferLog[bufferHead] = reg;
+  bufferHead = (bufferHead + 1) % MAX_REGISTROS;
+  if (bufferCount < MAX_REGISTROS) {
+    bufferCount++;
+  }
+
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f (Merma:%.1f%%) | Q_Perm=%.1f (Merma:%.1f%%, J/J0:%.1f%%) | J=%.2f LMH\n",
+                (unsigned int)bufferCount, ensayoActualId, t_rel_s, reg.rpm,
+                reg.q_alim, reg.merma_alim_pct, reg.q_perm, reg.merma_perm_pct, reg.j_sobre_j0_pct, reg.j_lmh);
+}
+
+// ------------------------------------------------------------------------------
+// GESTIÓN AUTOMÁTICA DE SESIONES Y ENSAYOS
+// ------------------------------------------------------------------------------
+void finalizarEnsayoActual() {
+  uint32_t duracion_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+  uint16_t muestrasEnsayo = 0;
+  for (size_t i = 0; i < bufferCount; i++) {
+    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
+  }
+
+  if (muestrasEnsayo == 0 && duracion_s >= 5) {
+    guardarMuestraDatalogger();
+    muestrasEnsayo = 1;
+  }
+
+  if (muestrasEnsayo > 0) {
+    if (numEnsayos >= MAX_ENSAYOS) {
+      for (size_t i = 0; i < MAX_ENSAYOS - 1; i++) {
+        listaEnsayos[i] = listaEnsayos[i + 1];
+      }
+      numEnsayos = MAX_ENSAYOS - 1;
+    }
+
+    listaEnsayos[numEnsayos].id               = ensayoActualId;
+    listaEnsayos[numEnsayos].rpm_consigna     = bomba.rpmObjetivo();
+    listaEnsayos[numEnsayos].t_inicio_ms      = tInicioEnsayo_ms;
+    listaEnsayos[numEnsayos].duracion_s       = duracion_s;
+    listaEnsayos[numEnsayos].muestras         = muestrasEnsayo;
+    listaEnsayos[numEnsayos].vol_alim         = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
+    listaEnsayos[numEnsayos].vol_perm         = (float)volumenPermeadoTotal_L() - volPermInicioEnsayo;
+    listaEnsayos[numEnsayos].merma_alim_final = mermaAlim_pct;
+    listaEnsayos[numEnsayos].merma_perm_final = mermaPerm_pct;
+    numEnsayos++;
+
+    Serial.printf("\n<<< [ENSAYO #%u FINALIZADO] Consigna: %.1f RPM | Duracion: %us | Merma Alim: %.1f%% | Merma Perm: %.1f%% >>>\n\n",
+                  ensayoActualId, bomba.rpmObjetivo(), duracion_s, mermaAlim_pct, mermaPerm_pct);
+  }
+}
+
+void reiniciarReferenciasTorta() {
+  qAlimRef_mLmin = 0.0f;
+  qPermRef_mLmin = 0.0f;
+  mermaAlim_pct  = 0.0f;
+  mermaPerm_pct  = 0.0f;
+  jSobreJ0_pct   = 100.0f;
+  segEstablesRef = 0;
+}
+
+void fijarReferenciasTortaActuales() {
+  if (qAlimEfectivo_mLmin > 10.0f) {
+    qAlimRef_mLmin = qAlimEfectivo_mLmin;
+  } else {
+    qAlimRef_mLmin = bomba.caudalTeorico_mLmin();
+  }
+  if (qPermEfectivo_mLmin > 0.5f) {
+    qPermRef_mLmin = qPermEfectivo_mLmin;
+  }
+  mermaAlim_pct = 0.0f;
+  mermaPerm_pct = 0.0f;
+  jSobreJ0_pct  = 100.0f;
+  Serial.printf("[TORTA] Referencia inicial Q0 fijada: Q_Alim_0 = %.1f mL/min | Q_Perm_0 = %.1f mL/min\n",
+                qAlimRef_mLmin, qPermRef_mLmin);
+}
+
+void iniciarNuevoEnsayo(float consignaRpm) {
+  uint16_t muestrasPrevias = 0;
+  for (size_t i = 0; i < bufferCount; i++) {
+    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+  }
+  if (muestrasPrevias > 0) {
+    ensayoActualId++;
+  }
+  tInicioEnsayo_ms = millis();
+  volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+  volPermInicioEnsayo = (float)volumenPermeadoTotal_L();
+  reiniciarReferenciasTorta();
+  tDatalogger = millis();
+  guardarMuestraDatalogger();
+  Serial.printf("\n>>> [ENSAYO #%u INICIADO] Consigna: %.1f RPM <<<\n", ensayoActualId, consignaRpm);
+}
+
+// ------------------------------------------------------------------------------
+// MANEJADORES DE RUTAS DEL SERVIDOR WEB
+// ------------------------------------------------------------------------------
+void handleRoot() {
+  server.send_P(200, "text/html", INDEX_HTML);
+}
+
+void handleCaptivePortal() {
+  String host = server.hostHeader();
+  if (host.indexOf("192.168.4.1") >= 0 || host.indexOf("bomba.local") >= 0) {
+    handleRoot();
+  } else {
+    server.sendHeader("Location", "http://192.168.4.1/", true);
+    server.send(302, "text/plain", "");
+  }
+}
+
+void handleStatus() {
+  uint32_t t_act_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+  uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
+  if (prog > 100) prog = 100;
+
+  char buf[1350];
+  int n = snprintf(buf, sizeof(buf),
+    "{"
+    "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
+    "\"ip\":\"%s\",\"alim_ok\":%s,\"perm_ok\":%s,\"f_alim\":%.2f,\"q_alim\":%.1f,\"vol_alim\":%.4f,"
+    "\"f_perm\":%.2f,\"q_perm\":%.1f,\"vol_perm\":%.4f,\"q_ret\":%.1f,\"recov\":%.2f,"
+    "\"q_alim_ref\":%.1f,\"merma_alim\":%.1f,\"q_perm_ref\":%.1f,\"merma_perm\":%.1f,\"j_j0\":%.1f,"
+    "\"perm_manual\":%s,\"q_perm_man\":%.1f,"
+    "\"flan_alim\":%lu,\"val_alim\":%lu,\"gl_alim\":%lu,"
+    "\"flan_perm\":%lu,\"val_perm\":%lu,\"gl_perm\":%lu,"
+    "\"modo_seco\":%s,\"solo_alim\":%s,\"ruido_seco\":%s,"
+    "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
+    "\"k_alim\":%.2f,\"k_perm\":%.2f,\"qmin_alim\":%.2f,\"qmin_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
+    "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
+    "\"n_logs\":%u,\"ensayo_act\":%u,\"t_ensayo_s\":%lu,"
+    "\"heap\":%u,\"maxblk\":%u,"
+    "\"ensayos\":[",
+    rpmRealConfirmada(), bomba.rpmObjetivo(),
+    bomba.enMarcha() ? "true" : "false",
+    bomba.invirtiendo() ? "true" : "false",
+    bomba.sentidoHorario() ? "true" : "false",
+    bomba.enRegimenEstable() ? "true" : "false",
+    bomba.enEmergencia() ? "true" : "false",
+    WiFi.softAPIP().toString().c_str(),
+    !sensorAlimentacion.sinSenal() ? "true" : "false",
+    (!sensorPermeado.sinSenal() || usarPermManual) ? "true" : "false",
+    sensorAlimentacion.frecuencia_Hz(), qAlimEfectivo_mLmin, sensorAlimentacion.volumen_L(),
+    sensorPermeado.frecuencia_Hz(), qPermEfectivo_mLmin, volumenPermeadoTotal_L(),
+    qRet_mLmin, recuperacion,
+    qAlimRef_mLmin, mermaAlim_pct, qPermRef_mLmin, mermaPerm_pct, jSobreJ0_pct,
+    usarPermManual ? "true" : "false", qPermManual_mLmin,
+    (unsigned long)sensorAlimentacion.flancosBrutos(), (unsigned long)sensorAlimentacion.pulsosValidos(), (unsigned long)sensorAlimentacion.glitchesVentana(),
+    (unsigned long)sensorPermeado.flancosBrutos(), (unsigned long)sensorPermeado.pulsosValidos(), (unsigned long)sensorPermeado.glitchesVentana(),
+    sensorPermeado.modoSeco() ? "true" : "false",
+    sensorPermeado.bloqueado() ? "true" : "false",
+    sensorPermeado.ruidoDetectadoEnSeco() ? "true" : "false",
+    caudalTeoricoConfirmado_mLmin(), deltaBomba, jLMH_actual, flagCruceSensores ? "true" : "false",
+    sensorAlimentacion.getK(), sensorPermeado.getK(),
+    sensorAlimentacion.getQMinDetectable(), sensorPermeado.getQMinDetectable(),
+    bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
+    autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
+    (unsigned)bufferCount, (unsigned)ensayoActualId, (unsigned long)t_act_s,
+    ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
+  );
+
+  if (!autoCalibrando && autoCalMensaje.length() > 0) {
+    autoCalMensaje = "";
+  }
+
+  if (n >= (int)sizeof(buf)) {
+    n = sizeof(buf) - 1;
+  }
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "application/json", "");
+  server.sendContent(buf, n);
+
+  char item[160];
+  for (size_t i = 0; i < numEnsayos; i++) {
+    int itemLen = snprintf(item, sizeof(item),
+      "%s{\"id\":%u,\"rpm\":%.1f,\"duracion_s\":%lu,\"muestras\":%u,\"vol_alim\":%.4f,\"vol_perm\":%.4f,\"merma_a\":%.1f,\"merma_p\":%.1f}",
+      (i > 0) ? "," : "",
+      listaEnsayos[i].id, listaEnsayos[i].rpm_consigna,
+      (unsigned long)listaEnsayos[i].duracion_s,
+      listaEnsayos[i].muestras,
+      listaEnsayos[i].vol_alim, listaEnsayos[i].vol_perm,
+      listaEnsayos[i].merma_alim_final, listaEnsayos[i].merma_perm_final
+    );
+    if (itemLen >= (int)sizeof(item)) itemLen = sizeof(item) - 1;
+    server.sendContent(item, itemLen);
+  }
+
+  server.sendContent("]}");
+  server.sendContent("");
+}
+
+void handleCmd() {
+  if (!server.hasArg("act")) {
+    server.send(400, "text/plain", "Falta argumento act");
+    return;
+  }
+  String act = server.arg("act");
+  if (act == "START") {
+    bomba.arrancar();
+  } else if (act == "STOP") {
+    bomba.detener();
+    if (autoCalibrando) {
+      autoCalibrando = false;
+      autoCalMensaje = "Auto-calibracion cancelada al apagar bomba.";
+    }
+  } else if (act == "EMERGENCY") {
+    bomba.paradaEmergencia();
+  } else if (act == "REARM") {
+    bomba.rearmarEmergencia();
+  } else if (act == "MODO_SECO_ON") {
+    sensorPermeado.setModoSeco(true);
+    sensorAlimentacion.setModoSeco(true);
+  } else if (act == "MODO_SECO_OFF") {
+    sensorPermeado.setModoSeco(false);
+    sensorAlimentacion.setModoSeco(false);
+  } else if (act == "SOLO_ALIM_ON") {
+    sensorPermeado.setBloqueado(true);
+    usarPermManual = false;
+    qPermManual_mLmin = 0.0f;
+  } else if (act == "SOLO_ALIM_OFF") {
+    sensorPermeado.setBloqueado(false);
+  } else if (act == "FIJAR_Q0") {
+    fijarReferenciasTortaActuales();
+  } else if (act == "PERM_AUTO") {
+    usarPermManual = false;
+    qPermManual_mLmin = 0.0f;
+  } else if (act == "LIMPIAR_ALARMA_SECO") {
+    sensorPermeado.limpiarAlarmaSeco();
+    sensorAlimentacion.limpiarAlarmaSeco();
+  } else if (act == "DIR") {
+    bomba.toggleSentido();
+  } else if (act == "RESET_VOL") {
+    sensorAlimentacion.resetVolumen();
+    sensorPermeado.resetVolumen();
+    volPermManualAcum_L = 0.0;
+    volAlimInicioEnsayo = 0.0f;
+    volPermInicioEnsayo = 0.0f;
+  }
+  server.send(200, "text/plain", "OK");
+}
+
+// Endpoint para ingresar caudal de permeado medido con probeta cuando es menor al mínimo del YF-S401
+void handleSetPermManual() {
+  if (!server.hasArg("qp")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Falta parametro qp\"}");
+    return;
+  }
+  float qp = server.arg("qp").toFloat();
+  if (!std::isfinite(qp) || qp < 0.0f || qp > 500.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Caudal manual fuera de rango (0-500 mL/min)\"}");
+    return;
+  }
+  if (qp == 0.0f) {
+    usarPermManual = false;
+    qPermManual_mLmin = 0.0f;
+  } else {
+    usarPermManual = true;
+    qPermManual_mLmin = qp;
+    if (qPermRef_mLmin <= 0.5f) {
+      qPermRef_mLmin = qp; // Si no había referencia Q_Perm_0 previa, adopta la primera lectura
+    }
+  }
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handleSetRPM() {
+  if (server.hasArg("rpm")) {
+    float nuevoRpm = server.arg("rpm").toFloat();
+    if (!std::isfinite(nuevoRpm) || nuevoRpm < RPM_MIN || nuevoRpm > RPM_MAX) {
+      server.send(400, "text/plain", "ERROR: RPM fuera de rango");
+      return;
+    }
+
+    float rpmActualConsigna = bomba.rpmObjetivo();
+
+    // Mantener el mismo Ensayo_ID cuando se cambian las RPM en marcha para no fragmentar el CSV
+
+    if (bomba.setRPM(nuevoRpm)) {
+      reiniciarReferenciasTorta();
+      server.send(200, "text/plain", "OK");
+    } else {
+      server.send(400, "text/plain", "ERROR al ajustar RPM");
+    }
+  } else {
+    server.send(400, "text/plain", "Falta argumento rpm");
+  }
+}
+
+void handleSetDev() {
+  float ka = -1.0f, kp = -1.0f, ml = -1.0f, qmina = -1.0f, qminp = -1.0f;
+  int32_t pul = -1;
+
+  if (server.hasArg("ka")) {
+    ka = server.arg("ka").toFloat();
+    if (!std::isfinite(ka) || ka < 10.0f || ka > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Alimentacion fuera de rango (10-1000)\"}");
+      return;
+    }
+  }
+  if (server.hasArg("kp")) {
+    kp = server.arg("kp").toFloat();
+    if (!std::isfinite(kp) || kp < 10.0f || kp > 1000.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Factor K Permeado fuera de rango (10-1000)\"}");
+      return;
+    }
+  }
+  if (server.hasArg("ml")) {
+    ml = server.arg("ml").toFloat();
+    if (!std::isfinite(ml) || ml < 1.0f || ml > 50.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Cilindrada fuera de rango (1-50 mL/rev)\"}");
+      return;
+    }
+  }
+  if (server.hasArg("pul")) {
+    pul = server.arg("pul").toInt();
+    if (pul < 200 || pul > 25600) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Pulsos/rev fuera de rango (200-25600)\"}");
+      return;
+    }
+  }
+  if (server.hasArg("qmina")) {
+    qmina = server.arg("qmina").toFloat();
+    if (!std::isfinite(qmina) || qmina < 0.0f || qmina > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable alimentacion invalido\"}");
+      return;
+    }
+  }
+  if (server.hasArg("qminp")) {
+    qminp = server.arg("qminp").toFloat();
+    if (!std::isfinite(qminp) || qminp < 0.0f || qminp > 100.0f) {
+      server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Qmin detectable permeado invalido\"}");
+      return;
+    }
+  }
+
+  if (ka > 0.0f && fabsf(ka - sensorAlimentacion.getK()) > 0.005f) sensorAlimentacion.setK(ka);
+  if (kp > 0.0f && fabsf(kp - sensorPermeado.getK()) > 0.005f)     sensorPermeado.setK(kp);
+  if (ml > 0.0f) bomba.setMlPorVuelta(ml);
+  if (pul > 0)   bomba.setPulsosPorRev((uint16_t)pul);
+  if (qmina >= 0.0f) sensorAlimentacion.setQMinDetectable(qmina);
+  if (qminp >= 0.0f) sensorPermeado.setQMinDetectable(qminp);
+
+  bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
+  if (saveNvs) {
+    guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                         bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+  }
+
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handleIniciarAutoCal() {
+  if (!bomba.enMarcha()) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Enciende la bomba primero\"}");
+    return;
+  }
+  autoCalibrando = true;
+  autoCalMuestras = 0;
+  autoCalSumFrecAlim = 0.0f;
+  autoCalSumFrecPerm = 0.0f;
+  autoCalMensaje = "";
+  server.send(200, "application/json", "{\"status\":\"iniciada\"}");
+}
+
+void handleCancelarAutoCal() {
+  autoCalibrando = false;
+  autoCalMensaje = "Auto-calibracion cancelada.";
+  server.send(200, "application/json", "{\"status\":\"cancelada\"}");
+}
+
+void handleCalibrarRpmQ() {
+  if (!server.hasArg("rpm") || !server.hasArg("qa")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos (requiere rpm y qa)\"}");
+    return;
+  }
+
+  float rpm = server.arg("rpm").toFloat();
+  float qa  = server.arg("qa").toFloat();
+  float qp  = server.hasArg("qp") ? server.arg("qp").toFloat() : 0.0f;
+
+  if (rpm <= 0.0f || qa <= 0.0f || !std::isfinite(rpm) || !std::isfinite(qa) || !std::isfinite(qp) || qp < 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores numericos invalidos\"}");
+    return;
+  }
+
+  float nuevaCilindrada = qa / rpm;
+  if (nuevaCilindrada >= 1.0f && nuevaCilindrada <= 50.0f) {
+    bomba.setMlPorVuelta(nuevaCilindrada);
+  }
+
+  float fa = server.hasArg("fa") ? server.arg("fa").toFloat() : sensorAlimentacion.frecuencia_Hz();
+  float fp = server.hasArg("fp") ? server.arg("fp").toFloat() : sensorPermeado.frecuencia_Hz();
+
+  bool kaOk = false;
+  bool kpOk = false;
+
+  if (fa > 1.0f) {
+    float nuevoKa = (fa * 1000.0f) / qa;
+    if (nuevoKa >= 20.0f && nuevoKa <= 600.0f) {
+      kaOk = sensorAlimentacion.setK(nuevoKa);
+    }
+  }
+  if (qp > 0.0f && fp > 0.35f && !sensorPermeado.bloqueado()) {
+    float nuevoKp = (fp * 1000.0f) / qp;
+    if (nuevoKp >= 20.0f && nuevoKp <= 600.0f) {
+      kpOk = sensorPermeado.setK(nuevoKp);
+    }
+  }
+
+  guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                       bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+  String json = "{";
+  json += "\"status\":\"ok\",";
+  json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
+  json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2) + ",";
+  json += "\"ka_actualizado\":" + String(kaOk ? "true" : "false") + ",";
+  json += "\"kp_actualizado\":" + String(kpOk ? "true" : "false");
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+void handleResetDev() {
+  sensorAlimentacion.setK(K_ALIMENTACION);
+  sensorPermeado.setK(K_PERMEADO);
+  bomba.setMlPorVuelta(ML_POR_VUELTA);
+  bomba.setPulsosPorRev(PULSOS_POR_REV);
+
+  guardarParametrosNVS(K_ALIMENTACION, K_PERMEADO, ML_POR_VUELTA, PULSOS_POR_REV);
+  server.send(200, "application/json", "{\"status\":\"reset_ok\"}");
+}
+
+// Exportación a Excel (.CSV) con columnas de Merma por Formación de Torta
+void handleExportCSV() {
+  String targetEnsayo = server.hasArg("ensayo") ? server.arg("ensayo") : "all";
+
+  String filename = "PlantaUF_MonitoreoTorta_";
+  if (targetEnsayo == "all") {
+    filename += "HistoricoCompleto.csv";
+  } else if (targetEnsayo == "actual") {
+    filename += "Ensayo_" + String(ensayoActualId) + "_EnVivo.csv";
+  } else {
+    filename += "Ensayo_" + targetEnsayo + ".csv";
+  }
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/csv; charset=UTF-8", "");
+
+  server.sendContent("\xEF\xBB\xBFsep=;\n"
+                     "PLANTA DE ULTRAFILTRACION FX100 - MONITOREO EN TIEMPO REAL DE MERMA DE CAUDAL Y TORTA (UNSa 2026)\n"
+                     "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Estable_1_0;Q_Bomba_Teorico_mLmin;"
+                     "Frec_Alim_Hz;Q_Alim_mLmin;Q_Alim_Inicial_mLmin;Merma_Alim_Torta_Pct;Vol_Alim_L;"
+                     "Modo_Perm;Frec_Perm_Hz;Q_Perm_mLmin;Q_Perm_Inicial_mLmin;Merma_Perm_Torta_Pct;Flujo_Relativo_J_J0_Pct;Vol_Perm_L;"
+                     "Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Pct;K_Alim;K_Perm;J_LMH\n");
+
+  uint16_t filtroId = 0;
+  if (targetEnsayo == "actual") {
+    filtroId = ensayoActualId;
+  } else if (targetEnsayo != "all") {
+    filtroId = (uint16_t)targetEnsayo.toInt();
+  }
+
+  char fila[320];
+  for (size_t i = 0; i < bufferCount; i++) {
+    size_t idx = (bufferHead + MAX_REGISTROS - bufferCount + i) % MAX_REGISTROS;
+    const RegistroCalibracion& r = bufferLog[idx];
+
+    if (filtroId > 0 && r.id_ensayo != filtroId) {
+      continue;
+    }
+
+    uint32_t mins = r.t_relativo_s / 60;
+    uint32_t secs = r.t_relativo_s % 60;
+
+    int len = snprintf(fila, sizeof(fila),
+      "%u;%lu;%02lu:%02lu;%.1f;%d;%.1f;"
+      "%.2f;%.1f;%.1f;%.2f;%.4f;"
+      "%s;%.2f;%.1f;%.1f;%.2f;%.2f;%.4f;"
+      "%.1f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+      (unsigned)r.id_ensayo, (unsigned long)r.t_relativo_s, (unsigned long)mins, (unsigned long)secs,
+      r.rpm, r.en_regimen ? 1 : 0, r.q_bomba,
+      r.f_alim, r.q_alim, r.q_alim_ref, r.merma_alim_pct, r.vol_alim,
+      r.perm_manual ? "PROBETA_MANUAL" : "SENSOR_TIEMPO_REAL",
+      r.f_perm, r.q_perm, r.q_perm_ref, r.merma_perm_pct, r.j_sobre_j0_pct, r.vol_perm,
+      r.q_ret, r.recov, r.delta, r.k_alim, r.k_perm, r.j_lmh
+    );
+
+    if (len > 0 && (size_t)len < sizeof(fila)) {
+      server.sendContent(fila, len);
+    } else if (len >= (int)sizeof(fila)) {
+      server.sendContent(fila, sizeof(fila) - 1);
+    }
+
+    if ((i & 15) == 0) yield();
+  }
+
+  server.sendContent("");
+}
+
+void handleClearCSV() {
+  bufferHead = 0;
+  bufferCount = 0;
+  numEnsayos = 0;
+  ensayoActualId = 1;
+  tInicioEnsayo_ms = bomba.enMarcha() ? millis() : 0;
+  volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+  volPermInicioEnsayo = (float)volumenPermeadoTotal_L();
+  reiniciarReferenciasTorta();
+  registroEnsayos.limpiar();
+  server.send(200, "text/plain", "LOGS_CLEARED");
+}
+
+class ServerPrintAdapter : public Print {
+public:
+  WebServer& _s;
+  char _buf[256];
+  size_t _idx = 0;
+
+  ServerPrintAdapter(WebServer& s) : _s(s) {}
+
+  size_t write(uint8_t c) override {
+    _buf[_idx++] = (char)c;
+    if (_idx >= sizeof(_buf) - 1 || c == '\n') {
+      _buf[_idx] = '\0';
+      _s.sendContent(_buf, _idx);
+      _idx = 0;
+    }
+    return 1;
+  }
+
+  void flush() {
+    if (_idx > 0) {
+      _buf[_idx] = '\0';
+      _s.sendContent(_buf, _idx);
+      _idx = 0;
+    }
+  }
+};
+
+void handleExportMetrologia() {
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"PlantaUF_Metrologia_Completa.csv\"");
+  server.sendHeader("Connection", "close");
+  server.send(200, "text/csv; charset=UTF-8", "");
+  ServerPrintAdapter adapter(server);
+  registroEnsayos.exportarCSV(adapter);
+  adapter.flush();
+  server.sendContent("");
+}
+
+// ------------------------------------------------------------------------------
+// SETUP DEL MICROCONTROLADOR ESP32
+// ------------------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Serial.println("\n==================================================");
+  Serial.println(" PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   ");
+  Serial.println(" Monitoreo en Tiempo Real de Formación de Torta   ");
+  Serial.println("==================================================");
+
+  pinMode(PIN_LED_BOMBA, OUTPUT);
+  digitalWrite(PIN_LED_BOMBA, LOW);
+
+  const bool inicioAlim = sensorAlimentacion.begin();
+  const bool inicioPerm = sensorPermeado.begin();
+  if (!inicioAlim || !inicioPerm) {
+    Serial.println("⚠️ [ERROR CRÍTICO] Fallo en la inicialización de caudalímetros");
+  }
+  bomba.begin();
+  registroEnsayos.begin();
+
+  cargarParametrosNVS();
+
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_AP);
+  WiFi.setSleep(false);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+
+  IPAddress local_IP(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4);
+
+  Serial.println("[WIFI] Punto de Acceso Estable Creado:");
+  Serial.printf("       SSID: %s | Pass: %s\n", SSID_AP, PASS_AP);
+  Serial.printf("       IP AP: http://%s\n", WiFi.softAPIP().toString().c_str());
+
+  if (MDNS.begin("bomba")) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("[mDNS] Servidor publicado en: http://bomba.local");
+  }
+
+  dnsServer.start(DNS_PORT, "*", local_IP);
+
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.on("/cmd", HTTP_GET, handleCmd);
+  server.on("/set", HTTP_GET, handleSetRPM);
+  server.on("/set_perm_manual", HTTP_GET, handleSetPermManual);
+  server.on("/set_dev", HTTP_GET, handleSetDev);
+  server.on("/reset_dev", HTTP_GET, handleResetDev);
+  server.on("/iniciar_auto_cal", HTTP_GET, handleIniciarAutoCal);
+  server.on("/cancelar_auto_cal", HTTP_GET, handleCancelarAutoCal);
+  server.on("/calibrar_rpm_q", HTTP_GET, handleCalibrarRpmQ);
+  server.on("/export_csv", HTTP_GET, handleExportCSV);
+  server.on("/export_metrologia", HTTP_GET, handleExportMetrologia);
+  server.on("/clear_csv", HTTP_GET, handleClearCSV);
+
+  server.on("/generate_204", HTTP_GET, handleCaptivePortal);
+  server.on("/gen_204", HTTP_GET, handleCaptivePortal);
+  server.on("/ncsi.txt", HTTP_GET, handleCaptivePortal);
+  server.on("/connecttest.txt", HTTP_GET, handleCaptivePortal);
+  server.on("/hotspot-detect.html", HTTP_GET, handleCaptivePortal);
+  server.onNotFound(handleCaptivePortal);
+
+  server.begin();
+  Serial.println("[HTTP] Servidor Web SCADA iniciado con exito en puerto 80.\n");
+
+  tLoop = millis();
+  tCaudal = millis();
+  tDatalogger = millis();
+  tInicioEnsayo_ms = 0;
+}
+
+// ------------------------------------------------------------------------------
+// BUCLE PRINCIPAL (LOOP NO BLOQUEANTE)
+// ------------------------------------------------------------------------------
+void loop() {
+  dnsServer.processNextRequest();
+  server.handleClient();
+
+  uint32_t tAhora = millis();
+
+  // 1. Control cinemático de la bomba cada 50 ms
+  if (tAhora - tLoop >= 50) {
+    float dt = (tAhora - tLoop) / 1000.0f;
+    tLoop = tAhora;
+    bomba.tick(dt);
+
+    digitalWrite(PIN_LED_BOMBA, (bomba.rpmActual() > 0.5f) ? HIGH : LOW);
+
+    bool enMarcha = bomba.enMarcha();
+
+    if (enMarcha && !bombaEnMarchaAnterior) {
+      iniciarNuevoEnsayo(bomba.rpmObjetivo());
+      registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
+    }
+
+    if (!enMarcha && bombaEnMarchaAnterior) {
+      finalizarEnsayoActual();
+      registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
+    }
+
+    bombaEnMarchaAnterior = enMarcha;
+  }
+
+  // 2. Adquisición en tiempo real y cálculo de merma por torta cada 1000 ms (1 segundo)
+  if (tAhora - tCaudal >= 1000) {
+    tCaudal = tAhora;
+
+    bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
+    float qBomba = bomba.caudalTeorico_mLmin();
+
+    // Captura atómica única por segundo
+    const auto ma = sensorAlimentacion.capturar(bombaEmpuja);
+    const auto mp = sensorPermeado.capturar(bombaEmpuja);
+    registroEnsayos.tick(ma, mp, bomba.rpmActual());
+
+    qAlimEfectivo_mLmin = sensorAlimentacion.caudal_mLmin();
+    float qPermSensor   = sensorPermeado.caudal_mLmin();
+
+    // Si el sensor de permeado detecta giro real de la turbina (> 2 mL/min), usa el sensor en tiempo real.
+    // Si la turbina se detuvo por caudal ultra-bajo y el operador cargó probeta manual, usa el valor manual.
+    if (usarPermManual && bombaEmpuja && !sensorPermeado.bloqueado()) {
+      qPermEfectivo_mLmin = qPermManual_mLmin;
+      volPermManualAcum_L += (double)qPermManual_mLmin / 60000.0; // Integra mL/min a Litros cada 1 s
+    } else {
+      qPermEfectivo_mLmin = qPermSensor;
+    }
+
+    // Captura automática de Caudales Iniciales (Q_Alim_0 y Q_Perm_0) tras 5 segundos en Régimen Estable
+    if (bomba.enRegimenEstable()) {
+      if (segEstablesRef < 10) segEstablesRef++;
+      if (segEstablesRef >= 5) {
+        if (qAlimRef_mLmin <= 1.0f && qAlimEfectivo_mLmin > 20.0f) {
+          qAlimRef_mLmin = qAlimEfectivo_mLmin;
+          Serial.printf("[TORTA] Q_Alim_0 inicial capturado automaticamente: %.1f mL/min\n", qAlimRef_mLmin);
+        }
+        if (qPermRef_mLmin <= 0.1f && qPermEfectivo_mLmin > 1.0f) {
+          qPermRef_mLmin = qPermEfectivo_mLmin;
+          Serial.printf("[TORTA] Q_Perm_0 inicial capturado automaticamente: %.1f mL/min\n", qPermRef_mLmin);
+        }
+      }
+    } else {
+      segEstablesRef = 0;
+    }
+
+    // Cálculo en tiempo real de la Merma de Caudal por Formación de Torta
+    if (bombaEmpuja && qAlimRef_mLmin > 10.0f) {
+      float caidaA = ((qAlimRef_mLmin - qAlimEfectivo_mLmin) / qAlimRef_mLmin) * 100.0f;
+      mermaAlim_pct = fmaxf(0.0f, caidaA);
+    } else {
+      mermaAlim_pct = 0.0f;
+    }
+
+    if (bombaEmpuja && qPermRef_mLmin > 0.5f) {
+      float caidaP = ((qPermRef_mLmin - qPermEfectivo_mLmin) / qPermRef_mLmin) * 100.0f;
+      mermaPerm_pct = fmaxf(0.0f, caidaP);
+      jSobreJ0_pct  = constrain((qPermEfectivo_mLmin / qPermRef_mLmin) * 100.0f, 0.0f, 150.0f);
+    } else {
+      mermaPerm_pct = 0.0f;
+      jSobreJ0_pct  = 100.0f;
+    }
+
+    flagCruceSensores = (qPermEfectivo_mLmin > qAlimEfectivo_mLmin + 50.0f) && (bomba.rpmActual() > 5.0f);
+
+    // Balance Hidráulico Tangencial y Flujo Darcy en tiempo real
+    qRet_mLmin   = fmaxf(0.0f, qAlimEfectivo_mLmin - qPermEfectivo_mLmin);
+    recuperacion = (qAlimEfectivo_mLmin > 50.0f) ? ((qPermEfectivo_mLmin / qAlimEfectivo_mLmin) * 100.0f) : 0.0f;
+    jLMH_actual  = (qPermEfectivo_mLmin * 0.06f) / AREA_MEMBRANA_M2;
+    resultadoDarcy = ResultadoDarcy{};
+    deltaBomba   = (qBomba > 1.0f) ? (((qAlimEfectivo_mLmin - qBomba) / qBomba) * 100.0f) : 0.0f;
+
+    // Máquina de estados de Auto-Calibración en régimen permanente
+    if (autoCalibrando) {
+      if (bomba.enRegimenEstable()) {
+        autoCalSumFrecAlim += sensorAlimentacion.frecuencia_Hz();
+        autoCalSumFrecPerm += sensorPermeado.frecuencia_Hz();
+        autoCalMuestras++;
+
+        if (autoCalMuestras >= MUESTRAS_AUTO_CAL) {
+          float fPromAlim = autoCalSumFrecAlim / (float)MUESTRAS_AUTO_CAL;
+          float qRefAlim  = bomba.rpmActual() * bomba.getMlPorVuelta();
+
+          if (qRefAlim > 10.0f && fPromAlim > 1.0f) {
+            float nuevoKa = (fPromAlim * 1000.0f) / qRefAlim;
+            sensorAlimentacion.setK(nuevoKa);
+          }
+
+          float kpActual = sensorPermeado.getK();
+          guardarParametrosNVS(sensorAlimentacion.getK(), kpActual,
+                               bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+          autoCalibrando = false;
+          autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " Hz/(L/min)";
+        }
+      }
+    }
+
+    Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min (Merma:%4.1f%%) | Q_Perm:%5.1f mL/min (Merma:%4.1f%%, J/J0:%5.1f%%) | J:%4.2f LMH\n",
+                  bomba.rpmActual(), qAlimEfectivo_mLmin, mermaAlim_pct,
+                  qPermEfectivo_mLmin, mermaPerm_pct, jSobreJ0_pct, jLMH_actual);
+  }
+
+  // 3. Muestreo del Datalogger cada 10 segundos (SOLO cuando la bomba gira realmente y hay flujo)
+  if (tAhora - tDatalogger >= INTERVALO_LOG_MS) {
+    tDatalogger = tAhora;
+    if (bombaGirandoReal()) {
+      guardarMuestraDatalogger();
+    }
+  }
+
+  delay(2);
+}

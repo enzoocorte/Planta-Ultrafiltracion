@@ -40,7 +40,7 @@ bool Caudalimetro::setK(double nuevoK) {
   reiniciarEstimadorLocked();
 
   if (_iniciado) {
-    _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
+    _nivelAlto = (gpio_get_level((gpio_num_t)_cfg.pin) != 0);
     _inicioNivel_us = esp_timer_get_time();
   }
   portEXIT_CRITICAL(&_mux);
@@ -104,7 +104,7 @@ bool Caudalimetro::begin() {
   pinMode(_cfg.pin, INPUT_PULLUP);
 
   portENTER_CRITICAL(&_mux);
-  _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
+  _nivelAlto = (gpio_get_level((gpio_num_t)_cfg.pin) != 0);
   _inicioNivel_us = esp_timer_get_time();
   reiniciarEstimadorLocked();
   portEXIT_CRITICAL(&_mux);
@@ -121,7 +121,7 @@ void ARDUINO_ISR_ATTR Caudalimetro::isrPuente(void* arg) {
 void ARDUINO_ISR_ATTR Caudalimetro::isr() {
   portENTER_CRITICAL_ISR(&_mux);
   const int64_t ahora = esp_timer_get_time();
-  const bool alto = (digitalRead(_cfg.pin) == HIGH);
+  const bool alto = (gpio_get_level((gpio_num_t)_cfg.pin) != 0);
 
   ++_flancos;
   if (_seco) _alarmaSeco = true;
@@ -184,7 +184,7 @@ void Caudalimetro::setModoSeco(bool activo) {
     _seco = activo;
     ++_epoca; // Cada cambio de modo inicia una nueva época metrológica
     reiniciarEstimadorLocked();
-    _nivelAlto = (digitalRead(_cfg.pin) == HIGH);
+    _nivelAlto = (gpio_get_level((gpio_num_t)_cfg.pin) != 0);
     _inicioNivel_us = esp_timer_get_time();
   }
   portEXIT_CRITICAL(&_mux);

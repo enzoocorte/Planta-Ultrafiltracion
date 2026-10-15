@@ -901,4 +901,7 @@ void loop() {
       guardarMuestraDatalogger();
     }
   }
+
+  // 4. Ceder tiempo al planificador FreeRTOS (Alimenta el Task Watchdog TG0WDT y da respiro a la pila WiFi)
+  delay(2);
 }
