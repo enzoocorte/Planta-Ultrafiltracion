@@ -95,11 +95,11 @@ struct ConfigSensor {
 constexpr ConfigSensor SENSOR_ALIM_CFG = {
   PIN_SENSOR_ALIMENTACION, // Pin 14
   205.98,                  // K calibrado en Ensayo 3 [Hz / (L/min)] (12359 pulsos/L)
-  1200,                    // Ancho mínimo LOW: 1200 us (supera constante RC de 940 us)
+  1200,                    // Ancho mínimo LOW: 1200 us
   1200,                    // Ancho mínimo HIGH: 1200 us
-  2800,                    // Período mínimo admisible: 2800 us (357 Hz)
+  1200,                    // Período mínimo admisible: 1200 us (833 Hz -> admite picos pulsátiles de ~410 Hz a 90-100 RPM)
   1500000,                 // Timeout de pérdida de señal: 1.5 s
-  1500.0,                  // Q máximo operativo admisible (mL/min)
+  2000.0,                  // Q máximo operativo admisible (mL/min, tolera crestas de onda de rodillo)
   20.0,                    // Umbral mínimo detectable (mL/min)
   true,                    // Calibración documentada en Ensayo 3
   280.0,                   // Q mínimo calibrado en probeta (20 RPM = 280 mL/min)
@@ -110,11 +110,11 @@ constexpr ConfigSensor SENSOR_ALIM_CFG = {
 constexpr ConfigSensor SENSOR_PERM_CFG = {
   PIN_SENSOR_PERMEADO,     // Pin 27
   205.98,                  // K homologado al mismo modelo físico YF-S401 (ajustable desde SCADA)
-  3500,                    // Ancho mínimo LOW: 3500 us (3.5 ms -> inmune a picos EMI + filtro RC de 940 us)
-  3500,                    // Ancho mínimo HIGH: 3500 us (3.5 ms)
-  8000,                    // Período mínimo admisible: 8000 us (125 Hz)
+  3500,                    // Ancho mínimo LOW: 3500 us (inmune a ruidos EMI)
+  3500,                    // Ancho mínimo HIGH: 3500 us
+  3500,                    // Período mínimo admisible: 3500 us (285 Hz)
   3500000,                 // Timeout de pérdida de señal: 3.5 s (permite medir frecuencias bajas hasta 0.4 Hz)
-  350.0,                   // Q máximo operativo admisible (mL/min)
+  500.0,                   // Q máximo operativo admisible (mL/min)
   2.0,                     // Umbral mínimo detectable (2.0 mL/min) para seguir la merma de permeado
   false,                   // Sujeto a asistencia por probeta cuando Q_perm cae bajo el umbral mecánico
   0.0,                     // Q min

@@ -139,12 +139,15 @@ void ARDUINO_ISR_ATTR Caudalimetro::isr() {
 
   const int64_t dt = _hayAnterior ? (ahora - _bajadaAnterior_us) : 0;
 
-  // Blanking digital de 3000 us (f_max = 333 Hz):
-  // - Bloquea en silicio cualquier ráfaga de ruido/falso contacto (como los 373 Hz).
-  // - Permite pasar el 100% de los pulsos reales desde 0 hasta 100 RPM (~230 Hz).
-  constexpr int64_t BLANKING_US = 3000LL;
+  // Blanking digital diferenciado por canal (Anti-EMI y respeto a la cinemática de pulsación):
+  // - Alimentación (GPIO 14): 1200 us (f_max = 833 Hz). Deja pasar el 100% del régimen pulsátil
+  //   de la bomba peristáltica (picos instantáneos de hasta ~410 Hz a 90-100 RPM) bloqueando
+  //   cualquier transitorio EMI de alta frecuencia (> 1 kHz).
+  // - Permeado (GPIO 27): 3500 us (f_max = 285 Hz). Bloquea rebotes mecánicos y falsos contactos
+  //   como el pico espurio de 373 Hz, admitiendo caudales transmembrana de hasta 800 mL/min.
+  const int64_t blanking_us = _esAlimentacion ? 1200LL : 3500LL;
 
-  if (!_hayAnterior || dt >= BLANKING_US) {
+  if (!_hayAnterior || dt >= blanking_us) {
     if (_pulsosVentana == 0) {
       _primeroVentana_us = ahora;
     }
@@ -241,8 +244,9 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
     m.edadPulso_us = m.t_us - m.ultimoAceptado_us;
   }
 
+  const int64_t timeout_us = (int64_t)_cfg.timeout_us;
   const bool sinSenal = bloqueado || !hayAnterior ||
-                        m.edadPulso_us < 0 || m.edadPulso_us > 3000000LL;
+                        m.edadPulso_us < 0 || m.edadPulso_us > timeout_us;
   if (sinSenal) {
     m.calidad |= SIN_SENAL;
   }
@@ -266,12 +270,13 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
       if (f < 0.25) f = 0.0;
     }
 
-    if (f > 0.05 && f <= 300.0) {
+    const double fMaxPermitida = _esAlimentacion ? 600.0 : 250.0;
+    if (f > 0.05 && f <= fMaxPermitida) {
       m.calidad |= PERIODO_DISPONIBLE;
       m.frecuencia_Hz = f;
       m.q_mLmin = (f * 1000.0) / m.k;
-      if (m.q_mLmin > 1500.0) {
-        m.q_mLmin = 1500.0;
+      if (m.q_mLmin > _cfg.qMaxOperativo_mLmin) {
+        m.q_mLmin = _cfg.qMaxOperativo_mLmin;
       }
     }
   }
@@ -298,10 +303,18 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
     _qSuavizadoDisplay = (_qSuavizadoDisplay == 0.0f)
                            ? qMed
                            : (0.35f * qMed + 0.65f * _qSuavizadoDisplay);
+    _cerosConsecutivos = 0;
   } else {
-    _qHist[0] = _qHist[1] = _qHist[2] = 0.0f;
-    _qHistCount = 0;
-    _qSuavizadoDisplay = 0.0f;
+    // Si la bomba sigue en marcha pero hubo una ventana aislada sin pulso, no borrar de golpe.
+    // Solo si se confirman 2 ventanas consecutivas sin pulsos o si la bomba se detuvo, resetear a 0.
+    _cerosConsecutivos++;
+    if (_cerosConsecutivos >= 2 || !bombaEmpuja || bloqueado) {
+      _qHist[0] = _qHist[1] = _qHist[2] = 0.0f;
+      _qHistCount = 0;
+      _qSuavizadoDisplay = 0.0f;
+    } else {
+      _qSuavizadoDisplay *= 0.5f; // Decaimiento suave
+    }
   }
 
   if (!_esAlimentacion || seco || !bombaEmpuja) {
