@@ -78,3 +78,23 @@ flowchart TD
   * 🛡️ **[`Guia_Enclavamientos_Seguridad_y_SCADA.md`](./01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md)**: Manual detallado de enclavamientos de seguridad, algoritmos de cálculo de TMP, mapeo de transductores en ADS1115, entregable y lista de verificación.
 * 📁 **[`02_Firmware_SCADA_Master/`](./02_Firmware_SCADA_Master/)**:
   * 💻 **[`firmware_planta_completa/firmware_planta_completa.ino`](./02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino)**: Sketch maestro para ESP32 con servidor web industrial HTML5 embebido, control AJAX en tiempo real, máquina de estados y ArduinoOTA.
+
+---
+
+## 📊 Estado de Avance Actual
+
+| Subhito / Actividad | Estado | Porcentaje | Observaciones |
+| :--- | :---: | :---: | :--- |
+| **Arquitectura de Enclavamientos y E-Stop** | ✅ Completado | 100% | Válvula de alivio física a $0.70\text{ bar}$ y corte por nivel. |
+| **Servidor Web SCADA & SoftAP (`192.168.4.1`)**| ✅ Completado | 100% | Dashboard en tiempo real con panel Darcy interactivo. |
+| **Cálculo de Ley de Darcy y Datalogger CSV** | ✅ Completado | 100% | Embebido en firmware (`darcy.h`) y exportación a Excel. |
+| **Integración Física Total de la Planta** | 🟡 En Curso | 85% | Montaje final en gabinete del Módulo 2 para ensayos de Hito 5. |
+
+---
+
+## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 5
+
+1. [x] Interfaz Web SCADA respondiendo fluidamente cada $500\text{ ms}$ en red Wi-Fi propia del ESP32 sin necesidad de router externo.
+2. [x] Cálculo síncrono y exportación en CSV de todas las variables hidráulicas ($Q_{\text{alim}}, Q_{\text{perm}}, P_1, P_2, \text{TMP}, T, J_{20}, \text{TCF}, R_{\text{total}}, R_{\text{torta}}$).
+3. [x] Enclavamiento de seguridad verificado ante sobrepresión y marcha en seco.
+4. [ ] **Habilitación formal:** Ejecución del protocolo de ensayos de filtración, diseño factorial $3^2$ y vida útil de membrana en el **Hito 5**.

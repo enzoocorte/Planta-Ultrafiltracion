@@ -461,6 +461,9 @@ El Hito 6 proporciona el cierre ingenieril y económico indispensable para la gr
 
 ## 🔗 9. Trazabilidad de Archivos y Enlaces Directos en el Repositorio
 
+* 📐 **Arquitectura General, Estructura DFM y P&ID (Hito 0):** [`00_General_y_P_ID_Planta/README.md`](./00_General_y_P_ID_Planta/README.md)
+* 🏗️ **Memoria Maestra de Estructura y Modularidad Mecánica:** [`00_General_y_P_ID_Planta/01_Estructura_y_Montaje_Filtro/DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md`](./00_General_y_P_ID_Planta/01_Estructura_y_Montaje_Filtro/DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md)
+* 📐 **Diagrama P&ID ISA 5.1 y Simulador Interactivo:** [`00_General_y_P_ID_Planta/02_Diagrama_PID_y_Filosofia_Control/diagrama_pid_interactivo.html`](./00_General_y_P_ID_Planta/02_Diagrama_PID_y_Filosofia_Control/diagrama_pid_interactivo.html)
 * 💻 **Firmware Activo en Operación (V6.4):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/)
 * 🚰 **Guía de Montaje Manómetros de Glicerina:** [`02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md)
 * 🌿 **Protocolo de Coagulación con Opuntia (Hito 3):** [`03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md)

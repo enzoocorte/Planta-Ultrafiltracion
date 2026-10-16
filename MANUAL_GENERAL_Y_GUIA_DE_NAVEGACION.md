@@ -14,17 +14,18 @@
 
 ---
 
-## 🗺️ Mapa de Navegación de los 5 Hitos de Trabajo (Consolidado)
+## 🗺️ Mapa de Navegación de los 7 Hitos de Trabajo (Consolidado)
 
 Cada hito cuenta con su propia carpeta autocontenida con documentación técnica, esquemas de conexión, firmware compilado y probado, simuladores o plantillas de datos:
 
 ```mermaid
 flowchart TD
-    P_ID["📐 GENERAL: Arquitectura P&ID Maestro e Interactivo (ISA 5.1)<br>• Diagrama global de mangueras, conexiones ESP32, cálculo de TMP y prefiltro"] -. Marco de Integración .-> H1
-    H1["⚡ HITO 1: Bomba Peristáltica MBP-2000 & Accionamiento NEMA 34<br>• Montaje 8 cables Serie 3A, DM860, bornera ESP32, simulador y Web Wi-Fi"] --> H2["📊 HITO 2: Instrumentación y Sensores Disponibles<br>• Caudalímetros YF-S401, Sonda TDS, Temp DS18B20 y Conversor ADS1115"]
+    H0["📐 HITO 0: Arquitectura General, Estructura DFM y P&ID (ISA 5.1)<br>• Bastidor modular de 3 cuerpos, segregación IP65, tanques y P&ID interactivo"] --> H1["⚡ HITO 1: Bomba Peristáltica MBP-2000 & Accionamiento NEMA 34<br>• Montaje 8 cables Serie 3A, DM860, bornera ESP32, simulador y Web Wi-Fi"]
+    H1 --> H2["📊 HITO 2: Instrumentación y Sensores Disponibles<br>• Caudalímetros YF-S401, Sonda TDS, Temp DS18B20 y Manómetros Glicerina"]
     H2 --> H3["🌪️ HITO 3: Reactor de Coagulación-Sedimentador Cónico<br>• Driver L298N, paleta PWM, gradiente Camp-Stein, boya inox y Jar Test"]
-    H3 --> H4["🌐 HITO 4: Integración Global, Automatización Total & SCADA<br>• Sincronización FSM, enclavamientos TMP ≤ 0.50 atm y telemetría completa"]
-    H4 --> H5["🧪 HITO 5: Ensayos de Membrana FX100, Darcy y Vida Útil<br>• Resistencia Rm y Rf, remoción turbidez/TDS y validación de tesis doctoral"]
+    H3 --> H4["🌐 HITO 4: Integración Global, Automatización Total & SCADA<br>• Sincronización FSM, enclavamientos TMP ≤ 0.45 bar y telemetría completa"]
+    H4 --> H5["🧪 HITO 5: Ensayos de Membrana FX100, Darcy y Vida Útil<br>• Matriz factorial 3², modelos Hermia, autopsia SEM/EDS en fibras Helixone®"]
+    H5 --> H6["🏭 HITO 6: Evaluación Industrial de Energía y Costos<br>• Consumo específico SEC (kWh/m³), frecuencia óptima CIP y costos OPEX (USD/m³)"]
 ```
 
 ---
@@ -32,12 +33,12 @@ flowchart TD
 ## 🧭 ¿Qué se busca y qué encontrarán en cada carpeta?
 
 ### 📁 [`00_General_y_P_ID_Planta/`](./00_General_y_P_ID_Planta/)
-* **Objetivo General**: Mantener la visión global e integral de todo el banco de pruebas hidráulico y electrónico de la planta.
+* **Objetivo General**: Mantener la visión global e integral de todo el banco de pruebas físico, mecánico, hidráulico y electrónico de la planta.
 * **Qué encontrarán aquí**:
-  * [`README.md`](./00_General_y_P_ID_Planta/README.md): Plano maestro P&ID según norma ISA 5.1 con diferenciación estricta de mangueras de proceso (línea llena) y señales de control al ESP32 (línea punteada), justificación de la válvula reguladora de aguja $V_{\text{reg}}$, especificación del prefiltro de succión y matriz de conexionado (directo vs indirecto).
-  * [`Guia_Construccion_y_Montaje_Tanques.md`](./00_General_y_P_ID_Planta/Guia_Construccion_y_Montaje_Tanques.md): Guía de diseño, perforación, estanqueidad e instalación de sensores (boya inox, DS18B20, TDS) y prefiltro de succión en los tanques T-01 y T-02.
-  * [`diagrama_pid_interactivo.html`](./00_General_y_P_ID_Planta/diagrama_pid_interactivo.html): Diagrama interactivo ejecutable en navegador con selector de capas (mangueras/cables), flujo animado y simulador de Presión Transmembrana (TMP).
-  * [`boceto_original_enzo_pid.jpg`](./00_General_y_P_ID_Planta/boceto_original_enzo_pid.jpg): Fotografía en alta resolución del boceto original de banco de Enzo.
+  * [`README.md`](./00_General_y_P_ID_Planta/README.md): Hub central del Hito 0 con especificaciones de DFM/DFA, segregación IP65 y objetivos del sistema.
+  * 📁 [`01_Estructura_y_Montaje_Filtro/`](./00_General_y_P_ID_Planta/01_Estructura_y_Montaje_Filtro/): Documento maestro de ingeniería mecánica (`DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md`), maqueta 3D interactiva en Three.js (`guia_visual_estructura.html`), memorias de cálculo de esbeltez de eje, segregación de potencia y galería fotográfica de bastidor y módulos.
+  * 📁 [`02_Diagrama_PID_y_Filosofia_Control/`](./00_General_y_P_ID_Planta/02_Diagrama_PID_y_Filosofia_Control/): Plano maestro P&ID según norma ISA 5.1 con diferenciación estricta de mangueras de proceso y señales de control al ESP32, simulador interactivo (`diagrama_pid_interactivo.html`), guía de tanques y constantes del dializador FX100.
+  * 📁 [`03_Organizacion_Equipo_y_Protocolos/`](./00_General_y_P_ID_Planta/03_Organizacion_Equipo_y_Protocolos/): Manual operativo del equipo (`ORGANIZACION_PROYECTO_Y_EQUIPO.md`), roles asignados y reglas de sincronización en Git.
 
 ---
 

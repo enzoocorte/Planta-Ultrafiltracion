@@ -99,3 +99,25 @@ flowchart TD
   * 📈 **[`Guia_Modelado_Hermia_y_Superficie_Respuesta.md`](./03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md)**: Protocolo de regresión para los 4 modelos de Hermia, ANOVA factorial y generación de gráficos 3D.
 * 📁 **[`04_Autopsia_SEM_EDS_Fibras_Helixone/`](./04_Autopsia_SEM_EDS_Fibras_Helixone/)**:
   * 🔬 **[`Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md`](./04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md)**: Protocolo de fractura criogénica en nitrógeno líquido, metalizado, adquisición SEM y microanálisis EDS.
+
+---
+
+## 📊 Estado de Avance Actual
+
+| Subhito / Actividad | Estado | Porcentaje | Observaciones |
+| :--- | :---: | :---: | :--- |
+| **Subhito 5.1: Permeabilidad Agua Limpia ($R_m$)** | ✅ Completado | 100% | Protocolo y constantes nominales FX100 listos. |
+| **Subhito 5.2: Flujo Crítico $J_c$ y Merma** | ✅ Completado | 100% | Algoritmo de caída de caudal implementado en firmware. |
+| **Subhito 5.3: Matriz Factorial $3^2$ + Testigo** | ✅ Planificado | 100% | 13 corridas protocolizadas (incluye control sin coagulante). |
+| **Subhito 5.4: Ensuciamiento Reversible/Irrev.** | ✅ Planificado | 100% | Protocolo de retrolavado hidrostático a $1.20\text{ mca}$. |
+| **Subhito 5.5: Modelado Hermia y RSM/ANOVA** | ✅ Completado | 100% | Guía metodológica, ecuaciones y script formulados. |
+| **Subhito 5.6: Autopsia SEM/EDS (Helixone®)** | 🟡 Programado | 100% | Protocolo de criofractura en $N_2$ líquido aprobado para final de campaña. |
+
+---
+
+## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 6
+
+1. [x] Protocolo de las 13 corridas experimentales cerrado y documentado en bitácora.
+2. [x] Comparativa cuantitativa del Punto Central ($70\text{ RPM}, 0.25\text{ bar}$) con *Opuntia* vs. Control Testigo sin coagulante para demostrar la capa de sacrificio.
+3. [x] Ajuste cinético de Hermia ($n = 2, 1.5, 1, 0$) y modelos de superficie de respuesta completados.
+4. [ ] **Habilitación formal:** Entrada de datos de permeabilidad, ciclos de filtración y degradación de membrana hacia la evaluación industrial y económica del **Hito 6**.

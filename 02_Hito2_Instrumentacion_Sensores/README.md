@@ -70,33 +70,49 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 ## 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
 * 📁 **[`01_Guias_Montaje_y_Calibracion/`](./01_Guias_Montaje_y_Calibracion/)**:
-  * 🩺 **[`Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento formal para tesis**. Diagnóstico de causas raíz del ruido de 81 Hz (835.5 mL/min), demostración matemática del filtro software, solución RC en Placa 2, corrección de inversión de canales y protocolo de ensayos.
+  * 📊 **[`Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md)**: **Guía oficial Subhito 2.4**. Montaje de manómetros Bourdon con glicerina ($P_1, P_2$), supresión de transductores analógicos genéricos/ADS1115, carga asistida en SCADA web y cálculo de Darcy en tiempo real.
+  * 🩺 **[`Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)**: **Documento formal para tesis**. Diagnóstico de causas raíz del ruido de 81 Hz (835.5 mL/min), filtro software, solución RC en Placa 2 y protocolo de ensayos.
   * 🔌 **[`Guia_Montaje_Placa_Filtrado_FrontEnd.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Placa_Filtrado_FrontEnd.md)**: Manual de conexionado físico paso a paso de las 2 borneras ZS-1057 (Placa 1 Master ESP32 + Placa 2 Acondicionamiento RC).
-  * 📈 **[`Simulaciones_Filtro_RC/`](./01_Guias_Montaje_y_Calibracion/Simulaciones_Filtro_RC/)**: Simulación en **LTspice** (`simulacion_filtro_caudalimetro.asc`), script de modelado en Python y curvas de atenuación de ruido.
+  * 📘 **[`Manual_Conexionado_Sensores_ESP32_Ultrafiltracion.docx`](./01_Guias_Montaje_y_Calibracion/Manual_Conexionado_Sensores_ESP32_Ultrafiltracion.docx)**: Manual técnico consolidado en Word con pinouts, borneras y esquemas.
+  * 📈 **[`Simulaciones_Filtro_RC/`](./01_Guias_Montaje_y_Calibracion/Simulaciones_Filtro_RC/)**: Simulación en **LTspice** (`simulacion_filtro_caudalimetro.asc`), script Python y curvas de atenuación.
   * 🖥️ **[`Esquemas_Conexionado_HTML/`](./01_Guias_Montaje_y_Calibracion/Esquemas_Conexionado_HTML/)**: Colección de planos interactivos SVG (borneras ZS-1057, protoboard, capacitor de desacoplo y nodo pull-up).
   * 📝 **[`Bitacoras_Calibracion/`](./01_Guias_Montaje_y_Calibracion/Bitacoras_Calibracion/)**: Registro cronológico de sesiones de laboratorio de Owen, ensayos en probeta y matriz de fallas resueltas.
   * 📘 **[`Documentacion_Tecnica/`](./01_Guias_Montaje_y_Calibracion/Documentacion_Tecnica/)**: Guía de arquitectura de programación del ESP32, prompts de diseño y cabeceras de referencia.
-  * 🌊 **[`Guia_Subhito2_1_Caudalimetros.md`](./01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md)**: Conexión, factor K (98 pulsos/L), monitoreo serie y calibración gravimétrica del YF-S401.
+  * 🌊 **[`Guia_Subhito2_1_Caudalimetros.md`](./01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md)**: Conexión, factor K (205.98 Hz/(L/min)), monitoreo serie y calibración gravimétrica del YF-S401.
   * 🚰 **[`Guia_Montaje_Hidraulico_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md)**: Instalación física de caudalímetros y sondas en tubería con entregable y checklist.
-  * 📐 **[`Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md)**: Fórmulas de conversión matemática, resolución de 16 bits y compensación térmica con entregable y checklist.
 
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🚀 **[`subhito2_2_v4/`](./02_Firmware_Test_Sensores/subhito2_2_v4/)**: **HITO 2.2 V4 — FIRMWARE BLINDADO (HARDENED) & AUDITORÍA IA**:
-    * 🛡️ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/)**: Firmware optimizado con período recíproco de pulsos (<0.1% a 5.5 Hz), protección ante desbordes de `micros()`, rampa hasta 100 RPM para diseño factorial, módulo físico de Darcy embebido (`darcy.h`) y cero fragmentación de heap.
-    * 🤖 **[`AuditoriaIA/`](./02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/)**: Dictámenes técnicos y auditoría cruzada de ChatGPT 6 Astra, GLM 5.3, Claude Sonnet 5 y **Claude 5.5 Opus (Ronda 3)** sobre FreeRTOS, ADS1115, seguridad física y Darcy.
-    * 🗺️ **[`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](../../HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md)**: Plan maestro de transición hacia Hito 2.3 (FreeRTOS dual-core) e Hito 5 (Ensayos de ultrafiltración y diseño factorial).
-  * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: **HITO 2.2 V3 — CONSOLIDACIÓN DE BANCO (ACTUAL EN ESP32)**:
-    * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v3/EN_USO_firmware_planta/)**: **FIRMWARE ACTIVO EN OPERACIÓN (Compilado y grabado en ESP32)**. Auto-calibración con probeta, Flash NVS permanente (`Preferences.h`), filtro anti-ruido a 2000 µs, datalogger de 600 muestras y Web SCADA en SoftAP puro (`192.168.4.1`).
-    * 💻 **[`firmware_esp32_platformio/`](./02_Firmware_Test_Sensores/subhito2_2_v3/firmware_esp32_platformio/)**: Entorno de compilación incremental rápida con PlatformIO Core CLI.
-    * ⚡ **[`scripts_compilacion_rapida/`](./02_Firmware_Test_Sensores/subhito2_2_v3/scripts_compilacion_rapida/)**: Accesos directos `.bat` para compilar, subir y abrir el monitor serie en 3 segundos.
-    * 💻 **[`firmware_sensores_test/`](./02_Firmware_Test_Sensores/subhito2_2_v3/firmware_sensores_test/)**: Sketch multivariable de adquisición continua.
+  * 🌟 **[`Subhito2_2_v6/`](./02_Firmware_Test_Sensores/Subhito2_2_v6/)**: **FIRMWARE ACTIVO DE PRODUCCIÓN (GRABADO EN ESP32)**:
+    * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/)**: Integración de Manómetros Bourdon de Glicerina, endpoint `/set_presion`, cálculo continuo de Ley de Darcy (`darcy.h`), factor TCF de Vogel, exportación CSV de 8 columnas metrológicas y panel visual interactivo SCADA.
+  * 🚀 **[`subhito2_2_v4/`](./02_Firmware_Test_Sensores/subhito2_2_v4/)**: Firmware previo refactorizado tras auditoría cruzada de 4 IAs.
+  * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: Versión previa de consolidación de banco.
   * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: Firmware modular base previo con arquitectura C++ (Bomba y Caudalímetro).
-  * 🌊 **[`subhito2_1_caudalimetros/`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/)**: Firmware básico de prueba para Subhito 2.1 con interrupciones por hardware.
+  * 🌊 **[`subhito2_1_caudalimetros/`](./02_Firmware_Test_Sensores/subhito2_1_caudalimetros/)**: Firmware básico inicial para Subhito 2.1.
 
 * 📁 **[`Datos/`](./Datos/)**:
   * 📊 **[`CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx`](./Datos/CALIBRACION_CAUDALIMETROS_PROBETA_50RPM_72RPM.xlsx)**: Planilla oficial de calibración de probeta de Owen a 50 RPM y 72 RPM con factores K resultantes.
-  * 📑 **[`datos_planta_uf_2026-09-30.csv`](./Datos/datos_planta_uf_2026-09-30.csv)**: Telemetría cruda en banco a 50–94 RPM donde se diagnosticó la inversión física de sensores.
+  * 📑 **[`datos_planta_uf_2026-09-30.csv`](./Datos/datos_planta_uf_2026-09-30.csv)**: Telemetría cruda en banco a 50–94 RPM.
   * 📑 **[`datos_planta_uf_2026-09-30 (1).csv`](./Datos/datos_planta_uf_2026-09-30 (1).csv)**: Ensayo de verificación a 25, 36, 50, 74 y 80 RPM.
+
+---
+
+## 📊 Estado de Avance Actual
+
+| Subhito / Actividad | Estado | Porcentaje | Observaciones |
+| :--- | :---: | :---: | :--- |
+| **Subhito 2.1: Caudalímetros YF-S401** | ✅ Completado | 100% | Calibrado con probeta ($K = 205.98\text{ Hz/(L/min)}$) y filtro anti-EMI. |
+| **Subhito 2.2: Temperatura DS18B20 & TCF** | ✅ Completado | 100% | Integrado en `darcy.h` con viscosidad de Vogel. |
+| **Subhito 2.3: Calidad de Agua TDS / ADS1115** | ✅ Completado | 100% | Protocolo I2C verificado a 0x48. |
+| **Subhito 2.4: Manómetros Glicerina & Darcy SCADA**| ✅ Completado | 100% | Implementado en firmware v6 y panel SCADA web. |
+
+---
+
+## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 3 y 4
+
+1. [x] Medición de caudal en tiempo real libre de ruido EMI ($81\text{ Hz}$ eliminado por filtro RC + software).
+2. [x] Presión manométrica de entrada ($P_1$) y retentado ($P_2$) legible con precisión de $\pm 16\text{ mbar}$ sobre manómetros Bourdon amortiguados.
+3. [x] Ley de Darcy calculando en vivo en el firmware ESP32 y exportando en cada fila del CSV.
+4. [ ] **Habilitación formal:** Interconexión con el reactor sedimentador del **Hito 3** y montaje central en el **Hito 4**.
 
 
 

@@ -58,5 +58,25 @@ Mientras que los Hitos 1 al 4 aseguraron la automatización de la planta y el Hi
 
 * 📁 **[`01_Consumo_Energetico_SEC/`](./01_Consumo_Energetico_SEC/)**:
   * ⚡ **[`Guia_Calculo_SEC_Consumo_Especifico.md`](./01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md)**: Fundamento termodinámico y eléctrico, fórmulas de cálculo de $\text{SEC}$, instrumentación de potencia y análisis de sensibilidad.
+  * 🐍 **[`calculo_sec_matriz13.py`](./01_Consumo_Energetico_SEC/calculo_sec_matriz13.py)**: Script en Python para el procesamiento matricial automatizado de energía en las 13 corridas de la tesis.
 * 📁 **[`02_Costos_y_Vida_Util/`](./02_Costos_y_Vida_Util/)**:
   * 💰 **[`Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md`](./02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md)**: Proyección de degradación irreversible de Polisulfona/Helixone, optimización de frecuencia de lavado, costos de reactivos y matriz económica unitaria.
+  * 🐍 **[`evaluacion_industrial_opex.py`](./02_Costos_y_Vida_Util/evaluacion_industrial_opex.py)**: Script en Python para la simulación de OPEX comparativo ($0.639\text{ USD/m}^3$ con *Opuntia* vs $2.987\text{ USD/m}^3$ sin pretratamiento).
+
+---
+
+## 📊 5. Estado de Avance Actual
+
+| Subhito / Actividad | Estado | Porcentaje | Observaciones |
+| :--- | :---: | :---: | :--- |
+| **Subhito 6.1: Consumo Específico (SEC)** | ✅ Completado | 100% | Modelo matemático, guía y script de cálculo matricial listos. |
+| **Subhito 6.2: Vida Útil, CIP y OPEX** | ✅ Completado | 100% | Modelo de degradación, balance tecno-económico y script listos. |
+
+---
+
+## 🏁 6. Entregables Críticos para la Defensa de Tesis
+
+1. [x] Matriz de SEC calculada demostrando un ahorro específico de energía del **$41.4\%$** gracias a la reducción de contrapresión con *Opuntia*.
+2. [x] Demostración de viabilidad económica con una reducción del **$78.6\%$** en el OPEX unitario por metro cúbico tratado.
+3. [x] Protocolo de descarte y recambio de cartucho dializador Fresenius FX100 definido ante $FRR < 60\%$.
+4. [x] **Cierre de Tesis:** Capítulo de Conclusiones e Ingeniería de Escalamiento consolidado para el tribunal examinador de la UNSa.
