@@ -102,22 +102,26 @@ flowchart TD
 
 ---
 
-## 📊 Estado de Avance Actual
+## 📊 Estado de Avance Actual (Avance Global: 5% — Solo Planificación Experimental)
+
+> [!NOTE]
+> **Situación Real de Ensayos en Hito 5:**
+> Las campañas experimentales de filtración sobre la membrana Fresenius FX100 **aún no han comenzado**. Se dispone de la formulación metodológica completa, protocolos de ensayo, diseño de matriz factorial $3^2$ y scripts de ajuste, pero no se ha ejecutado ninguna corrida física en el laboratorio.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Subhito 5.1: Permeabilidad Agua Limpia ($R_m$)** | ✅ Completado | 100% | Protocolo y constantes nominales FX100 listos. |
-| **Subhito 5.2: Flujo Crítico $J_c$ y Merma** | ✅ Completado | 100% | Algoritmo de caída de caudal implementado en firmware. |
-| **Subhito 5.3: Matriz Factorial $3^2$ + Testigo** | ✅ Planificado | 100% | 13 corridas protocolizadas (incluye control sin coagulante). |
-| **Subhito 5.4: Ensuciamiento Reversible/Irrev.** | ✅ Planificado | 100% | Protocolo de retrolavado hidrostático a $1.20\text{ mca}$. |
-| **Subhito 5.5: Modelado Hermia y RSM/ANOVA** | ✅ Completado | 100% | Guía metodológica, ecuaciones y script formulados. |
-| **Subhito 5.6: Autopsia SEM/EDS (Helixone®)** | 🟡 Programado | 100% | Protocolo de criofractura en $N_2$ líquido aprobado para final de campaña. |
+| **Subhito 5.1: Permeabilidad Agua Limpia ($R_m$)** | 🟡 Protocolizado | 30% | Protocolo en papel listo; 0 corridas ejecutadas en cartucho. |
+| **Subhito 5.2: Flujo Crítico $J_c$ y Merma** | 🟡 Protocolizado | 20% | Algoritmo y metodología definidos; pendiente ensayo de laboratorio. |
+| **Subhito 5.3: Matriz Factorial $3^2$ + Testigo** | 🟡 Protocolizado | 20% | 13 corridas protocolizadas; 0 corridas ejecutadas en planta. |
+| **Subhito 5.4: Ensuciamiento Reversible/Irrev.** | 🟡 Protocolizado | 20% | Metodología de retrolavado definida; pendiente de ensayo físico. |
+| **Subhito 5.5: Modelado Hermia y RSM/ANOVA** | 🟡 Formulado | 20% | Scripts de ajuste preparados; a la espera de datos reales de telemetría. |
+| **Subhito 5.6: Autopsia SEM/EDS (Helixone®)** | ⚪ Programado | 10% | Ensayo destructivo pautado estrictamente para el cierre de la campaña. |
 
 ---
 
 ## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 6
 
-1. [x] Protocolo de las 13 corridas experimentales cerrado y documentado en bitácora.
-2. [x] Comparativa cuantitativa del Punto Central ($70\text{ RPM}, 0.25\text{ bar}$) con *Opuntia* vs. Control Testigo sin coagulante para demostrar la capa de sacrificio.
-3. [x] Ajuste cinético de Hermia ($n = 2, 1.5, 1, 0$) y modelos de superficie de respuesta completados.
+1. [ ] Ejecución de las 13 corridas experimentales en planta piloto con registro en datalogger CSV.
+2. [ ] Comparativa cuantitativa del Punto Central ($70\text{ RPM}, 0.25\text{ bar}$) con *Opuntia* vs. Control Testigo sin coagulante para demostrar la capa de sacrificio.
+3. [ ] Ajuste cinético empírico de Hermia ($n = 2, 1.5, 1, 0$) y modelos de superficie de respuesta completados con datos reales.
 4. [ ] **Habilitación formal:** Entrada de datos de permeabilidad, ciclos de filtración y degradación de membrana hacia la evaluación industrial y económica del **Hito 6**.

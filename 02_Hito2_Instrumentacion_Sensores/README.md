@@ -96,23 +96,29 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 
 ---
 
-## 📊 Estado de Avance Actual
+## 📊 Estado de Avance Actual (Avance Global: 35% — En Desarrollo y Ajuste de Firmware)
+
+> [!IMPORTANT]
+> **Decisiones Técnicas y Realidad de Taller en el Hito 2:**
+> 1. **Descarte de Transductores Electrónicos de Presión (Decisión de Argon):** Se eliminan del diseño los transductores analógicos piezoeléctricos genéricos (0-10 bar) y el canal de presión del ADS1115 debido al alto error de deriva a bajas presiones (0.1–0.4 bar) y ruido EMI del motor. Se emplean **manómetros mecánicos Bourdon con baño de glicerina** montados directamente en línea.
+> 2. **Firmware ESP32:** El sketch preparado (`Subhito2_2_v6`) que incorpora los filtros, blanking y módulo Darcy **aún no ha sido compilado ni testeado en el ESP32 físico**; se encuentra pendiente de verificación en el hardware real del laboratorio.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Subhito 2.1: Caudalímetros YF-S401** | ✅ Completado | 100% | Calibrado con probeta ($K = 205.98\text{ Hz/(L/min)}$) y filtro anti-EMI. |
-| **Subhito 2.2: Temperatura DS18B20 & TCF** | ✅ Completado | 100% | Integrado en `darcy.h` con viscosidad de Vogel. |
-| **Subhito 2.3: Calidad de Agua TDS / ADS1115** | ✅ Completado | 100% | Protocolo I2C verificado a 0x48. |
-| **Subhito 2.4: Manómetros Glicerina & Darcy SCADA**| ✅ Completado | 100% | Implementado en firmware v6 y panel SCADA web. |
+| **Subhito 2.1: Caudalímetros YF-S401** | 🟡 En Ensayos | 50% | Ensayos previos en probeta; pendiente validación con nuevo filtro en hardware. |
+| **Subhito 2.2: Temperatura DS18B20 & TCF** | 🟡 En Integración| 40% | Librería OneWire integrada en código; pendiente lectura en placa final. |
+| **Subhito 2.3: Calidad de Agua TDS / ADS1115** | 🟡 En Pruebas | 30% | Lectura de TDS; ADS1115 reservado solo para calidad de agua (no presiones). |
+| **Subhito 2.4: Manómetros Glicerina & Darcy** | 🟡 En Desarrollo | 25% | **Transductores electrónicos descartados**. Manómetros de glicerina definidos; firmware pendiente de compilación en ESP32. |
 
 ---
 
 ## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 3 y 4
 
-1. [x] Medición de caudal en tiempo real libre de ruido EMI ($81\text{ Hz}$ eliminado por filtro RC + software).
-2. [x] Presión manométrica de entrada ($P_1$) y retentado ($P_2$) legible con precisión de $\pm 16\text{ mbar}$ sobre manómetros Bourdon amortiguados.
-3. [x] Ley de Darcy calculando en vivo en el firmware ESP32 y exportando en cada fila del CSV.
-4. [ ] **Habilitación formal:** Interconexión con el reactor sedimentador del **Hito 3** y montaje central en el **Hito 4**.
+1. [ ] **Compilación y Flasheo Exitoso en ESP32:** Demostrar que el firmware `Subhito2_2_v6` compila sin errores de librerías ni desbordamientos de memoria en el ESP32 físico del laboratorio.
+2. [ ] **Medición Estable de Caudal en Vivo:** Caudalímetros YF-S401 respondiendo con el algoritmo de blanking y filtro RC sin conteo fantasma inducido por EMI.
+3. [ ] **Manómetros de Glicerina Montados:** Instalación física de los manómetros Bourdon en entrada ($P_1$) y retentado ($P_2$).
+4. [ ] **Cálculo de Darcy Asistido en Web SCADA:** Verificación del cálculo en tiempo real de TMP y resistencias al ingresar $P_1$ y $P_2$ desde la interfaz.
+5. [ ] **Habilitación formal:** Interconexión con el reactor sedimentador del **Hito 3** y montaje central en el **Hito 4**.
 
 
 

@@ -34,15 +34,23 @@ Diseñar, construir, instrumentar y validar experimentalmente una **Planta Pilot
 ├──────┬─────────────────────────────────────────────────┬──────────┬────────────────────┤
 │ Hito │ Nombre y Alcance Técnico                        │ Avance   │ Estado Actual      │
 ├──────┼─────────────────────────────────────────────────┼──────────┼────────────────────┤
-│ 📁 0 │ Arquitectura General, Estructura DFM y P&ID     │   95%    │ 🟢 Muy Avanzado    │
-│ 📁 1 │ Accionamiento NEMA 34 + DM860 (Bomba MBP-2000)  │  100%    │ ✅ Validado Banco  │
-│ 📁 2 │ Instrumentación, Filtro RC, Manómetros y Darcy  │  100%    │ ✅ Calibrado Banco │
-│ 📁 3 │ Reactor Sedimentador, Paleta 12V y Opuntia      │   90%    │ 🟢 Firmware OK     │
-│ 📁 4 │ Integración SCADA Web, IoT y Enclavamientos     │   90%    │ 🟢 Operativo Web   │
-│ 📁 5 │ Ensayos FX100, Matriz 3², Hermia y Autopsia SEM │   80%    │ 🟡 Protocolizado   │
-│ 📁 6 │ Evaluación Industrial: Energía (SEC) y OPEX     │  100%    │ ✅ Modelos Listos  │
+│ 📁 0 │ Arquitectura General, Estructura DFM y P&ID     │   25%    │ 🟡 En Diseño       │
+│ 📁 1 │ Accionamiento NEMA 34 + DM860 (Bomba MBP-2000)  │   70%    │ 🟡 En Ensayos (⚠️) │
+│ 📁 2 │ Instrumentación, Filtro RC, Manómetros y Darcy  │   35%    │ 🟡 En Desarrollo   │
+│ 📁 3 │ Reactor Sedimentador, Paleta 12V y Opuntia      │   20%    │ 🔴 Inicial (Torque)│
+│ 📁 4 │ Integración SCADA Web, IoT y Enclavamientos     │    5%    │ ⚪ Solo Plan       │
+│ 📁 5 │ Ensayos FX100, Matriz 3², Hermia y Autopsia SEM │    5%    │ ⚪ Solo Plan       │
+│ 📁 6 │ Evaluación Industrial: Energía (SEC) y OPEX     │    5%    │ ⚪ Modelos Teóricos│
 └──────┴─────────────────────────────────────────────────┴──────────┴────────────────────┘
 ```
+
+> [!NOTE]
+> **Estado Técnico Real de la Planta en Laboratorio (Sinceramiento de Hitos):**
+> * **Hito 0 (25%):** Se cuenta con los diagramas conceptuales de flujo y P&ID; la estructura física (bastidor modular de soporte, distribución y segregación) se encuentra **recién en etapa de diseño preliminar**.
+> * **Hito 1 (70%):** Accionamiento probado en banco con motor NEMA 34 y driver DM860. **Alerta técnica abierta:** se registran problemas de calentamiento en el motor durante funcionamiento continuo, requiriendo optimización térmica y de corriente.
+> * **Hito 2 (35%):** El último firmware preparado (`Subhito2_2_v6`) **está pendiente de compilar y validar en el ESP32 real**. Siguiendo la recomendación de Argon, **se descartaron los transductores de presión electrónicos** por deriva/ruido, adoptando manómetros mecánicos de glicerina.
+> * **Hito 3 (20%):** Se dispone físicamente de la cuba cónica del sedimentador, pero **el agitador no se ha incorporado** debido a que el motorreductor actual no posee el torque/potencia necesaria para mover las paletas con fluido.
+> * **Hitos 4, 5 y 6 (5% c/u):** **No comenzados a nivel físico.** Se cuenta con la arquitectura de enclavamientos, el plan de ensayos de filtración (matriz $3^2$, Hermia, autopsia SEM) y los scripts teóricos de cálculo de energía y costos en Python.
 
 ---
 
@@ -126,53 +134,60 @@ SistemaUF/
 
 ## 🔍 5. Contenido Detallado y Función de Cada Carpeta
 
-### 📐 `00_General_y_P_ID_Planta/`
+### 📐 `00_General_y_P_ID_Planta/` *(Avance: 25% — En Diseño Preliminar)*
 * **¿Qué ponemos aquí?**: Toda la documentación de diseño previo, arquitectura física, modularidad de chapa, seguridad ocupacional y diagramas maestros de proceso.
+* **Situación real**: Se cuenta con los diagramas P&ID y la arquitectura DFM/DFA; la estructura física del bastidor y montaje de módulos se encuentra **recién en fase de diseño**.
 * **Archivos clave**:
   * [`01_Estructura_y_Montaje_Filtro/DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md`](./00_General_y_P_ID_Planta/01_Estructura_y_Montaje_Filtro/DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md): Memoria técnica de ingeniería industrial con diseño DFM/DFA de los 3 módulos, análisis de esbeltez de eje de agitación, cálculo de potencia hidrodinámica y aislamiento IP65.
   * [`01_Estructura_y_Montaje_Filtro/guia_visual_estructura.html`](./00_General_y_P_ID_Planta/01_Estructura_y_Montaje_Filtro/guia_visual_estructura.html): Maqueta 3D virtual navegable en Three.js.
   * [`02_Diagrama_PID_y_Filosofia_Control/diagrama_pid_interactivo.html`](./00_General_y_P_ID_Planta/02_Diagrama_PID_y_Filosofia_Control/diagrama_pid_interactivo.html): Diagrama animado interactivo bajo norma ISA-5.1.
   * [`03_Organizacion_Equipo_y_Protocolos/ORGANIZACION_PROYECTO_Y_EQUIPO.md`](./00_General_y_P_ID_Planta/03_Organizacion_Equipo_y_Protocolos/ORGANIZACION_PROYECTO_Y_EQUIPO.md): Marco de gobernanza, roles y flujo de Git.
 
-### ⚡ `01_Hito1_Control_Accionamiento_NEMA34_DM860/`
+### ⚡ `01_Hito1_Control_Accionamiento_NEMA34_DM860/` *(Avance: 70% — En Ensayos con Alerta Térmica)*
 * **¿Qué ponemos aquí?**: La etapa electromecánica de potencia. Motor paso a paso NEMA 34 acoplado a la bomba peristáltica MBP-2000, driver DM860, transformador y control cinemático por microcontrolador.
+* **Situación real**: El accionamiento y rampa fueron probados en banco, pero **persiste un problema de calentamiento en el motor NEMA 34** durante funcionamiento continuo prolongado. Se trabaja en la optimización térmica (ajuste de DIP switches, disipación y ciclo de trabajo).
 * **Archivos clave**:
   * [`03_Firmware_Control_Bomba/bomba/bomba.ino`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/03_Firmware_Control_Bomba/bomba/bomba.ino): Sketch oficial de control con interfaz web Wi-Fi.
   * [`02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/02_Montaje_y_Optimizacion_Motor/GUIA_OPTIMIZACION_MOTOR_NEMA34_Y_DIP_SWITCHES.md): Puesta a punto en 3200 pulsos/rev y 3.0A serie.
   * [`04_Simulador_Interactivo/simulador_bomba.html`](./01_Hito1_Control_Accionamiento_NEMA34_DM860/04_Simulador_Interactivo/simulador_bomba.html): Simulador web de rampa y disipación térmica.
 
-### 📊 `02_Hito2_Instrumentacion_Sensores/`
-* **¿Qué ponemos aquí?**: La instrumentación física, acondicionamiento de señales y firmware activo grabado en el ESP32.
+### 📊 `02_Hito2_Instrumentacion_Sensores/` *(Avance: 35% — En Desarrollo y Ajuste de Firmware)*
+* **¿Qué ponemos aquí?**: La instrumentación física, acondicionamiento de señales y firmware en desarrollo para el ESP32.
+* **Situación real**: Siguiendo la recomendación técnica de Argon, **se descartaron definitivamente los transductores de presión electrónicos** (por deriva térmica y ruido EMI); la lectura de presiones se realiza con manómetros con baño de glicerina. El último firmware preparado (`Subhito2_2_v6`) **aún no se ha compilado ni probado físicamente en el ESP32**.
 * **Archivos clave**:
-  * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md): Especificación de manómetros Bourdon de glicerina (inmunes a EMI) e ingesta híbrida en SCADA.
+  * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md): Especificación de manómetros Bourdon de glicerina (inmunes a EMI) e ingesta asistida en SCADA.
   * [`01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md): Demostración matemática del filtro de ruido de 81 Hz para el informe de tesis.
-  * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE OFICIAL EN OPERACIÓN** con módulo Darcy en vivo (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
+  * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE EN DESARROLLO (Pendiente de validación en ESP32)** con módulo Darcy (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
 
-### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/`
+### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/` *(Avance: 20% — Cuello de Botella en Motorreductor)*
 * **¿Qué ponemos aquí?**: El subsistema químico y mecánico de coagulación-floculación en el reactor cónico.
+* **Situación real**: Se dispone físicamente del cuerpo/cono del sedimentador, pero **el agitador no está incorporado** debido a que el motorreductor actual carece de la potencia/torque requerida para mover las paletas con fluido.
 * **Archivos clave**:
   * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Extracción de mucílago de cladodios de *Opuntia*, cálculo de gradiente $G$ y ensayo de Jar Test.
   * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware FSM no bloqueante para driver L298N con protección por boya de nivel.
   * [`04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html`](./03_Hito3_Reactor_Sedimentador_Agitador/04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html): Manual interactivo de conexionado y fotos de taller.
 
-### 🌐 `04_Hito4_Integracion_Automatizacion_IoT/`
+### 🌐 `04_Hito4_Integracion_Automatizacion_IoT/` *(Avance: 5% — Solo Planificación Técnica)*
 * **¿Qué ponemos aquí?**: La orquestación global del banco de ensayos, seguridad física y supervisión en la nube.
+* **Situación real**: **No iniciado físicamente en planta.** Se dispone de la arquitectura teórica de enclavamientos y los borradores de firmware unificado SCADA.
 * **Archivos clave**:
   * [`01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md`](./04_Hito4_Integracion_Automatizacion_IoT/01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md): Válvula de alivio a $0.70\text{ bar}$ y paradas de emergencia.
-  * [`02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino`](./04_Hito4_Integracion_Automatizacion_IoT/02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino): Servidor Web SCADA integral con control AJAX e IoT.
+  * [`02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino`](./04_Hito4_Integracion_Automatizacion_IoT/02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino): Boceto de firmware SCADA integral con control AJAX e IoT.
 
-### 🧪 `05_Hito5_Ensayos_Membrana_VidaUtil/`
+### 🧪 `05_Hito5_Ensayos_Membrana_VidaUtil/` *(Avance: 5% — Solo Protocolos de Ensayo)*
 * **¿Qué ponemos aquí?**: Toda la campaña de experimentación de ultrafiltración capilar y modelado de ensuciamiento.
+* **Situación real**: **No iniciado físicamente.** Existen las metodologías protocolizadas (diseño factorial $3^2$, modelos de Hermia y protocolo SEM), pero aún no se ha ejecutado ninguna corrida experimental en el cartucho FX100.
 * **Archivos clave**:
   * [`01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md): Protocolo completo de la matriz factorial $3^2$, flujo crítico escalonado y retrolavado hidrostático a $1.20\text{ mca}$.
   * [`03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md): Modelos de Hermia ($n = 2, 1.5, 1, 0$) y análisis ANOVA 3D.
-  * [`04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md): Autopsia destructiva en nitrógeno líquido, medición de espesor de torta $\delta_c$ y microanálisis EDS.
+  * [`04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md): Protocolo de autopsia destructiva en nitrógeno líquido, medición de espesor de torta $\delta_c$ y microanálisis EDS.
 
-### 🏭 `06_Hito6_Evaluacion_Industrial_Energia_Costos/`
+### 🏭 `06_Hito6_Evaluacion_Industrial_Energia_Costos/` *(Avance: 5% — Solo Modelos Teóricos)*
 * **¿Qué ponemos aquí?**: El cierre tecno-económico y productivo de la Tesis de Grado.
+* **Situación real**: **No iniciado con datos reales de planta.** Los scripts analíticos en Python son herramientas preliminares de simulación teórica que serán alimentadas una vez concluidos los ensayos del Hito 5.
 * **Archivos clave**:
-  * [`01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md) + Script [`calculo_sec_matriz13.py`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/calculo_sec_matriz13.py): Demuestra un ahorro energético del **$41.4\%$** operando con *Opuntia* ($1.954\text{ kWh/m}^3$) vs el testigo ($3.333\text{ kWh/m}^3$).
-  * [`02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md) + Script [`evaluacion_industrial_opex.py`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/evaluacion_industrial_opex.py): Demuestra una reducción del **$78.6\%$** en el OPEX unitario ($0.639\text{ USD/m}^3$ con *Opuntia* vs $2.987\text{ USD/m}^3$ sin coagulante).
+  * [`01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md) + Script [`calculo_sec_matriz13.py`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/calculo_sec_matriz13.py): Script de estimación de energía y reducción de contrapresión.
+  * [`02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md) + Script [`evaluacion_industrial_opex.py`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/evaluacion_industrial_opex.py): Script preliminar de OPEX unitario y frecuencia CIP.
 
 ---
 

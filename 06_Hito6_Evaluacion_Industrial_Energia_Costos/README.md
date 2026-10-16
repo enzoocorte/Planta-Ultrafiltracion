@@ -65,18 +65,22 @@ Mientras que los Hitos 1 al 4 aseguraron la automatización de la planta y el Hi
 
 ---
 
-## 📊 5. Estado de Avance Actual
+## 📊 5. Estado de Avance Actual (Avance Global: 5% — Solo Modelos Teóricos Preliminares)
+
+> [!NOTE]
+> **Situación Real de Hito 6:**
+> Este hito **aún no se ha iniciado con datos empíricos**. Los scripts en Python (`calculo_sec_matriz13.py` y `evaluacion_industrial_opex.py`) representan herramientas analíticas teóricas de proyección tecno-económica que esperan los datos experimentales reales de la matriz factorial del Hito 5 para su cálculo definitivo.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Subhito 6.1: Consumo Específico (SEC)** | ✅ Completado | 100% | Modelo matemático, guía y script de cálculo matricial listos. |
-| **Subhito 6.2: Vida Útil, CIP y OPEX** | ✅ Completado | 100% | Modelo de degradación, balance tecno-económico y script listos. |
+| **Subhito 6.1: Consumo Específico (SEC)** | 🟡 Formulado | 30% | Ecuaciones y script listos; pendiente alimentar con telemetría real. |
+| **Subhito 6.2: Vida Útil, CIP y OPEX** | 🟡 Formulado | 30% | Modelo financiero y script listos; a la espera de tasas de fouling de H5. |
 
 ---
 
 ## 🏁 6. Entregables Críticos para la Defensa de Tesis
 
-1. [x] Matriz de SEC calculada demostrando un ahorro específico de energía del **$41.4\%$** gracias a la reducción de contrapresión con *Opuntia*.
-2. [x] Demostración de viabilidad económica con una reducción del **$78.6\%$** en el OPEX unitario por metro cúbico tratado.
-3. [x] Protocolo de descarte y recambio de cartucho dializador Fresenius FX100 definido ante $FRR < 60\%$.
-4. [x] **Cierre de Tesis:** Capítulo de Conclusiones e Ingeniería de Escalamiento consolidado para el tribunal examinador de la UNSa.
+1. [ ] Matriz de SEC calculada con datos experimentales reales de planta evaluando el impacto del pretratamiento con *Opuntia*.
+2. [ ] Determinación de viabilidad económica con el cálculo real del OPEX unitario por metro cúbico tratado.
+3. [ ] Protocolo de descarte y recambio de cartucho dializador Fresenius FX100 validado empíricamente ante $FRR < 60\%$.
+4. [ ] **Cierre de Tesis:** Capítulo de Conclusiones e Ingeniería de Escalamiento consolidado para el tribunal examinador de la UNSa.

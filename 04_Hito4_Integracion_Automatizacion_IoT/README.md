@@ -81,20 +81,24 @@ flowchart TD
 
 ---
 
-## 📊 Estado de Avance Actual
+## 📊 Estado de Avance Actual (Avance Global: 5% — Solo Planificación Técnica)
+
+> [!NOTE]
+> **Situación Real de Taller en Hito 4:**
+> Este hito **aún no se ha comenzado físicamente**. Se dispone de la formulación conceptual de enclavamientos, el diseño de la arquitectura de software y el borrador del sketch SCADA integral, pero no se ha realizado el montaje ni la integración de componentes en el gabinete de planta.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Arquitectura de Enclavamientos y E-Stop** | ✅ Completado | 100% | Válvula de alivio física a $0.70\text{ bar}$ y corte por nivel. |
-| **Servidor Web SCADA & SoftAP (`192.168.4.1`)**| ✅ Completado | 100% | Dashboard en tiempo real con panel Darcy interactivo. |
-| **Cálculo de Ley de Darcy y Datalogger CSV** | ✅ Completado | 100% | Embebido en firmware (`darcy.h`) y exportación a Excel. |
-| **Integración Física Total de la Planta** | 🟡 En Curso | 85% | Montaje final en gabinete del Módulo 2 para ensayos de Hito 5. |
+| **Arquitectura de Enclavamientos y E-Stop** | 🟡 En Papel | 30% | Lógica de alivio a $0.70\text{ bar}$ y paradas de emergencia documentada. |
+| **Borrador Firmware SCADA Master** | 🟡 Escrito | 20% | Código preparado en repositorio; no integrado en hardware completo. |
+| **Interfaz Web SCADA & SoftAP** | 🟡 Diseñado | 20% | Plantilla HTML5/CSS interactiva lista para enlazar variables. |
+| **Integración Física y Cableado de Planta** | ⚪ No Iniciado | 0% | Pendiente de finalización de Hito 0, 1, 2 y 3. |
 
 ---
 
 ## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 5
 
-1. [x] Interfaz Web SCADA respondiendo fluidamente cada $500\text{ ms}$ en red Wi-Fi propia del ESP32 sin necesidad de router externo.
-2. [x] Cálculo síncrono y exportación en CSV de todas las variables hidráulicas ($Q_{\text{alim}}, Q_{\text{perm}}, P_1, P_2, \text{TMP}, T, J_{20}, \text{TCF}, R_{\text{total}}, R_{\text{torta}}$).
-3. [x] Enclavamiento de seguridad verificado ante sobrepresión y marcha en seco.
+1. [ ] Interfaz Web SCADA respondiendo fluidamente cada $500\text{ ms}$ en red Wi-Fi propia del ESP32 en banco integrado.
+2. [ ] Cálculo síncrono y exportación en CSV de todas las variables hidráulicas ($Q_{\text{alim}}, Q_{\text{perm}}, P_1, P_2, \text{TMP}, T, J_{20}, \text{TCF}, R_{\text{total}}, R_{\text{torta}}$).
+3. [ ] Enclavamiento de seguridad verificado físicamente ante sobrepresión y marcha en seco.
 4. [ ] **Habilitación formal:** Ejecución del protocolo de ensayos de filtración, diseño factorial $3^2$ y vida útil de membrana en el **Hito 5**.

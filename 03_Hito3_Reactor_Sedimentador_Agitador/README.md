@@ -103,21 +103,28 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 
 ---
 
-## 📊 Estado de Avance Actual
+## 📊 Estado de Avance Actual (Avance Global: 20% — Muy Verde / Bloqueo en Motorreductor)
+
+> [!WARNING]
+> **Cuello de Botella Técnico Mecánico en Hito 3:**
+> Se dispone físicamente de la **cuba cónica del sedimentador**, pero **el agitador no ha sido incorporado**. Las primeras pruebas en taller evidenciaron que el motorreductor de 12V actual **carece del torque y potencia necesarios** para vencer la viscosidad y resistencia hidrodinámica del fluido al girar las paletas.
+> **Acción Requerida:** Redimensionar el par motor ($T = P / \omega$) y seleccionar un motorreductor de mayor torque o con caja reductora más robusta antes de fabricar el acople definitivo.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Protocolo Químico Jar Test (*Opuntia*)** | ✅ Completado | 100% | Protocolo de coagulación-floculación formalizado. |
-| **Firmware de Agitador FSM (L298N)** | ✅ Completado | 100% | Máquina de estados no bloqueante con control PWM. |
-| **Boya de Nivel Inox (Seguridad en Seco)** | ✅ Completado | 100% | Enclavamiento de corte por software verificado en GPIO 32. |
-| **Ensamble Mecánico y Motor 12V con Reductor** | 🟡 En Curso | 85% | Ajuste final de acople y nivelación de base cónica. |
+| **Cuba Cónica del Sedimentador** | ✅ Disponible | 80% | Recipiente cónico disponible físicamente en taller. |
+| **Protocolo Químico Jar Test (*Opuntia*)** | 🟡 Formulado | 60% | Protocolo de coagulación-floculación documentado en papel. |
+| **Firmware de Agitador FSM (L298N)** | 🟡 Escrito | 40% | Código FSM con PWM preparado; pendiente prueba en carga real. |
+| **Boya de Nivel Inox (Seguridad en Seco)** | 🟡 Disponible | 30% | Boya adquirida; pendiente fijación mecánica y calibración de cota. |
+| **Accionamiento Mecánico del Agitador** | 🔴 Bloqueado | 10% | **Motorreductor insuficiente en potencia/torque.** En fase de reemplazo. |
 
 ---
 
 ## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 4
 
-1. [x] Demostración de ciclo automático: Mezcla Rápida (150 RPM / 60 s) ➔ Mezcla Lenta (30 RPM / 15 min) ➔ Sedimentación (0 RPM / 30 min).
-2. [x] Verificación de parada instantánea al activarse la boya de nivel por falta de líquido.
-3. [x] Sobrenadante clarificado con remoción de turbidez $\ge 85\%$ apto para alimentar la bomba peristáltica sin colmatar el prefiltro.
-4. [ ] **Habilitación formal:** Interconexión de la salida del sedimentador hacia la bomba y sensores para la automatización central en el **Hito 4**.
+1. [ ] **Nuevo Motorreductor de Agitación Integrado:** Montaje de motorreductor con torque verificado capaz de mover las paletas en agua sin sobrecalentar ni trabarse.
+2. [ ] **Demostración de ciclo automático:** Mezcla Rápida (150 RPM / 60 s) ➔ Mezcla Lenta (30 RPM / 15 min) ➔ Sedimentación (0 RPM / 30 min) controlado por FSM.
+3. [ ] **Verificación de corte por boya de nivel:** Parada instantánea del motor al descender el nivel de fluido.
+4. [ ] **Clarificación demostrada:** Sobrenadante clarificado con remoción de turbidez apto para alimentar el cartucho FX100.
+5. [ ] **Habilitación formal:** Interconexión de la descarga del sedimentador hacia la bomba peristáltica del **Hito 4**.
 

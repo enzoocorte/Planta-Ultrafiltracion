@@ -306,14 +306,17 @@ Seguir estrictamente esta secuencia antes de energizar la planta:
 
 ---
 
-### 1.8. Criterio de Aprobación del Hito 1
+### 1.8. Criterio de Aprobación del Hito 1 (Avance Global: 70% — En Ensayos de Banco)
 
-El Hito 1 se encuentra **OFICIALMENTE VALIDADO Y APROBADO EN BANCO**:
+El Hito 1 se encuentra **EN FASE DE ENSAYOS DE BANCO CON ALERTA TÉRMICA ABIERTA**:
 
 - [x] **Giro Suave y Silencioso**: El motor gira en el rango operativo calibrado de $70\text{ a }160\text{ RPM}$ (presets en $80, 100, 120\text{ y }140\text{ RPM}$) con emisión sonora mínima, habiéndose descartado la zona resonante (<60 RPM).
 - [x] **Rampa Dinámica Libre de Pérdida de Pasos**: Aceleración a $40\text{ RPM/s}$ continua, sin cabeceos ni silbidos de pérdida de paso por hardware LEDC.
 - [x] **Inversión de Sentido Fiable y Segura**: Transición automática entre Filtración (CW) y Retrolavado (CCW) con desaceleración suave a 0 RPM, conmutación física de dirección en reposo y reaceleración progresiva sin sobrepresiones ni golpes de ariete.
-- [x] **Estabilidad Térmica Comprobada**: El switch SW4 en `OFF` (50% Standstill Current) reduce la disipación Joule en reposo en un 75%, manteniendo motor y driver tibios y estables tras operación continua.
+- [ ] **Estabilidad Térmica en Operación Continua (ALERTA ABIERTA)**: ⚠️ El motor NEMA 34 experimenta elevación excesiva de temperatura durante ensayos prolongados. Tareas pendientes:
+  * Ajuste fino de corriente en los switches SW1-SW3 del driver DM860 para verificar si la corriente pico supera los 3.0A recomendados en conexión serie.
+  * Comprobación del switch SW4 en `OFF` (50% Standstill Current) para reducir disipación Joule en reposo.
+  * Evaluación de disipación mecánica pasiva (disipador de aluminio acoplado a la carcasa) o forzada (fan 12V).
 - [x] **Torque de Arrastre y Protección de Membrana FX100**: Arrastre fluido de los rodillos del cabezal peristáltico MBP-2000 y aviso visual de precaución antes y al superar el límite de caudal de diseño ($0.60\text{ L/min}$).
 
 ---

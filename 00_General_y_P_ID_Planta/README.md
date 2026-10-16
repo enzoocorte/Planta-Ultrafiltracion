@@ -53,25 +53,27 @@ La carpeta `00_General_y_P_ID_Planta/` centraliza todo el diseño conceptual y f
 
 ---
 
-## 📊 4. Estado de Avance Actual
+## 📊 4. Estado de Avance Actual (Avance Global: 25% — En Diseño Preliminar)
 
 | Tarea / Componente | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
-| **Diagrama P&ID bajo norma ISA-5.1** | ✅ Completado | 100% | Validado e implementado en simulador interactivo. |
-| **Diseño Conceptual y DFM de Estructura** | ✅ Completado | 100% | Especificado en `DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md`. |
-| **Modelado 3D de Bastidor (Three.js)** | ✅ Completado | 100% | Disponible en `guia_visual_estructura.html`. |
-| **Definición de Circuitos Hidráulicos y Tanques** | ✅ Completado | 100% | Guía de tanques y selección de mallas lavables finalizada. |
-| **Fabricación de Bastidor en Taller** | 🟡 En Curso | 85% | Ensamblaje de base cónica y carro rodante en ejecución. |
+| **Diagrama P&ID bajo norma ISA-5.1** | ✅ Completado | 100% | Validado e implementado en simulador interactivo y bocetos. |
+| **Diseño Conceptual y DFM de Estructura** | 🟡 En Curso | 35% | Bocetos iniciales y memoria preliminar en desarrollo. |
+| **Modelado 3D de Bastidor (Three.js)** | 🟡 En Curso | 40% | Maqueta virtual Three.js como referencia geométrica preliminar. |
+| **Definición de Circuitos Hidráulicos y Tanques** | 🟡 En Curso | 30% | Dimensionamiento de volúmenes y especificación preliminar. |
+| **Diseño Mecánico y Planos de Estructura** | 🟡 En Curso | 25% | **Recién en diseño**: perfilería, distribución de tanques y bastidor. |
+| **Fabricación y Soldadura en Taller** | ⚪ Pendiente | 0% | No iniciada la construcción física del bastidor. |
 
 ---
 
 ## 🏁 5. Entregables Críticos para Habilitar el Paso al Hito 1
 
-Para considerar superado el Hito 0 y proceder formalmente con los ensayos cinemáticos del Hito 1, deben cumplirse las siguientes condiciones de compuerta (*Stage-Gate*):
+Para considerar superado el Hito 0 y proceder formalmente con la integración física del Hito 1, deben cumplirse las siguientes condiciones de compuerta (*Stage-Gate*):
 
-1. **Gabinete Módulo 2 preparado:** Bastidor metálico con bandeja para soportar el cabezal de la bomba peristáltica MBP-2000 y el motor NEMA 34.
-2. **Caja Estanca IP65 montada:** Compartimento segregado con perforaciones pasacables tipo prensaestopas para alojar el driver DM860 y el ESP32 sin exposición a agua.
-3. **P&ID Validado:** Aprobación del circuito de recirculación y puntos de conexionado para alimentación, retentado y permeado.
+1. [ ] **Planos constructivos finales del bastidor:** Definición geométrica para corte y armado de los 3 módulos.
+2. [ ] **Gabinete Módulo 2 fabricado:** Bandeja estructural para fijar el motor NEMA 34 y el cabezal de la bomba MBP-2000.
+3. [ ] **Caja Estanca IP65 montada:** Compartimento segregado con prensaestopas para alojar electrónica (DM860 y ESP32) protegida de fluidos.
+4. [ ] **P&ID Validado en taller:** Trazado definitivo de mangueras, racores y llaves esféricas de corte.
 
 > [!TIP]
-> Una vez verificado el montaje físico del motor sobre el bastidor, dirigirse a [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](file:///c:/Users/enzoo/OneDrive/Documentos/ENZO/Domotica/SistemaUF/01_Hito1_Control_Accionamiento_NEMA34_DM860/README.md) para el control cinemático y prueba de torque de la bomba.
+> Mientras se concluye el diseño y armado de la estructura, los ensayos electromecánicos del motor se avanzan en banco de pruebas en [`01_Hito1_Control_Accionamiento_NEMA34_DM860/`](file:///c:/Users/enzoo/OneDrive/Documentos/ENZO/Domotica/SistemaUF/01_Hito1_Control_Accionamiento_NEMA34_DM860/README.md).

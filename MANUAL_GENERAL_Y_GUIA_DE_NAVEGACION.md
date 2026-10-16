@@ -32,6 +32,14 @@ flowchart TD
 
 ## 🧭 ¿Qué se busca y qué encontrarán en cada carpeta?
 
+> [!NOTE]
+> **Estado Técnico Real de los Hitos en Taller / Laboratorio:**
+> * **Hito 0 (25% — En Diseño Preliminar):** Se definieron los diagramas conceptuales y P&ID; la estructura del bastidor y montaje físico está **recién en diseño**.
+> * **Hito 1 (70% — En Ensayos de Banco):** Bomba peristáltica y NEMA 34 probados en banco; **alerta abierta:** calentamiento del motor en régimen continuo bajo estudio.
+> * **Hito 2 (35% — En Desarrollo de Firmware):** Siguiendo la recomendación de Argon, **se descartaron los sensores de presión electrónicos** (se usan manómetros de glicerina). El firmware `Subhito2_2_v6` **está pendiente de compilar y probar en el ESP32 real**.
+> * **Hito 3 (20% — Cuello de Botella Mecánico):** Cuba cónica del sedimentador disponible, pero **el agitador no está incorporado** debido a que el motorreductor actual carece del torque/potencia requerida para mover las paletas con fluido.
+> * **Hitos 4, 5 y 6 (5% c/u — Solo Planificación):** Aún **no iniciados a nivel físico/experimental**. Se cuenta con la arquitectura teórica, protocolos de laboratorio y modelos matemáticos de proyección tecno-económica.
+
 ### 📁 [`00_General_y_P_ID_Planta/`](./00_General_y_P_ID_Planta/)
 * **Objetivo General**: Mantener la visión global e integral de todo el banco de pruebas físico, mecánico, hidráulico y electrónico de la planta.
 * **Qué encontrarán aquí**:
