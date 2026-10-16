@@ -73,20 +73,27 @@ flowchart TD
    * La pendiente de la regresión lineal es exactamente igual a $\mu_{20} \cdot R_m$.
    * Despejar: $R_m = \frac{\text{Pendiente}}{\mu_{20}}$ (valor esperado en FX100: $\approx 1.2 \times 10^{11} \text{ a } 1.8 \times 10^{11}\text{ m}^{-1}$).
 
-### 2.2. Ensayo 2: Comparativa de Velocidad de Ensuciamiento
-* **Lote A (Filtración Directa)**: Alimentar agua turbia sintética ($500\text{ NTU}$) directo a la membrana FX100. Medir el tiempo de operación continua hasta que la $\text{TMP}$ alcanza el umbral crítico de $0.50\text{ atm}$.
-* **Lote B (Filtración Asistida por Floculación de Opuntia)**: Tratar previamente el agua en el sedimentador cónico con $20\text{ mg/L}$ de *Opuntia*, decantar $30\text{ min}$ y alimentar el sobrenadante a la membrana FX100.
-* **Hipótesis a Validar en la Tesis**: El pretratamiento con coagulante natural reduce la tasa de incremento de resistencia hidráulica ($\frac{dR}{dt}$) en al menos un $70\%$, multiplicando por 4 el tiempo de ciclo productivo de filtración.
+### 2.2. Ensayo 2: Contraste Factorial y Corrida Testigo de Control (*Opuntia* vs. Agua Cruda)
+* **Condición de Ensayo Estandarizada:** Punto Central de la Matriz Factorial (**$70\text{ RPM}$ y $\text{TMP} = 0.25\text{ bar}$**).
+* **Corrida Testigo (Control sin Pretratamiento):** Alimentar agua cruda sintética ($100 - 500\text{ NTU}$) directamente al módulo FX100. Registrar el colapso temporal de flujo $J(t)$ y el crecimiento acelerado de resistencia hidráulica.
+* **Réplicas del Punto Central con *Opuntia ficus-indica* (Hito 3):** Tratar previamente el agua en el reactor cónico con la dosis óptima de *Opuntia* ($150\text{ RPM}$ rápida, $30\text{ RPM}$ lenta, $30\text{ min}$ decantación). Alimentar el sobrenadante clarificado ($< 20\text{ NTU}$) en 3 réplicas independientes (inicio, medio y final de la campaña).
+* **Resultados Científicos de Tesis:**
+  1. Reducción drástica de la resistencia de torta: $\Delta R_{\text{torta}} = R_{\text{torta, cruda}} - R_{\text{torta, Opuntia}}$.
+  2. Atenuación del $70\%$ al $85\%$ en la tasa de incremento de resistencia ($\frac{dR_{\text{total}}}{dt}$).
+  3. Desplazamiento del mecanismo cinético de Hermia (de bloqueo de poro $n=1.5/1.0$ a formación de torta porosa $n=0.0$).
 
-### 2.3. Ensayo 3: Eficiencia de Retrolavado (*Backwash*)
-1. Una vez finalizado el ciclo de filtración colmatado, presionar el botón **🔄 INVERTIR GIRO** en el Dashboard SCADA o activar el comando por firmware.
-2. Hacer girar la bomba peristáltica en sentido **Antihorario** a $30\text{ RPM}$ durante $60\text{ segundos}$ aspirando agua limpia de permeado e inyectándola a contraflujo por el lumen capilar.
-3. Volver a filtrar agua limpia y medir el flujo post-lavado ($J_{\text{post}}$).
-4. Calcular el **Índice de Recuperación de Flujo (*Flux Recovery Ratio* - $FRR$)**:
+### 2.3. Ensayo 3: Eficiencia de Retrolavado Hidráulico (*Backwash*)
+> [!IMPORTANT]
+> **Protocolo Hidrostático de Retrolavado:**  
+> Invertir la bomba peristáltica solo invierte el flujo en el lumen. Un retrolavado capilar real requiere inyectar agua pura desde el puerto exterior de permeado hacia el lumen capilar. Para resguardar la integridad de los capilares, se utiliza una columna/depósito hidrostático elevado ($\le 1.5\text{ m} \approx 0.15\text{ bar}$) con drenaje luminal abierto, aplicando pulsos de $30\text{ a }60\text{ segundos}$.
+
+1. Finalizado el ciclo de filtración colmatado, aplicar el retrolavado hidrostático a contracorriente con agua destilada durante $60\text{ s}$.
+2. Volver a filtrar agua limpia y medir el flujo post-lavado ($J_{\text{post}}$).
+3. Calcular el **Índice de Recuperación de Flujo (*Flux Recovery Ratio* - $FRR$)**:
 
 $$FRR (\%) = \left(\frac{J_{\text{post}}}{J_{\text{inicial}}}\right) \times 100$$
 
-* Un $FRR \ge 90\%$ indica excelente reversibilidad del ensuciamiento y preservación de la vida útil de los capilares.
+* Un $FRR \ge 90\%$ valida la reversibilidad del fouling de *Opuntia* y la prolongación de la vida útil del módulo.
 
 ---
 

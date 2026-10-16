@@ -63,92 +63,75 @@ Esta hoja de ruta establece los pasos de ingeniería rigurosos y consensuados co
 
 ---
 
-## 🧭 3. Hito 2.3: Instrumentación de Presión Transmembrana (TMP) y Conversor ADS1115
+## 🧭 3. Subhito 2.4: Instrumentación Manométrica Primaria (P1, P2) e Integración Híbrida en SCADA para Cálculo de Darcy en Tiempo Real
 
 ```
-                                  CONEXIÓN SINGLE-ENDED AL ADS1115
+                    INSTALACIÓN DE MANÓMETROS DE GLICERINA EN PLANTA
    
-   +5V ────────┬──────────────┬──────────────┬───────────────────────────────┐
-               │              │              │                               │
-            [P1: FEED]     [P2: RET.]     [P3: PERM.]                     [Sonda TDS]
-          (0.5 - 4.5V)   (0.5 - 4.5V)   (0.5 - 4.5V)                      (0 - 2.3V)
-               │              │              │                               │
-             [ 10k ]        [ 10k ]        [ 10k ]                           │
-               ├── V_div      ├── V_div      ├── V_div                       │
-             [ 20k ]        [ 20k ]        [ 20k ]                           │
-               │              │              │                               │
-   GND ────────┴──────────────┴──────────────┴───────────────────────────────┴──────────
-               │              │              │                               │
-               ▼              ▼              ▼                               ▼
-            ADS1115        ADS1115        ADS1115                         ADS1115
-            Canal A0       Canal A1       Canal A2                        Canal A3
-         (0.33 - 2.97V) (0.33 - 2.97V) (0.33 - 2.97V)                   (0 - 2.3V)
+    Línea de Impulsión                                             Línea de Permeado
+    (Salida Bomba MBP-2000)                                        (Salida Filtrado)
+           │                                                               │
+           ▼                                                               ▼
+     [ MANÓMETRO P1 ]                                                [ MANÓMETRO P3 ]
+   (Baño de Glicerina)                                              (O Descarga Libre:
+     0 a 1.0 / 1.6 bar                                                P3 ≈ 0.0 bar)
+           │
+           ├───► [ Válvula de Alivio Mecánica a 0.70 bar ] ──► Retorno a Tanque
+           │
+           ▼
+    ┌────────────────────────────────────────────────────────┐
+    │       MÓDULO DE ULTRAFILTRACIÓN FRESENIUS FX100        │
+    │     (Lumen capilar de Polisulfona/Helixone, 2.2 m²)    │
+    └────────────────────────────────────────────────────────┘
+           │
+           ▼
+     [ MANÓMETRO P2 ]
+   (Baño de Glicerina)
+     0 a 1.0 / 1.6 bar
+           │
+           ▼
+    [ Válvula de Aguja ] ──► Línea de Retentado (Recirculación a Tanque)
 ```
 
-### 3.1. Topología de Conexión: Single-Ended vs. Diferencial (Veredicto Técnico)
-Tras la auditoría cruzada con los tres modelos de IA (Astra, GLM 5.3 y Claude), se ratifica de forma **unánime la configuración Single-Ended** utilizando los 4 canales analógicos del ADS1115 (dirección I2C `0x48`):
+### 3.1. Decisión Estratégica de Ingeniería: Reemplazo de Transductores Genéricos y ADS1115 por Manómetros con Baño de Glicerina
 
-* **Canal A0:** Presión de Alimentación ($P_1$ o $P_{\text{feed}}$).
-* **Canal A1:** Presión de Retentado ($P_2$ o $P_{\text{ret}}$).
-* **Canal A2:** Presión de Permeado ($P_3$ o $P_{\text{perm}}$).
-* **Canal A3:** Sonda de Calidad de Agua / Conductividad TDS (o riel de 5V para compensación ratiométrica).
+Tras la adquisición de los **manómetros mecánicos con baño de glicerina** para la planta piloto, se tomó la decisión consensuada de ingeniería de **no adquirir ni montar transductores electrónicos genéricos (0-10 bar + ADS1115)**, fundamentada en sólidos criterios metrológicos y de compatibilidad electromagnética:
 
-#### Justificación Matemática y de Proceso:
-1. **Definición de Presión Transmembrana en Módulos Capilares:**
-   $$\text{TMP} = \frac{P_1 + P_2}{2} - P_3$$
-   Una medición diferencial de hardware solo permite medir pares fijos como $(P_1 - P_2)$. Para obtener la TMP por hardware diferencial se requerirían dos chips ADS1115 separados, ya que la referencia $P_3$ no puede conectarse simultáneamente a dos pares analógicos en el mismo multiplexor interno.
-2. **Diagnóstico Hidráulico Esencial:**
-   El modo Single-Ended preserva las presiones manométricas independientes respecto a la atmósfera. Esto es indispensable para:
-   * Evaluar la pérdida de carga hidráulica longitudinal a lo largo del lumen de la fibra: $\Delta P_{\text{lumen}} = P_1 - P_2$. Si $\Delta P_{\text{lumen}}$ crece rápidamente, diagnostica atascamiento en la entrada del haz capilar.
-   * Diagnosticar cavitación o succión negativa en la línea de aspiración ($P_1 < 0$).
-   * Medir $P_1$ de pico para la protección estructural de la membrana.
-   * Detectar contrapresión anormal en la línea de permeado ($P_3 > 0.05\text{ bar}$).
+1. **Incompatibilidad de Rango Operativo y Error de Cero (*Zero Drift*):**
+   * El rango de trabajo de Presión Transmembrana en el Hito 5 con la membrana Fresenius FX100 es de muy baja presión: **$0.10\text{ bar}$, $0.25\text{ bar}$ y $0.40\text{ bar}$** ($100\text{ a }400\text{ mbar}$).
+   * Un transductor piezoeléctrico genérico de mercado de $0-10\text{ bar}$ ($0-1\text{ MPa}$) con precisión típica de $\pm 1.5\%$ Fondo de Escala (FS) presenta una incertidumbre absoluta de **$\pm 0.15\text{ bar}$ ($\pm 150\text{ mbar}$)**.
+   * A una TMP operativa de $0.25\text{ bar}$, dicho error representa un **sesgo relativo del $60\%$**, haciendo inviable cualquier modelado científico de permeabilidad y resistencias de Darcy.
+2. **Inmunidad Total al Ruido Electromagnético (EMI):**
+   * El driver Leadshine DM860 conmuta corrientes inductivas de $3.0\text{ A}$ por fase a alta frecuencia sobre el motor NEMA 34.
+   * Los cables de señal analógica milivoltílica y el bus I2C hacia el ADS1115 son altamente vulnerables al ruido acoplado, mientras que los manómetros de glicerina son **completamente mecánicos e inmunes a EMI**.
+3. **Amortiguación Hidráulica Viscosa de Pulsaciones:**
+   * La bomba peristáltica MBP-2000 de 3 rodillos genera pulsaciones hidráulicas a frecuencias de $1.25\text{ a }5\text{ Hz}$.
+   * El baño de glicerina de alta viscosidad actúa como un filtro pasabajos mecánico de segundo orden, estabilizando la aguja indicadora y permitiendo una lectura visual directa del valor medio de presión sin oscilaciones erráticas ni fatiga mecánica del tubo Bourdon.
 
-### 3.2. Especificaciones Críticas para Compras (¡Alerta de Adquisición!)
-> [!CAUTION]
-> **Riesgo de Pérdida Experimental:** NO adquirir transductores industriales genéricos de **0 a 6 bar** o **0 a 1.2 MPa (12 bar)**.
-> * Los sensores comerciales piezoeléctricos tienen un error de precisión típico de $\pm 1.0\%$ a $\pm 2.0\%$ a Fondo de Escala (Full Scale - FS).
-> * En un sensor de 6 bar ($6000\text{ mbar}$), un error de $\pm 1\%$ FS representa una incertidumbre absoluta de **$\pm 60\text{ mbar}$ ($\pm 0.06\text{ bar}$)**.
-> * En filtración capilar con membrana FX100, la TMP de trabajo se sitúa entre **$0.10\text{ bar}$ y $0.40\text{ bar}$** ($100\text{ a }400\text{ mbar}$).
-> * ¡Una incertidumbre de $\pm 60\text{ mbar}$ introduce un **error relativo del 24% al 60%** en la variable de respuesta central de la tesis!
+### 3.2. Topología Hidráulica e Instalación Física ($P_1, P_2, P_3$)
+* **Manómetro $P_1$ (Alimentación / Feed):** Instalado inmediatamente antes de la entrada al cabezal superior de la membrana FX100, en derivación T posterior a la válvula de alivio calibrada a $0.70\text{ bar}$.
+* **Manómetro $P_2$ (Retentado / Concentrado):** Instalado en la salida del cabezal inferior de la membrana, previo a la válvula de aguja de estrangulamiento.
+* **Presión de Permeado ($P_3$):** Al descargar el permeado libremente a presión atmosférica o en probeta/tanque receptor abierto, se asume $P_3 = 0.00\text{ bar}$ manométrico (salvo que se instale un manómetro de baja escala si se restringe la salida).
+* **Variables Hidráulicas Directas:**
+  $$\Delta P_{\text{lumen}} = P_1 - P_2 \quad (\text{Pérdida de carga axial})$$
+  $$\text{TMP} = \frac{P_1 + P_2}{2} - P_3 \quad (\text{Presión Transmembrana efectiva})$$
 
-#### Especificación Oficial para el Pedido de Materiales:
-* **Rango Manométrico:** **0 a 1.0 bar (0 a 100 kPa / 0 a 14.5 psi)**. Alternativa admisible: **0 a 1.2 bar**.
-* **Tipo de Salida:** Ratiométrica lineal $0.5\text{ V}$ a $4.5\text{ V}$ con alimentación de $+5\text{ VDC}$ (o transmisores $4-20\text{ mA}$ con resistencia shunt de $150\ \Omega$ al 0.1%).
-* **Conexión Hidráulica:** Rosca macho $G 1/4"$ en acero inoxidable o latón niquelado.
-* **Precisión:** $\le \pm 1.0\%$ FS (incertidumbre absoluta $\le \pm 10\text{ mbar}$, equivalente a un error relativo $< 4\%$ a $0.25\text{ bar}$ de TMP).
+### 3.3. Integración Híbrida Asistida en el Servidor Web SCADA (`http://192.168.4.1`)
+Para mantener la automatización del datalogger y el cálculo científico de Darcy en tiempo real sin requerir transductores electrónicos:
+1. El operador observa las lecturas estables en los manómetros de glicerina ($P_1$ y $P_2$) y la temperatura del agua ($T\ [^\circ\text{C}]$) en la probeta o termómetro.
+2. En la interfaz web del SCADA (`http://192.168.4.1`), el operador ingresa los valores en el panel dedicado **"📊 Presión Manométrica Primaria & Darcy"** y presiona **"Fijar Presiones"**.
+3. El microcontrolador ESP32 recibe los valores mediante el endpoint HTTP `/set_presion?p1=...&p2=...&temp=...` y el módulo C++ embebido `darcy.h` calcula de forma instantánea:
+   * Presión Transmembrana: $\text{TMP} = \frac{P_1 + P_2}{2} - P_3\ [\text{bar}]$.
+   * Viscosidad dinámica del agua según Vogel: $\mu(T) = 0.00002414 \times 10^{\frac{247.8}{T + 273.15 - 140}}\ [\text{Pa}\cdot\text{s}]$.
+   * Factor de Corrección Térmica: $\text{TCF}(T) = \frac{\mu(T)}{\mu(20^\circ\text{C})}$.
+   * Flujo normalizado a 20°C: $J_{20} = J \cdot \text{TCF}\ [\text{LMH}]$.
+   * Resistencia hidráulica total: $R_{\text{total}} = \frac{\text{TMP}\ [\text{Pa}]}{\mu(T) \cdot J_{\text{SI}}}\ [\text{m}^{-1}]$.
+   * Resistencia adicional de ensuciamiento/torta: $R_{\text{torta}} = R_{\text{total}} - R_m\ [\text{m}^{-1}]$.
+4. **Exportación Continua en Datalogger CSV:** Cada fila registrada en el buffer del ESP32 (cada 10 segundos) incluye automáticamente las columnas calculadas de presiones y resistencias, permitiendo la descarga directa del ensayo completo para su análisis en Excel o Python.
 
-### 3.3. Interfaz Eléctrica Segura (Adaptación 5V a 3.3V)
-Dado que los transductores de 0-1 bar operan con salida ratiométrica de $0.5\text{ V}$ a $4.5\text{ V}$ alimentados con $5\text{ V}$, si el ADS1115 se alimenta con $3.3\text{ V}$, cualquier tensión superior a $V_{DD} + 0.3\text{ V}$ destruirá los diodos de protección ESD de las entradas analógicas.
-
-Se establecen dos alternativas de conexión para el montaje de Owen:
-* **Alternativa A (Recomendada por Simplicidad - Divisor Resistivo de Precisión):**
-  - Alimentar el ADS1115 a $3.3\text{ V}$ y configurar la ganancia interna PGA en `GAIN_ONE` (rango $0 \text{ a } 4.096\text{ V}$, $0.125\text{ mV/LSB}$).
-  - Interponer un divisor de tensión en cada canal analógico ($P_1, P_2, P_3$):
-    $$R_{\text{alto}} = 10\text{ k}\Omega \ (\text{tolerancia } 1\% \text{ o } 0.1\%) \quad , \quad R_{\text{bajo}} = 20\text{ k}\Omega \ (\text{tolerancia } 1\% \text{ o } 0.1\%)$$
-    Factor de atenuación: $\frac{20}{10 + 20} = \frac{2}{3} \approx 0.6667$.
-  - Con esto, la señal de $0.5 - 4.5\text{ V}$ se escala linealmente a **$0.333\text{ V} - 3.000\text{ V}$**, perfectamente dentro del rango seguro del ADS1115 alimentado a $3.3\text{ V}$.
-  - Agregar un capacitor cerámico de $10\text{ nF}$ a $100\text{ nF}$ en paralelo con $R_{\text{bajo}}$ para supresión de ruido de conmutación.
-* **Alternativa B (Level Shifter I2C):**
-  - Alimentar el ADS1115 a $+5\text{ V}$ con ganancia `GAIN_ONE`.
-  - Conectar los sensores directamente sin divisores a A0, A1, A2.
-  - Interponer un módulo desplazador de nivel bidireccional MOSFET (tipo BSS138 de 4 canales) entre el bus I2C del ESP32 (3.3V) y el ADS1115 (5V).
-
-### 3.4. Montaje Físico y Tara Hidrostática en NVS
-* **Cota Geodésica Común:** Los tres transductores deben instalarse rigurosamente a la **misma altura física / cota de referencia**. Una diferencia de altura de apenas $10\text{ cm}$ en la columna de agua genera un error estático de $\approx 10\text{ mbar}$ ($1\text{ kPa}$), lo que representa un $20\%$ de sesgo en una TMP de $0.05\text{ bar}$.
-* **Tara Automática de Cero en NVS:** Con la bomba detenida y el circuito hidráulico completamente cebado con agua, se ejecuta una rutina de puesta a cero en la UI que almacena los offsets de reposo en la memoria Flash NVS (`Preferences.h`).
-
-### 3.5. Driver I2C No Bloqueante & Registros ADS1115
-Para configurar correctamente las lecturas Single-Ended en el ADS1115:
-* **Palabra de Configuración Single-Ended (128 SPS, PGA 4.096V):**
-  El campo MUX para Single-Ended respecto a GND es `100 + canal`:
-  $$\text{Registro} = 0\text{x}8000 \ | \ ((4 + \text{ch}) \ll 12) \ | \ 0\text{x}0200 \ | \ 0\text{x}0100 \ | \ (\text{DR} \ll 5) \ | \ 0\text{x}0003$$
-  - Canal A0 (128 SPS): `0xC383`
-  - Canal A1 (128 SPS): `0xD383`
-  - Canal A2 (128 SPS): `0xE383`
-  - Canal A3 (128 SPS): `0xF383`
-* **Muestreo a 250 SPS en Round-Robin:** Conversión de $4\text{ ms}$ por canal, barriendo los 3 canales de presión a $\approx 55\text{ Hz}$. Esto permite registrar no solo el promedio, sino el **valor pico de $P_1$** causado por la pulsación de los 3 rodillos del cabezal peristáltico ($1.25 - 5\text{ Hz}$).
-* **Recuperación Automática de Bus I2C Trabado:** Si la línea SDA queda retenida en nivel bajo, el firmware libera los pines y conmuta SCL durante **9 ciclos de reloj** con SDA en alto para forzar la liberación del esclavo, reinicializando luego el bus `Wire`.
+### 3.4. Seguridad de Proceso y Enclavamientos Asistidos
+* **Protección Mecánica Autónoma:** La válvula de alivio calibrada a **$0.70\text{ bar}$** y el hongo de parada de emergencia (E-Stop) garantizan la protección física contra rotura de mangueras y sobrepresión de capilares sin depender del software.
+* **Alarma Visual y Sonora en SCADA:** Si el operador ingresa un valor de $P_1 \ge 0.60\text{ bar}$ o $\text{TMP} \ge 0.45\text{ bar}$, la interfaz web despliega una advertencia crítica en rojo y emite alerta de seguridad para instruir la apertura inmediata de la válvula de retentado o la detención de la bomba.
 
 ---
 
@@ -291,7 +274,7 @@ El Flujo Crítico delimita el régimen donde la fuerza convectiva hacia la membr
 
 ---
 
-### 5.5. Fase 2: Matriz Experimental Factorial Completa ($3^2$ con Puntos Centrales)
+### 5.5. Fase 2: Matriz Experimental Factorial Completa ($3^2$) y Vinculación con Pretratamiento (*Opuntia ficus-indica*)
 Para optimizar el esfuerzo de laboratorio, evitar esquinas infactibles y preservar las membranas:
 
 * **Factor A: Caudal de Impulsión / Esfuerzo de Corte ($Q_{\text{feed}}$)**
@@ -303,9 +286,15 @@ Para optimizar el esfuerzo de laboratorio, evitar esquinas infactibles y preserv
   - Nivel Medio ($0$): $0.25\text{ bar}$ ($250\text{ mbar}$).
   - Nivel Alto ($+1$): $0.40\text{ bar}$ ($400\text{ mbar}$).
 
-#### Plan de Ejecución (12 Ensayos Aleatorizados con Recirculación Total):
-* 9 tratamientos de la matriz $3 \times 3$.
-* **3 réplicas en el punto central (70 RPM, 0.25 bar)** distribuidas al inicio, mitad y final (Total = **12 corridas**) para estimar el error experimental puro y evaluar curvatura cuadrática mediante Metodología de Superficie de Respuesta (RSM).
+#### Plan de Ejecución (13 Ensayos Aleatorizados con Recirculación Total):
+1. **9 tratamientos de la matriz factorial $3 \times 3$** ejecutados con agua pretratada por coagulación-floculación con *Opuntia ficus-indica* (Hito 3).
+2. **3 réplicas en el Punto Central ($70\text{ RPM}$, $\text{TMP} = 0.25\text{ bar}$)** con agua pretratada con *Opuntia*, distribuidas al inicio, mitad y final de la campaña para estimar la varianza residual pura y evaluar curvatura cuadrática mediante Metodología de Superficie de Respuesta (RSM).
+3. **1 Corrida Testigo de Control sin Pretratamiento (Agua Cruda Directa):**
+   * Ejecutada en las condiciones idénticas del Punto Central (**$70\text{ RPM}$ y $\text{TMP} = 0.25\text{ bar}$**).
+   * **Objetivo Científico Fundamental de la Tesis:** Contrastar directamente la corrida testigo contra las 3 réplicas del punto central con *Opuntia* para cuantificar rigurosamente:
+     * Reducción absoluta y porcentual de la resistencia de torta: $\Delta R_{\text{torta}} = R_{\text{torta, cruda}} - R_{\text{torta, Opuntia}}$.
+     * Atenuación de la pendiente de declinación de flujo adimensional: $\left|\frac{d(J/J_0)}{dt}\right|_{\text{Opuntia}} \ll \left|\frac{d(J/J_0)}{dt}\right|_{\text{cruda}}$.
+     * Incremento del Factor de Recuperación de Flujo post-retrolavado ($\text{FRR}$).
 * **Condición Operativa Mandatoria:** Manguera de permeado retornando al tanque de alimentación (recirculación total de permeado) para garantizar concentración constante durante los 45 a 60 minutos de cada ensayo.
 
 #### Respuestas Primarias Registradas en CSV y Balanza:
@@ -353,49 +342,132 @@ Donde:
 
 ---
 
-## 👥 6. Asignación de Roles y Responsabilidades del Equipo
+### 5.8. Subhito 5.5 — Modelado Cinético de Mecanismos de Fouling (Modelos de Hermia) y Optimización por Superficie de Respuesta (RSM / ANOVA)
+
+Aprovechando las series temporales de flujo $J(t)$ registradas cada $10\text{ segundos}$ en los archivos `.CSV` durante los 60 minutos de cada corrida:
+
+1. **Ajuste de la Ecuación General de Bloqueo de Hermia:**
+   $$\frac{d^2 t}{d V^2} = k \left(\frac{d t}{d V}\right)^n \quad \Longleftrightarrow \quad -\frac{dJ}{dt} = K_H \, J \, (A_m J)^{2-n}$$
+   Se ajustan por regresión no lineal y linealización los 4 mecanismos clásicos:
+   * **Bloqueo Completo de Poros ($n = 2.0$):** Cada partícula coloidal sella completamente la entrada de un poro sin superposición.
+     $$\ln\left(\frac{J}{J_0}\right) = -k_b \, t$$
+   * **Bloqueo Estándar Interno ($n = 1.5$):** Las partículas penetran en los capilares y se adsorben en las paredes internas de los poros reduciendo su diámetro útil.
+     $$\frac{1}{\sqrt{J}} - \frac{1}{\sqrt{J_0}} = k_s \, t$$
+   * **Bloqueo Intermedio ($n = 1.0$):** Algunas partículas bloquean poros abiertos mientras otras se depositan sobre partículas ya adsorbidas.
+     $$\frac{1}{J} - \frac{1}{J_0} = k_i \, t$$
+   * **Filtración por Formación de Torta ($n = 0.0$):** Las partículas coloidales y flóculos forman una capa porosa superficial sobre la membrana.
+     $$\frac{1}{J^2} - \frac{1}{J_0^2} = 2 \, k_c \, t$$
+2. **Identificación de Transición de Mecanismos:**
+   * Comparación de coeficientes de determinación $R^2$ para determinar el mecanismo rector en cada fase temporal (bloqueo de poros inicial vs. crecimiento de torta en régimen).
+   * Contraste directo del mecanismo entre la corrida con agua cruda y las corridas con agua floculada con *Opuntia ficus-indica*.
+3. **Superficie de Respuesta 3D y Análisis de Varianza (ANOVA):**
+   * Ajuste de modelo polinomial de segundo orden para el flujo estacionario $J_{\text{ss}}$, la merma de caudal y $R_{\text{torta}}$:
+     $$Y = \beta_0 + \beta_1 (\text{RPM}) + \beta_2 (\text{TMP}) + \beta_{12} (\text{RPM} \cdot \text{TMP}) + \beta_{11} (\text{RPM}^2) + \beta_{22} (\text{TMP}^2) + \varepsilon$$
+   * Tabla ANOVA para verificar significancia estadística ($p < 0.05$) de efectos lineales, cuadráticos y de interacción.
+   * Determinación de las condiciones operativas óptimas $(\text{RPM}^*, \text{TMP}^*)$ que maximizan el volumen de permeado minimizando la velocidad de ensuciamiento.
+
+---
+
+### 5.9. Subhito 5.6 — Autopsia Morfológica Post-Mortem de las Fibras Capilares Helixone® mediante Microscopía Electrónica de Barrido (SEM / EDS)
+
+> [!CAUTION]
+> **Ensayo Destructivo — Ubicación Estricta al Cierre Experimental:**  
+> La autopsia de la membrana Fresenius FX100 implica el seccionamiento físico del cartucho de diálisis, la fractura criogénica y la extracción irreversible de fibras capilares. Se ejecuta **estrictamente una vez concluida la totalidad de corridas de la matriz factorial**.
+
+#### Protocolo de Disección y Microscopía Electrónica (SEM / EDS):
+1. **Seccionamiento y Muestreo Axial:**
+   * Apertura controlada de la carcasa de policarbonato del cartucho FX100 mediante sierra oscilante sin afectar el haz central.
+   * Extracción de fascículos de fibras capilares ($185\ \mu\text{m}$ diámetro interno, $35\ \mu\text{m}$ espesor de pared) en 3 posiciones axiales estratégicas:
+     - **Zona 1 (Entrada / Feed):** Máximo esfuerzo de corte luminal y primer impacto coloidal.
+     - **Zona 2 (Centro del Módulo):** Régimen hidrodinámico completamente desarrollado.
+     - **Zona 3 (Salida / Retentado):** Máxima concentración de sólidos y polarización por concentración límite.
+2. **Corte Transversal Criogénico (*Cross-Section*):**
+   * Congelación de fibras en Nitrógeno Líquido ($-196^\circ\text{C}$) y fractura frágil limpia para preservar la arquitectura porosa asimétrica sin deformación mecánica.
+   * Metalizado con oro/platino por pulverización catódica (*sputtering*).
+   * **Medición Micrométrica Directa del Espesor de Torta ($\delta_c\ [\mu\text{m}]$):** Medición por micrografía SEM de la capa superficial de torta coloidal sobre la cara interna luminal.
+   * **Validación Falso-Científica de Darcy:** Correlación directa entre el espesor observado $\delta_c$ y la resistencia hidráulica $R_{\text{torta}}$ calculada por el modelo de Darcy en el SCADA ($R_{\text{torta}} = \frac{\delta_c}{P_{\text{torta}}}$).
+3. **Superficie Luminal Interna (Micrografías Comparativas a 2.000x, 5.000x y 20.000x):**
+   * **Fibra Virgen (Control de Fábrica):** Matriz limpia de Polisulfona/PVP, estructura microporosa abierta.
+   * **Fibra Ensuciada (Pre-Retrolavado):** Cobertura densa de torta coloidal y agregados floculados de *Opuntia*.
+   * **Fibra Regenerada (Post-Retrolavado):** Verificación visual directa de poros desobstruidos y partículas residuales irreversibles que justifican físicamente el valor de $R_{\text{irrev}}$.
+4. **Microanálisis Elemental por Dispersión de Energía de Rayos X (EDS):**
+   * Mapeo composicional puntual y espectral sobre la superficie de ensuciamiento:
+     - Identificación inorgánica: Silicio ($\text{Si}$), Aluminio ($\text{Al}$), Hierro ($\text{Fe}$), Calcio ($\text{Ca}$), Magnesio ($\text{Mg}$) atribuibles a arcillas bentoníticas y sales minerales.
+     - Identificación orgánica: Carbono ($\text{C}$) y Oxígeno ($\text{O}$) atribuibles a restos poliméricos del biocoagulante *Opuntia ficus-indica*.
+
+---
+
+## 🏭 6. Hito 6: Evaluación de Indicadores de Ingeniería Industrial (SEC, Costo Operativo y Vida Útil)
+
+El Hito 6 proporciona el cierre ingenieril y económico indispensable para la graduación de Antonella y Owen en Ingeniería Industrial / Química, transformando los datos fenomenológicos en métricas de toma de decisiones productivas.
+
+### 6.1. Subhito 6.1 — Consumo Específico de Energía ($\text{SEC}$ en $\text{kWh/m}^3$)
+1. **Medición y Modelado de Potencia Eléctrica:**
+   * Medición de potencia de la etapa de potencia DM860 + motor NEMA 34 y del agitador L298N en cada punto operativo $(\text{RPM}, \text{TMP})$.
+   * Potencia eléctrica total absorbida: $P_{\text{eléctrica}} = P_{\text{bomba}} + P_{\text{agitador}}\ [\text{kW}]$.
+2. **Cálculo del SEC en la Matriz Factorial:**
+   $$\text{SEC} = \frac{P_{\text{eléctrica}}\ [\text{kW}]}{Q_p\ [\text{m}^3/\text{h}]} \quad \left[\frac{\text{kWh}}{\text{m}^3}\right]$$
+3. **Optimización Energética de Proceso:**
+   * Gráfica de curvas de iso-consumo energético específico ($\text{SEC}$ vs $\text{TMP}$ y $\text{RPM}$).
+   * Identificación del Punto Óptimo de Compromiso: mínimo gasto energético por metro cúbico producido con máxima retención de turbidez y calidad de agua CAA.
+
+### 6.2. Subhito 6.2 — Estimación de Vida Útil del Módulo y Costo Operativo Unitario
+1. **Modelado de Pérdida Irreversible de Permeabilidad y Fin de Vida Útil:**
+   * Proyección del incremento acumulativo de resistencia irreversible ciclo a ciclo:
+     $$R_{\text{irrev}}(N) = R_{m,0} + N \cdot \Delta R_{\text{irrev}}$$
+   * Definición del Fin de Vida Útil del Módulo FX100 cuando el flujo permeado declina un $40\%$ respecto a su valor inicial ($FRR < 60\%$) incluso tras limpieza química CIP profunda.
+2. **Frecuencia Óptima de Retrolavado y Limpieza Química (CIP):**
+   * Optimización temporal entre tiempo de filtración productiva ($t_f$) y tiempo de parada por lavado ($t_l$) para maximizar la productividad neta de agua tratada.
+3. **Estructura de Costos Operativos ($\text{OPEX}$ Unitario):**
+   * Costo energético ($\text{SEC} \times \text{Tarifa Eléctrica}$ en $\$AR/\text{kWh}$).
+   * Costo de insumos químicos (preparación de *Opuntia ficus-indica*, $\text{NaOCl}$, ácido cítrico).
+   * Amortización del módulo capilar Fresenius FX100 (costo de reposición / $\text{m}^3$ totales proyectados).
+   * **Indicador de Tesis:** Costo total unitario por metro cúbico de agua potable producida ($\text{USD/m}^3$ y $\$AR/\text{m}^3$), validando la viabilidad tecno-económica de la planta en comunidades rurales aisladas.
+
+---
+
+## 👥 7. Asignación de Roles y Responsabilidades del Equipo
 
 * **Ing. Enzo (Codirector — Tesis Doctoral):**
-  - Supervisión de la arquitectura FreeRTOS determinista y seguridad de control en Core 1.
-  - Aprobación de especificaciones de compras de transductores 0-1 bar y válvula de alivio mecánica calibrada a 0.70 bar.
-  - Modelado avanzado de transporte, regresión no lineal y ANOVA del diseño factorial.
+  - Supervisión de la arquitectura determinista de firmware y el modelo de Darcy embebido.
+  - Formulación y ajuste de los modelos de Hermia (bloqueo completo, estándar, intermedio y torta).
+  - Coordinación de la sesión de Microscopía Electrónica de Barrido (SEM / EDS) en el centro de microscopía.
+  - Validación del análisis de varianza (ANOVA) y optimización tecno-económica del SEC.
 * **Owen Cañizares (Tesista de Grado):**
-  - Montaje de transductores de presión y divisores resistivos ($10\text{ k}\Omega / 20\text{ k}\Omega$) en bornera Placa 2.
-  - Conexión del bus I2C al ADS1115 y calibración/tara hidrostática en banco con columna de agua.
-  - Instalación de la válvula de alivio a 0.7 bar y pulsador de emergencia (E-Stop) sobre la etapa de potencia DM860.
-  - Calibración gravimétrica de la curva $K(f)$ del caudalímetro de permeado (5 a 8 puntos con balanza).
-  - Compilación y mantenimiento del firmware mediante PlatformIO CLI.
+  - Instalación mecánica de los manómetros de glicerina $P_1$ y $P_2$, válvula de aguja y válvula de alivio calibrada a $0.70\text{ bar}$.
+  - Operación del firmware V6.4, carga asistida de presiones manométricas en la interfaz web SCADA y verificación de cálculo en vivo de Darcy.
+  - Medición eléctrica de potencia y cálculo de curvas de $\text{SEC}\ [\text{kWh/m}^3]$ en el Hito 6.
+  - Preparación de muestras de fibras capilares para la fractura criogénica y observación SEM/EDS.
 * **Antonella Guitián (Tesista de Grado):**
   - Preparación de suspensiones turbias de ensayo y optimización de dosis de coagulante en Jar Test (Hito 3).
-  - Configuración del circuito en recirculación total de permeado para los ensayos a concentración constante.
-  - Ejecución de balances gravimétricos en laboratorio (filtración $0.45\ \mu\text{m}$, secado $105^\circ\text{C}$ y pesaje de torta $M_s$).
-  - Monitoreo de calidad de agua: turbidez de entrada/salida (CAA Art. 982), conductividad TDS y registro en planillas experimentales.
+  - Ejecución de la Corrida Testigo sin pretratamiento vs. las 3 réplicas con *Opuntia ficus-indica* en el Punto Central.
+  - Medición de turbidez, conductividad TDS y balances gravimétricos ($0.45\ \mu\text{m}$, secado $105^\circ\text{C}$).
+  - Estimación de costos operativos unitarios ($\text{OPEX}$), frecuencia de CIP y redacción del capítulo industrial de tesis.
 
 ---
 
-## 📅 7. Cronograma de Hitos y Tareas Secuenciales
+## 📅 8. Cronograma Consolidado de Hitos y Tareas Secuenciales
 
-| Semana | Hito / Fase | Actividad Técnica | Responsable | Entregable Clave |
+| Semana | Hito / Fase | Actividad Técnica y Experimental | Responsables | Entregable Clave |
 | :---: | :---: | :--- | :---: | :--- |
-| **Semana 1** | **Seguridad & Compras** | Compra de transductores 0-1 bar e instalación de válvula de alivio a 0.7 bar / E-Stop. | Owen / Enzo | Circuito hidráulico protegido contra sobrepresión. |
-| **Semana 1** | **Hito 2.3 (Firmware)** | Implementación FreeRTOS dual-core (Core 1 a prio 19), enclavamientos a 50 ms y FSM ADS1115. | Enzo / Antigravity | Firmware compilado sin warnings en PlatformIO. |
-| **Semana 2** | **Hito 2.3 (Banco)** | Calibración de transductores P1, P2, P3 con columna de agua, tara hidrostática y parada dura. | Owen / Antonella | Curvas manométricas y validación de parada en $<50\text{ ms}$. |
-| **Semana 2** | **Hito 5 (Fase 0)** | Ensayo de agua limpia CWF, determinación de $R_{m,0}$ y validación $R^2 \ge 0.985$ e intercepto ≈ 0. | Todo el equipo | Curva $J_{20}$ vs TMP y valor basal de resistencia. |
-| **Semana 3** | **Hito 5 (Fase 1)** | Ensayo de Flujo Escalonado con histéresis para determinar Flujo Crítico $J_c$ (recirculación total). | Antonella / Owen | Curva $J$ vs TMP con punto de quiebre y ley de corte. |
-| **Semana 3-4**| **Hito 5 (Fase 2)** | Ejecución de Matriz Factorial $3^2$ (12 ensayos con 3 puntos centrales y balances gravimétricos). | Antonella / Owen | Planillas de datos completos y balances de masa. |
-| **Semana 5** | **Hito 5 (Fase 3)** | Modelado de compresibilidad $\alpha = \alpha_0 (\Delta P)^s$, ajuste de Hermia y redacción final. | Todo el equipo | Gráficas vectoriales a 300 DPI y borrador de tesis. |
+| **Semana 1** | **Subhito 2.4 & SCADA** | Instalación de manómetros de glicerina $P_1, P_2$, válvula de alivio a 0.7 bar, prueba de carga asistida en SCADA. | Owen / Enzo | SCADA calculando Darcy y CSV exportando presiones. |
+| **Semana 2** | **Hito 5 (Fase 0 & 1)** | Ensayos de agua limpia CWF (determinación de $R_{m,0}$) y ensayo de flujo crítico escalonado $J_c$. | Todo el equipo | Curva $J_{20}$ vs TMP y punto de quiebre de flujo crítico. |
+| **Semana 3** | **Hito 3 ◄► Hito 5** | Corrida Testigo (agua cruda directa) vs. 3 réplicas Punto Central con *Opuntia* (70 RPM, 0.25 bar). | Antonella / Owen | Cuantificación de $\Delta R_{\text{torta}}$ y atenuación de colmatación. |
+| **Semana 4** | **Hito 5 (Fase 2)** | Ejecución de la matriz factorial completa $3^2$ (13 corridas totales con recirculación de permeado). | Antonella / Owen | Datalogger CSV completo de las 13 sesiones experimentales. |
+| **Semana 5** | **Subhito 5.5 & Hito 6** | Ajuste cinético de Hermia ($n=2, 1.5, 1, 0$), ANOVA/RSM 3D, cálculo de $\text{SEC}\ [\text{kWh/m}^3]$ y OPEX. | Enzo / Antonella / Owen | Superficies de respuesta 3D y evaluación económica. |
+| **Semana 6** | **Subhito 5.6 & Cierre** | Autopsia destructiva SEM/EDS de fibras FX100, medición de espesor $\delta_c$ y consolidación final de tesis. | Todo el equipo | Micrografías SEM a 300 DPI, espectros EDS y borrador final. |
 
 ---
 
-## 🔗 8. Trazabilidad de Archivos y Enlaces Directos en el Repositorio
+## 🔗 9. Trazabilidad de Archivos y Enlaces Directos en el Repositorio
 
-* 💻 **Firmware Blindado Activo (v4):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/EN_USO_firmware_planta/)
-* 🤖 **Auditorías Externas de IA (Rondas 1, 2 y 3):**
-  - **Ronda 3 (Cierre Maestro - Claude 5.5 Opus):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda3_claude_opus.md`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda3_claude_opus.md)
-  - Astra: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/Ronda2_Astra.md`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/Ronda2_Astra.md)
-  - GLM 5.3: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_glm5.3.txt`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_glm5.3.txt)
-  - Claude Sonnet 5: [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_claudesonet5.txt`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/AuditoriaIA/ronda2_claudesonet5.txt)
-* 📋 **Manual de Organización y Protocolo Git del Equipo:** [`ORGANIZACION_PROYECTO_Y_EQUIPO.md`](./ORGANIZACION_PROYECTO_Y_EQUIPO.md)
-* 🩺 **Diagnóstico Físico y Filtro RC para Tesis:** [`02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md)
-* 🧪 **Protocolo Completo del Hito 5:** [`05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md)
-* 📑 **Planilla Maestra de Datos de Tesis:** [`05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv`](./05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv)
+* 💻 **Firmware Activo en Operación (V6.4):** [`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/)
+* 🚰 **Guía de Montaje Manómetros de Glicerina:** [`02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md)
+* 🌿 **Protocolo de Coagulación con Opuntia (Hito 3):** [`03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md)
+* 🧪 **Protocolo Completo Darcy y Ensayos (Hito 5):** [`05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md)
+* 📈 **Modelado Cinético Hermia y RSM (Subhito 5.5):** [`05_Hito5_Ensayos_Membrana_VidaUtil/03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md)
+* 🔬 **Protocolo de Autopsia SEM / EDS FX100 (Subhito 5.6):** [`05_Hito5_Ensayos_Membrana_VidaUtil/04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md)
+* 🏭 **Hito 6: Evaluación Industrial, Consumo Energético y Costos:** [`06_Hito6_Evaluacion_Industrial_Energia_Costos/README.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/README.md)
+* ⚡ **Cálculo de Consumo Específico SEC (Subhito 6.1):** [`06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md)
+* 💰 **Vida Útil y Costos Operativos OPEX (Subhito 6.2):** [`06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md)
+

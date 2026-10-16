@@ -13,13 +13,14 @@ Este hito representa la convergencia de todos los subsistemas desarrollados en l
 ---
 
 ## 📋 Lista de Verificación Maestra (Checklist del Hito 4)
-- [ ] Conexión del bus I2C al ADS1115 y lectura analógica de transductores de presión en los canales A1, A2 y A3.
-- [ ] Algoritmo de cálculo de Presión Transmembrana ($\text{TMP} = \frac{P_1 + P_2}{2} - P_3$) validado en memoria.
-- [ ] Enclavamiento mandatorio comprobado: la bomba se detiene en $< 50\text{ ms}$ cuando la $\text{TMP}$ supera $0.50\text{ atm}$.
+- [ ] Instalación de manómetros de glicerina amortiguados en impulsión ($P_1$) y retentado ($P_2$).
+- [ ] Válvula mecánica de alivio calibrada a $0.70\text{ bar}$ y E-Stop instalados para protección autónoma de sobrepresión.
+- [ ] Carga asistida de presiones en la interfaz SCADA web (`http://192.168.4.1`) y cálculo dinámico de $\text{TMP} = \frac{P_1 + P_2}{2} - P_3$.
+- [ ] Alarma visual y acústica en SCADA comprobada ante $P_1 \ge 0.60\text{ bar}$ o $\text{TMP} \ge 0.45\text{ bar}$.
 - [ ] Enclavamiento por boya verificado: el arranque de bomba y agitador se inhibe si el reactor está vacío.
 - [ ] Dashboard Web SCADA responsivo cargado y accesible desde smartphone y PC sin necesidad de instalar aplicaciones.
 - [ ] Servidor OTA verificado: capacidad de compilar y flashear nuevas versiones de firmware por Wi-Fi de forma remota.
-- [ ] Integración de telemetría: visualización de flujo volumétrico Darcy ($J$, en $\text{LMH}$) y acumulación de litros en tiempo real.
+- [ ] Integración de telemetría: visualización de flujo volumétrico Darcy ($J$, $J_{20}$ en $\text{LMH}$), resistencias ($R_{\text{total}}, R_{\text{torta}}$) y acumulación de litros en tiempo real.
 
 ---
 
@@ -28,17 +29,18 @@ Este hito representa la convergencia de todos los subsistemas desarrollados en l
 ```mermaid
 flowchart TD
     subgraph Sensores_Entrada["Telemetría & Instrumentación (Inputs)"]
-        S1["🌡️ DS18B20 (Temp Permeado)"]
+        S1["🌡️ DS18B20 (Temp Agua)"]
         S2["🧪 Sensor TDS (Calidad Agua)"]
-        S3["🌊 2x YF-S401 (Caudal Qp y Qc)"]
-        S4["📊 3x Transductores (P1, P2, P3 en ADS1115)"]
+        S3["🌊 2x YF-S401 (Caudal Qalim y Qperm)"]
+        S4["📊 Manómetros Glicerina (P1, P2 en vivo) + Carga SCADA"]
         S5["🛡️ Boya Inox (Nivel de Tanque)"]
     end
 
     subgraph Cerebro_ESP32["ESP32 Dual-Core (Cerebro de Control)"]
         FSM["⚡ Máquina de Estados FSM<br>• Llenado<br>• Coagulación Rápida (150 RPM)<br>• Floculación Lenta (30 RPM)<br>• Decantación (0 RPM)<br>• Ultrafiltración FX100<br>• Retrolavado (Backwash)"]
-        SEG["🚨 Enclavamiento de Seguridad<br>• TMP ≤ 0.50 atm<br>• Corte por Tanque Vacío"]
-        WEB["🌐 Servidor Web & ArduinoOTA<br>• Dashboard en http://bomba-uf.local"]
+        DARCY["📐 Módulo Darcy Embebido<br>• TMP = (P1+P2)/2 - P3<br>• Vogel TCF y J20 LMH<br>• R_total y R_torta"]
+        SEG["🚨 Enclavamientos de Seguridad<br>• Alivio Mecánico 0.70 bar<br>• Alarma SCADA TMP ≥ 0.45 bar<br>• Corte por Tanque Vacío"]
+        WEB["🌐 Servidor Web & ArduinoOTA<br>• Dashboard en http://192.168.4.1"]
     end
 
     subgraph Actuadores_Salida["Actuadores de Potencia (Outputs)"]
@@ -54,20 +56,19 @@ flowchart TD
 
 ## 🛡️ 2. Enclavamientos de Seguridad de Proceso
 
-1. **Protección de la Membrana FX100 contra Sobrepresión**:
-   * Si $\text{TMP} = \frac{P_1 + P_2}{2} - P_3 > 0.50\text{ atm}$ ($50.66\text{ kPa}$), el ESP32 **detiene la bomba en $< 50\text{ ms}$** y activa alarma sonora/visual en la web para evitar delaminación o rotura de los capilares de Polisulfona.
+1. **Protección Mecánica y de Proceso contra Sobrepresión**:
+   * **Válvula de alivio física a $0.70\text{ bar}$** en derivación antes del módulo: si una válvula se cierra, el fluido retorna al tanque sin destruir los capilares de Polisulfona ($0.67\text{ bar}$ límite).
+   * Si en la interfaz SCADA se ingresa una presión $\text{TMP} = \frac{P_1 + P_2}{2} - P_3 \ge 0.45\text{ bar}$ o $P_1 \ge 0.60\text{ bar}$, el ESP32 activa alarma crítica en rojo y emite alerta sonora para instruir la detención inmediata de la bomba.
 2. **Protección contra Marcha en Seco**:
    * Si la boya de nivel (`GPIO 32`) detecta que el reactor no tiene agua, impide el arranque de la bomba para proteger la manguera peristáltica y no inyectar aire al filtro.
 
 ---
 
-## 🛒 3. Compras Finales para Completar este Hito
+## 🛒 3. Estado de Adquisiciones y Cierre de Instrumentación
 
-Para poner en marcha este hito al 100%, solo resta adquirir:
-* **3x Transductores de Presión Hidráulica ($0 \text{ a } 1.2\text{ bar}$ / $0 \text{ a } 17\text{ PSI}$, rosca G1/4", salida $0.5-4.5\text{V}$)**:
-  * $P_1$: Entrada al cabezal FX100 (Canal A1 del ADS1115).
-  * $P_2$: Salida de Retentado / Concentrado (Canal A2 del ADS1115).
-  * $P_3$: Salida de Permeado Filtrado (Canal A3 del ADS1115).
+* **Manómetros de Glicerina ($P_1, P_2$):** **ADQUIRIDOS Y EN PLANTA**. Se descartó la compra de transductores electrónicos genéricos de 0-10 bar por su alta incertidumbre ($\pm 60\%$ a la TMP de trabajo de 0.25 bar) y su susceptibilidad al ruido EMI del driver DM860.
+* **Válvula de Alivio Mecánica a 0.70 bar & E-Stop:** Instalados y contrastados con manómetro patrón.
+* **Sistema Listo al 100% para Ensayos de Filtración.**
 
 ---
 

@@ -56,7 +56,8 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 
 | Fecha | Commit | Desafío de Ingeniería Encontrado | Solución Técnica Implementada en el Repositorio |
 | :---: | :---: | :--- | :--- |
-| **15/10/2026** | `V6.4` *(WIP)* | **Diagnóstico de Caudalímetros (Ahogo RC y Falso Contacto en Placa 2) y Firmware V6.4**: Bomba NEMA 34 y datalogger 100% operativos sin caídas de RPM. Lecturas de caudal erráticas y colapso a 0.0 mL/min a altas RPM identificadas por patas sueltas de pull-up ($4.7\text{ k}\Omega$) en zócalo hembra de Placa 2 (ahogo capacitivo con $\tau = 4.5\text{ ms}$). | Desarrollo de [`Subhito2_2_v6/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/): Firmware V6.4 con blanking digital de $3000\ \mu\text{s}$ en ISR (filtra rebotes $> 333\text{ Hz}$), filtro de mediana de 3 ventanas + EMA ($\alpha = 0.35$), cálculo de merma por torta en tiempo real, e independización de RPM del flujo. Documentado protocolo físico de conexión bajo tornillos verdes (bornes 1, 4, 6, 9 y 12 sin capacitor 104) para validación definitiva en planta. |
+| **16/10/2026** | *(Actual)* | **Reestructuración Estratégica: Manómetros de Glicerina, Subhitos 5.5/5.6 y Creación del Hito 6**: Reemplazo de transductores analógicos genéricos y ADS1115 por manómetros mecánicos amortiguados en glicerina con carga híbrida en SCADA. Incorporación de corrida testigo de agua cruda vs. *Opuntia* (Hito 3 ◄► Hito 5), modelado cinético de Hermia y RSM (Subhito 5.5), autopsia destructiva SEM/EDS de fibras capilares Helixone® (Subhito 5.6), y creación del Hito 6 de evaluación industrial (SEC y OPEX). | Actualización integral de [`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](./HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md), creación de [`06_Hito6_Evaluacion_Industrial_Energia_Costos/`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/), guías de laboratorio y firmware con soporte para ingesta de presiones y cálculo de Darcy en tiempo real. |
+| **15/10/2026** | `V6.4` | **Diagnóstico de Caudalímetros (Ahogo RC y Falso Contacto en Placa 2) y Firmware V6.4**: Bomba NEMA 34 y datalogger 100% operativos sin caídas de RPM. Lecturas de caudal erráticas y colapso a 0.0 mL/min a altas RPM identificadas por patas sueltas de pull-up ($4.7\text{ k}\Omega$) en zócalo hembra de Placa 2 (ahogo capacitivo con $\tau = 4.5\text{ ms}$). | Desarrollo de [`Subhito2_2_v6/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/): Firmware V6.4 con blanking digital de $3000\ \mu\text{s}$ en ISR (filtra rebotes $> 333\text{ Hz}$), filtro de mediana de 3 ventanas + EMA ($\alpha = 0.35$), cálculo de merma por torta en tiempo real, e independización de RPM del flujo. Documentado protocolo físico de conexión bajo tornillos verdes (bornes 1, 4, 6, 9 y 12 sin capacitor 104) para validación definitiva en planta. |
 | **01/10/2026** | *(Anterior)* | **Hoja de Ruta Técnica Hito 2.3 (FreeRTOS/ADS1115) e Hito 5 (Darcy/Factorial)**: Consolidación de la auditoría cruzada (ChatGPT 6 Astra & GLM 5.3) para la instrumentación de presiones y ensayos de membrana. | Creación de [`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](./HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md): Elección unánime de ADS1115 Single-Ended (A0-A3), alerta crítica de compra para transductores 0-1 bar (evita error del 48% a TMP de trabajo), desacople FreeRTOS dual-core mediante Seqlock atómico y diseño experimental factorial $3^2$ (11 ensayos con 3 puntos centrales, cálculo de flujo crítico $J_c$, compresibilidad coloidal $\alpha$ y protocolo de limpieza con NaOCl). |
 | **01/10/2026** | `bfaee32` | **Auditoría Cruzada Round 2 y Firmware Blindado v4**: Rampa ampliada a 100 RPM para diseño factorial, blindaje atómico y modelo físico de transporte. | Desarrollo de [`subhito2_2_v4/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v4/): Rango hasta 100 RPM ($\approx 1360\text{ mL/min}$) con alarma clínica en 44 RPM, período recíproco en caudalímetros (<0.1% a 5.5 Hz) inmune a desbordes de `micros()`, sección crítica por instancia (`portMUX_TYPE`), módulo Darcy (`darcy.h`) con ecuación de Vogel y corrección TCF, y cero fragmentación de memoria heap. |
 | **01/10/2026** | `336a537` | **Integración de Calibración de Owen, Auto-Calibración y Persistencia Flash NVS**: Owen calibró caudalímetros en probeta a 50 RPM ($680\text{ mL/min}$) obteniendo $K_{\text{alim}} = 154.62$, $K_{\text{perm}} = 55.00$ y cilindrada real de $13.6\text{ mL/rev}$, incorporando almacenamiento no-volátil en Flash NVS (`Preferences.h`), datalogger multi-sesión y optimización de filtro a 2000 µs. | Se integró formalmente la rama de Owen a `main`. Se aplicó ajuste de seguridad preventiva en `config.h`: `RPM_INICIO = 25.0f` ($\approx 340\text{ mL/min}$) para resguardar la membrana Fresenius FX100 ($600\text{ mL/min}$ / $36\text{ RPM}$). Se consolidó [`firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_planta/) como versión oficial activa y se integró [`Capitulo_4_Programacion_Firmware/`](./Capitulo_4_Programacion_Firmware/) con simulaciones LTspice y bitácoras. |
@@ -70,7 +71,7 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 
 ---
 
-## 🗺️ 4. Hoja de Ruta Maestra: Transición a Hito 2.3 (FreeRTOS & ADS1115) e Hito 5 (Darcy & Factorial)
+## 🗺️ 4. Hoja de Ruta Maestra: Transición a Subhito 2.4 (Manómetros & SCADA), Hito 5 (Hermia & SEM) e Hito 6 (SEC & OPEX)
 
 > 📘 **Documento Maestro de Ingeniería:** Para consultar el desglose exhaustivo de ecuaciones, especificaciones de compras de sensores, arquitectura determinista y protocolos de laboratorio, consultar:  
 > 👉 **[`HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md`](./HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md)**
@@ -78,38 +79,39 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 ### Síntesis de Directrices Técnicas y Decisiones de Auditoría IA:
 
 ```
-                                  MAPA DE RUTA TÉCNICA
+                                  MAPA DE RUTA TÉCNICA REESTRUCTURADO
   
-      [ SUBHITO 2.2 V3 ] ──► [ SUBHITO 2.2 V4 ] ──► [ HITO 2.3 FREERTOS ] ──► [ HITO 5 ENSAYOS ]
-      • Calibrado probeta    • Rampa 100 RPM        • Core 0: Control 50ms     • Línea base Rm diaria
-      • 50 y 72 RPM          • Darcy embebido       • Core 1: Web SCADA        • Flujo crítico Jc
-      • NVS Flash            • Período recíproco    • ADS1115 Single-Ended     • Matriz 3x3 (11 corridas)
-      • En banco físico      • Cero fragmentación   • Transductores 0-1 bar    • Compresibilidad torta
+      [ SUBHITO 2.2 V6 ] ──► [ SUBHITO 2.4 MANÓMETROS ] ──► [ HITO 5 DARCY, HERMIA & SEM ] ──► [ HITO 6 SEC & OPEX ]
+      • Blanking 3000 µs     • Manómetros de glicerina      • Línea base Rm y Jc escalonado    • Consumo específico SEC
+      • Filtro mediana + EMA • Inmunidad total a EMI        • Testigo Cruda vs 3x Opuntia      • Vida útil y recambio FX100
+      • Datalogger en vivo   • Carga híbrida en SCADA       • Modelos Hermia (n=2,1.5,1,0)     • Frecuencia óptima de CIP
+      • Merma por torta      • Darcy y Vogel en tiempo real • Autopsia SEM/EDS post-mortem     • Costo unitario OPEX ($/m³)
 ```
 
 1. **Seguridad de Proceso y Desplazamiento Positivo (Dictamen Opus):**
-   * **Protección Mecánica Calibrada a 0.70 bar:** A 4.5 Nm de torque, el motor revienta mangueras o fibras si se estrangula la aguja. Es obligatorio instalar una **válvula de alivio mecánica calibrada a $\approx 0.70\text{ bar}$** (contrastada con manómetro) y un **hongo de parada de emergencia (E-Stop)** cortando potencia al DM860. *(Se descartó calibrar a 1.0 bar porque la TMP alcanzaría 0.95 bar y destruiría la membrana).*
-   * **Techo Dinámico e Histéresis (`_techo`):** La bomba opera autolimitada a **44 RPM**. Solo se desbloquea hasta 100 RPM si hay transductores con telemetría viva ($<1.5\text{ s}$); tras una pérdida de señal, baja a 44 RPM de inmediato y requiere 5 a 10 s continuos para rearmar.
-   * **Parada Dura Inmediata (`paradaDura()`):** Disparo en $<50\text{ ms}$ si $P_1 \ge \mathbf{0.60\text{ bar}}$ (antes de saturar el sensor en 1.0 bar) o si $\text{TMP} \ge \mathbf{0.45\text{ bar}}$. El E-Stop queda enclavado de forma persistente y vacía la cola de comandos con `xQueueReset()`. Inversión de giro bloqueada con membrana conectada.
+   * **Protección Mecánica Calibrada a 0.70 bar:** A 4.5 Nm de torque, el motor revienta mangueras o fibras si se estrangula la aguja. Es obligatorio instalar una **válvula de alivio mecánica calibrada a $\approx 0.70\text{ bar}$** (contrastada con manómetro) y un **hongo de parada de emergencia (E-Stop)** cortando potencia al DM860.
+   * **Techo Dinámico e Histéresis (`_techo`):** La bomba opera autolimitada a **44 RPM**. El rango extendido se autoriza con supervisión manométrica continua.
+   * **Parada Dura Inmediata y Alertas SCADA:** Alerta visual y sonora en SCADA si $P_1 \ge \mathbf{0.60\text{ bar}}$ o si $\text{TMP} \ge \mathbf{0.45\text{ bar}}$. Inversión de giro bloqueada con membrana conectada.
 
-2. **Instrumentación de Presión y ADS1115 (Hito 2.3):**
-   * **Modo Single-Ended Unánime:** Canales A0 ($P_{\text{alim}}$), A1 ($P_{\text{ret}}$), A2 ($P_{\text{perm}}$) y A3 (Conductividad TDS) usando palabra de control `(4 + ch) << 12` (`0xC383, 0xD383, 0xE383, 0xF383`). Permite calcular $\text{TMP} = \frac{P_1 + P_2}{2} - P_3$, supervisar la caída luminal $\Delta P = P_1 - P_2$ y vigilar cavitación en succión.
-   * **Alerta Crítica de Compras:** Comprar transductores ratiométricos ($0.5 - 4.5\text{ V}$) de **0 a 1.0 bar (o máximo 0 a 1.2 bar)** con rosca $G 1/4"$. Evitar transductores estándar de 6 o 12 bar, cuyo error de fondo de escala ($\pm 60\text{ a }120\text{ mbar}$) falsearía la TMP de ensayo ($0.10 - 0.40\text{ bar}$) con errores relativos de hasta el 48%.
-   * **Acondicionamiento Seguro 5V $\rightarrow$ 3.3V:** Divisor resistivo de precisión ($10\text{ k}\Omega / 20\text{ k}\Omega$ al $1\%$ o $0.1\%$) con capacitor de $100\text{ nF}$ para proteger el ADS1115 y suprimir ruido eléctrico.
-   * **Cota Geodésica y Tara Hidrostática en NVS:** Montar los tres transductores a la misma altura física (10 cm de desnivel = 10 mbar = 20% de error) y registrar la tara a cero con líneas llenas en memoria Flash permanente.
-   * **Driver I2C No Bloqueante (250 SPS):** Muestreo en round-robin capturando $P_{1,\text{pico}}$ (pulsaciones de rodillos a 1.25–5 Hz), timeout de bus de $50\text{ ms}$, rutina de recuperación de 9 pulsos de reloj en SCL y dead-man a los $1.5\text{ s}$.
+2. **Instrumentación Manométrica Primaria e Integración Híbrida en SCADA (Subhito 2.4):**
+   * **Reemplazo de Transductores Electrónicos Genéricos por Manómetros de Glicerina:** Decisión estratégica fundamentada en que la TMP operativa en Hito 5 ($0.10 - 0.40\text{ bar}$) representa entre el $1\%$ y $4\%$ del fondo de escala de un transductor genérico de 10 bar, lo que induciría un error del $60\%$ por deriva térmica y susceptibilidad a EMI del driver DM860. Los manómetros con baño de glicerina amortiguan mecánicamente las pulsaciones de los 3 rodillos del cabezal y ofrecen lectura estable y robusta.
+   * **Integración Híbrida Asistida:** El operador ingresa en vivo $P_1, P_2$ y la temperatura $T$ en el SCADA (`http://192.168.4.1`). El módulo `darcy.h` del ESP32 calcula automáticamente en tiempo real:
+     $$\text{TMP} = \frac{P_1 + P_2}{2} - P_3 \quad , \quad J_{20} = J \cdot \text{TCF}(T) \quad , \quad R_{\text{total}} = \frac{\text{TMP}}{\mu(T) \cdot J_{\text{SI}}} \quad , \quad R_{\text{torta}} = R_{\text{total}} - R_m$$
+   * Las filas del `.CSV` exportan automáticamente las presiones y resistencias calculadas.
 
-3. **Arquitectura Concurrente FreeRTOS (Hito 2.3 / Hito 4):**
-   * **Core 1 (`tareaControl`, Prioridad 19):** Lazo de control determinista a **50 ms (20 Hz)** mediante `vTaskDelayUntil()`. Prioridad 19 por encima del stack Wi-Fi lwIP para garantizar cero jitter. Control cinemático de bomba, FSM de presiones y **evaluación ininterrumpida de sobrepresión en cada ciclo de 50 ms (NUNCA a 1 Hz)**.
-   * **Core 0 (`tareaWeb`, Prioridad 2):** Servidor HTTP `WebServer`, Wi-Fi SoftAP y datalogging NVS. Prohibidas las escrituras en Flash durante ensayos activos para no congelar la caché.
-   * **Sincronización Lock-Free:** Snapshot plano (`SnapshotPlanta_t` $\le 300\text{ B}$) copiado bajo spinlock liviano `portMUX` (~1 µs). Banderas atómicas directas (`std::atomic<bool>`) para STOP y EMERGENCIA independientes de la cola de consignas.
-   * **Metrología de Caudal y Permeado a Bajo Flujo:** El sensor YF-S401 opera por debajo de su rango útil ($<300\text{ mL/min}$) en permeado; se establece el uso de una **balanza de precisión en laboratorio como referencia primaria**, mientras el firmware calcula $\Delta\text{vol}/\Delta t$ en ventanas de 10 a 30 s con calibración poligonal $K(f)$.
+3. **Arquitectura Concurrente y Metrología de Caudal:**
+   * Lazo determinista de rampa a 50 ms. Caudalímetro de permeado con opción de asistencia por probeta manual para flujos $< 2\text{ mL/min}$ por debajo del umbral de giro de turbina.
 
-4. **Protocolo Experimental de Modelado Darcy y Ensuciamiento (Hito 5):**
-   * **Fase 0 (Línea Base Diaria $R_{m,0}$):** Ensayo previo obligatorio con agua destilada (5 escalones de TMP a $\ge 60\text{ RPM}$) para desacoplar el envejecimiento de la membrana. Criterios: $R^2 \ge 0.985$ e intercepto compatible con cero. $K_{\text{UF}} = 54750\text{ mL/(h}\cdot\text{bar)}$.
-   * **Fase 1 (Flujo Crítico $J_c$):** Determinación por método escalonado (*flux-step*) ascendente y descendente con **recirculación obligatoria del permeado al tanque** para evitar la concentración artificial de la alimentación. La histéresis cuantifica el ensuciamiento irreversible.
-   * **Fase 2 (Diseño Factorial $3^2$ Factible):** Caudal (40, 70, 95 RPM — *desplazado desde 25 RPM para evitar recuperación $>100\%$*) $\times$ TMP (0.10, 0.25, 0.40 bar) con **3 réplicas en el punto central (70 RPM, 0.25 bar)** sumando **12 corridas en total** analizadas por Metodología de Superficie de Respuesta (RSM).
-   * **Fase 3 (Compresibilidad Coloidal y Limpieza):** Resistencia específica de torta $\alpha = \alpha_0 (\Delta P)^s$ mediante balances gravimétricos ($0.45\ \mu\text{m}$, $105^\circ\text{C}$). Enjuague físico rápido (*forward flush* + *backwash* hidrostático suave con depósito elevado $\le 1.5\text{ m} \approx 0.15\text{ bar}$), con criterio $R_{m,\text{post}} \le 1.05 R_{m,0}$ ($FRR \ge 95\%$), y regeneración química con $\text{NaOCl}$ ($100-200\text{ ppm}$, pH 10) con registro acumulado de dosis ($\text{ppm}\cdot\text{h}$).
+4. **Protocolo Experimental de Membranas, Modelado Hermia y Autopsia SEM (Hito 5):**
+   * **Fase 0 (Línea Base Diaria $R_{m,0}$):** Ensayo con agua desionizada (5 escalones de TMP) con $R^2 \ge 0.985$.
+   * **Fase 1 (Flujo Crítico $J_c$):** Determinación por método escalonado (*flux-step*) ascendente y descendente en recirculación total.
+   * **Fase 2 (Matriz Factorial $3^2$ y Vinculación Hito 3):** 9 tratamientos con agua floculada con *Opuntia ficus-indica* + 3 réplicas en Punto Central ($70\text{ RPM}, 0.25\text{ bar}$) + **1 Corrida Testigo de Control sin Pretratamiento (Agua Cruda Directa)** para cuantificar la reducción de $\Delta R_{\text{torta}}$, atenuación de caída de flujo y mejora de $FRR$.
+   * **Subhito 5.5 (Modelado Cinético Hermia y RSM 3D):** Ajuste de los 4 mecanismos de bloqueo (completo $n=2$, estándar $n=1.5$, intermedio $n=1$, torta $n=0$ linealizando $1/J^2\text{ vs }t$) y superficie de respuesta ANOVA 3D.
+   * **Subhito 5.6 (Autopsia SEM / EDS de Fibras FX100):** Ensayo destructivo al final de todas las corridas: corte transversal criogénico para medición micrométrica del espesor de torta $\delta_c\ [\mu\text{m}]$ (correlacionado con $R_{\text{torta}}$), superficie luminal interna (virgen vs ensuciada vs post-retrolavado), perfil axial entrada-centro-salida, y microanálisis elemental EDS (Si, Al, Fe, Ca, Mg vs C, O).
+
+5. **Evaluación de Indicadores de Ingeniería Industrial (Hito 6):**
+   * **Subhito 6.1 (Consumo Específico de Energía - SEC):** Cálculo de $\text{SEC} = \frac{P_{\text{eléctrica}}}{Q_p}\ [\text{kWh/m}^3]$ en toda la matriz operativa para hallar el punto de mínima energía.
+   * **Subhito 6.2 (Vida Útil, Frecuencia CIP y Costos Operativos):** Modelado de acumulación de $R_{\text{irrev}}$, optimización de ciclo filtración/lavado y proyección del costo unitario ($\text{OPEX}$ en $\text{USD/m}^3$ o $\$AR/\text{m}^3$) para potabilización en comunidades rurales.
 
 ---
 
@@ -120,19 +122,27 @@ Esta tabla resume la evolución cronológica del sistema, los desafíos encontra
 
 ```text
 SistemaUF/
-├── 📄 HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md   ◄── Hoja de ruta técnica de Hito 2.3 e Hito 5
+├── 📄 HOJA_DE_RUTA_DESARROLLO_Y_ENSAYOS.md   ◄── Hoja de ruta técnica de Hitos 2.4, 5 y 6
 ├── 📄 ORGANIZACION_PROYECTO_Y_EQUIPO.md      ◄── Protocolo de trabajo en equipo y ramas Git
 ├── 📁 00_General_y_P_ID_Planta/              ◄── Planos ISA 5.1 y especificaciones membrana FX100
 ├── 📁 01_Hito1_Control_Accionamiento_NEMA34_DM860/ ◄── Motor, driver Leadshine, cabezal MBP-2000
-├── 📁 02_Hito2_Instrumentacion_Sensores/      ◄── Instrumentación, acondicionamiento RC y firmwares
-│   ├── 📁 01_Guias_Montaje_y_Calibracion/    ◄── Diagnóstico de ruido 81 Hz, LTspice y planos HTML
+├── 📁 02_Hito2_Instrumentacion_Sensores/      ◄── Manómetros de glicerina, caudalímetros y firmware V6.4
+│   ├── 📁 01_Guias_Montaje_y_Calibracion/    ◄── Guía de manómetros P1/P2, filtros RC y planos HTML
 │   ├── 📁 02_Firmware_Test_Sensores/
-│   │   ├── 📁 subhito2_2_v3/                 ◄── Firmware en operación en el banco de pruebas
-│   │   └── 📁 subhito2_2_v4/                 ◄── Versión blindada con Darcy, 100 RPM y auditoría IA
+│   │   ├── 📁 Subhito2_2_v6/                 ◄── Firmware Oficial Activo (V6.4) con carga de presiones
+│   │   ├── 📁 subhito2_2_v4/                 ◄── Firmware blindado con Darcy embebido
+│   │   └── 📁 subhito2_2_v3/                 ◄── Firmware histórico calibrado en probeta
 │   └── 📁 Datos/                             ◄── Planillas de calibración en probeta y CSVs
 ├── 📁 03_Hito3_Reactor_Sedimentador_Agitador/ ◄── Coagulación-floculación Jar Test con Opuntia
-├── 📁 04_Hito4_Integracion_Automatizacion_IoT/◄── Concurrencia FreeRTOS y enclavamientos
-├── 📁 05_Hito5_Ensayos_Membrana_VidaUtil/    ◄── Protocolo experimental Darcy, Jc y matriz factorial
+├── 📁 04_Hito4_Integracion_Automatizacion_IoT/◄── SCADA integral web y enclavamientos de seguridad
+├── 📁 05_Hito5_Ensayos_Membrana_VidaUtil/    ◄── Ensayos Darcy, matriz 3x3, Hermia, RSM y Autopsia SEM
+│   ├── 📁 01_Protocolo_Ensayos_Darcy_y_Fouling/
+│   ├── 📁 02_Planillas_y_Datos_Tesis/
+│   ├── 📁 03_Modelado_Hermia_y_Optimizacion_RSM/ ◄── Modelos de Hermia y ANOVA 3D (Subhito 5.5)
+│   └── 📁 04_Autopsia_SEM_EDS_Fibras_Helixone/   ◄── Autopsia destructiva SEM y EDS (Subhito 5.6)
+├── 📁 06_Hito6_Evaluacion_Industrial_Energia_Costos/ ◄── Nuevo Hito 6: SEC, Vida Útil y Costos OPEX
+│   ├── 📁 01_Consumo_Energetico_SEC/             ◄── Cálculo de SEC en kWh/m³ (Subhito 6.1)
+│   └── 📁 02_Costos_y_Vida_Util/                 ◄── Vida útil, frecuencia CIP y OPEX (Subhito 6.2)
 └── 📁 Archivado/                             ◄── Historial y códigos preliminares de respaldo
 ```
 
@@ -168,8 +178,12 @@ SistemaUF/
 * **¿Para qué leerlo?**: Para entender cómo el ESP32 coordina todos los subsistemas de forma autónoma sin intervención humana.
 
 #### 🧪 `05_Hito5_Ensayos_Membrana_VidaUtil/`
-* **Contenido**: Modelado fenomenológico del cartucho Fresenius FX100, Ley de Darcy modificada por temperatura (TCF), determinación de flujo crítico $J_c$, matriz factorial $3^2$ (11 ensayos con réplicas en punto central), mecanismos de ensuciamiento (*cake layer*, *pore blocking*) y planillas modelo para la tesis.
-* **¿Para qué leerlo?**: Para redactar los capítulos de resultados experimentales, curvas de permeabilidad y conclusiones de la tesis de grado.
+* **Contenido**: Modelado fenomenológico del cartucho Fresenius FX100, Ley de Darcy modificada por temperatura (TCF), determinación de flujo crítico $J_c$, matriz factorial $3^2$ con 3 réplicas en punto central y corrida testigo con agua cruda sin pretratar, ajuste cinético de modelos de Hermia ($n=2, 1.5, 1, 0$), optimización por superficie de respuesta (RSM 3D) y autopsia destructiva post-mortem de fibras capilares Helixone® mediante Microscopía Electrónica de Barrido (SEM / EDS).
+* **¿Para qué leerlo?**: Para redactar los capítulos de resultados experimentales, curvas de permeabilidad, cinéticas de ensuciamiento y morfología de micrografías de la tesis de grado.
+
+#### 🏭 `06_Hito6_Evaluacion_Industrial_Energia_Costos/`
+* **Contenido**: Evaluación de indicadores tecno-económicos e industriales: Consumo Específico de Energía ($\text{SEC}$ en $\text{kWh/m}^3$) en función de RPM y TMP, proyección de vida útil y acumulación de $R_{\text{irrev}}$, optimización de la frecuencia de retrolavado y limpiezas químicas CIP, y estructura de costos operativos ($\text{OPEX}$ unitario por $\text{m}^3$ de agua potabilizada).
+* **¿Para qué leerlo?**: Para fundamentar el capítulo de evaluación económica, balance energético y viabilidad industrial de la tesis de Ingeniería Industrial / Química.
 
 #### 📦 `Archivado/`
 * **Contenido**: Códigos preliminares de prueba, librerías intermedias y documentación obsoleta.

@@ -413,6 +413,63 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       </div>
     </div>
 
+    <!-- CARD: PRESIÓN MANOMÉTRICA PRIMARIA & LEY DE DARCY (SUBHITO 2.4) -->
+    <div class="card" style="border: 1px solid #10b981; background: #0c1824;">
+      <div class="row">
+        <b style="font-size:12px; color:#34d399">📊 PRESIÓN MANOMÉTRICA PRIMARIA & DARCY EN TIEMPO REAL</b>
+        <span class="pill on" id="pill_darcy" style="margin-top:0">DARCY ACTIVO</span>
+      </div>
+      <p style="font-size:10px; color:var(--muted); margin-bottom:8px;">
+        Ingreso visual de Manómetros Bourdon de Glicerina (P₁, P₂) y Temperatura (T). El microcontrolador calcula en vivo TMP, factor TCF (viscosidad Vogel), flujo J₂₀ y resistencias hidráulicas R_total y R_torta en cada muestra.
+      </p>
+
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr) auto; gap:6px; align-items:end; margin-bottom:10px; background:#07101b; padding:8px; border-radius:8px; border:1px solid #13273e;">
+        <div>
+          <label style="font-size:10px; color:var(--alim); font-weight:700; display:block; margin-bottom:2px">P₁ Alim (bar):</label>
+          <input type="number" id="inp_p1" step="0.01" min="0" max="6" value="0.30" style="width:100%; background:#141c30; border:1px solid #334155; color:#fff; padding:5px 6px; border-radius:6px; font-size:11px; font-weight:700; text-align:center;">
+        </div>
+        <div>
+          <label style="font-size:10px; color:var(--ret); font-weight:700; display:block; margin-bottom:2px">P₂ Ret (bar):</label>
+          <input type="number" id="inp_p2" step="0.01" min="0" max="6" value="0.20" style="width:100%; background:#141c30; border:1px solid #334155; color:#fff; padding:5px 6px; border-radius:6px; font-size:11px; font-weight:700; text-align:center;">
+        </div>
+        <div>
+          <label style="font-size:10px; color:var(--perm); font-weight:700; display:block; margin-bottom:2px">Temp T (°C):</label>
+          <input type="number" id="inp_temp" step="0.5" min="5" max="45" value="20.0" style="width:100%; background:#141c30; border:1px solid #334155; color:#fff; padding:5px 6px; border-radius:6px; font-size:11px; font-weight:700; text-align:center;">
+        </div>
+        <div>
+          <button style="padding:6px 10px; font-size:11px; background:#10b981; color:#fff; font-weight:700;" onclick="actualizarPresion()">⚡ Aplicar</button>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; margin-bottom:8px;">
+        <div style="background:#07101b; border:1px solid #162a42; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:9px; color:var(--muted); font-weight:700">TMP EFECTIVA</div>
+          <div style="font-size:15px; font-weight:800; color:#38bdf8" id="disp_tmp">0.250</div>
+          <div style="font-size:9px; color:var(--muted)">bar</div>
+        </div>
+        <div style="background:#07101b; border:1px solid #162a42; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:9px; color:var(--muted); font-weight:700">FLUJO J₂₀</div>
+          <div style="font-size:15px; font-weight:800; color:var(--perm)" id="disp_j20">0.00</div>
+          <div style="font-size:9px; color:var(--muted)">LMH (20°C)</div>
+        </div>
+        <div style="background:#07101b; border:1px solid #162a42; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:9px; color:var(--muted); font-weight:700">FACTOR TCF</div>
+          <div style="font-size:15px; font-weight:800; color:#cbd5e1" id="disp_tcf">1.000</div>
+          <div style="font-size:9px; color:var(--muted)">μ(T)/μ₂₀</div>
+        </div>
+        <div style="background:#07101b; border:1px solid #162a42; border-radius:8px; padding:8px; text-align:center;">
+          <div style="font-size:9px; color:var(--muted); font-weight:700">R_TORTA</div>
+          <div style="font-size:12px; font-weight:800; color:#f59e0b" id="disp_rtorta">0.00e0</div>
+          <div style="font-size:9px; color:var(--muted)">m⁻¹</div>
+        </div>
+      </div>
+
+      <div class="row" style="font-size:10px; margin-bottom:0; color:var(--muted)">
+        <span>Resistencia Total R_tot: <b id="disp_rtot" style="color:#e2e8f0">0.00e0 m⁻¹</b></span>
+        <span>Membrana FX100 Rm: <b style="color:#94a3b8">2.09e13 m⁻¹</b></span>
+      </div>
+    </div>
+
     <!-- CARD 3: MODO CALIBRACIÓN / PARÁMETROS GUARDADOS -->
     <div class="card card-dev" id="card_dev" style="display:none">
       <div class="row">
@@ -601,6 +658,23 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     function volverPermAuto() {
       $('inp_qp_man').value = '';
       cmd('PERM_AUTO');
+    }
+
+    function actualizarPresion() {
+      const p1 = parseFloat($('inp_p1').value);
+      const p2 = parseFloat($('inp_p2').value);
+      const temp = parseFloat($('inp_temp').value);
+      if (isNaN(p1) || isNaN(p2) || isNaN(temp)) {
+        alert("Ingresa valores válidos de presión y temperatura.");
+        return;
+      }
+      fetch(`/set_presion?p1=${p1}&p2=${p2}&temp=${temp}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.status === 'ok') {
+            showToast(`✅ Presión registrada: TMP=${res.tmp} bar | J20=${res.j20} LMH`);
+          }
+        });
     }
 
     function calibrarPorRpmYQ() {
@@ -824,6 +898,23 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           $('db').innerText = (d.delta > 0 ? '+' : '') + d.delta.toFixed(1) + ' %';
 
           $('lbl_ka').innerText = d.k_alim.toFixed(2);
+
+          // Indicadores de Presión Manométrica y Darcy en Tiempo Real (Subhito 2.4)
+          if ($('disp_tmp')) $('disp_tmp').innerText = (d.tmp !== undefined) ? d.tmp.toFixed(3) : '--';
+          if ($('disp_j20')) $('disp_j20').innerText = (d.j20 !== undefined) ? d.j20.toFixed(2) : '--';
+          if ($('disp_tcf')) $('disp_tcf').innerText = (d.tcf !== undefined) ? d.tcf.toFixed(3) : '1.000';
+          if ($('disp_rtorta')) $('disp_rtorta').innerText = (d.r_torta !== undefined) ? d.r_torta.toExponential(2) : '--';
+          if ($('disp_rtot')) $('disp_rtot').innerText = (d.r_tot !== undefined) ? d.r_tot.toExponential(2) + ' m⁻¹' : '--';
+          if ($('pill_darcy')) {
+            $('pill_darcy').className = 'pill ' + (d.darcy_ok ? 'on' : 'off');
+            $('pill_darcy').innerText = d.darcy_ok ? 'DARCY ACTIVO' : 'SIN TMP / PERM';
+          }
+
+          if (!document.activeElement || (document.activeElement.id !== 'inp_p1' && document.activeElement.id !== 'inp_p2' && document.activeElement.id !== 'inp_temp')) {
+            if ($('inp_p1') && d.p1 !== undefined && !$('inp_p1').dataset.touched) $('inp_p1').value = d.p1.toFixed(2);
+            if ($('inp_p2') && d.p2 !== undefined && !$('inp_p2').dataset.touched) $('inp_p2').value = d.p2.toFixed(2);
+            if ($('inp_temp') && d.temp !== undefined && !$('inp_temp').dataset.touched) $('inp_temp').value = d.temp.toFixed(1);
+          }
 
           // Actualizar gráfico en tiempo real cada 2 segundos mientras la bomba está encendida
           let nowMs = Date.now();

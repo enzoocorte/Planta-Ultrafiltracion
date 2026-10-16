@@ -65,14 +65,12 @@ flowchart TD
   * **Subhito 2.1**: Lectura de pulsos de microflujo con caudalímetros de efecto Hall YF-S401 ($98\text{ pulsos/seg} = 1\text{ L/min}$), interrupciones IRAM y contraste dinámico con la bomba MBP-2000.
   * **Subhito 2.2**: Protocolo OneWire digital para la sonda sumergible de temperatura DS18B20 y cálculo de TCF Darcy.
   * **Subhito 2.3**: Bus I2C y conversión analógica-digital con ADS1115 de 16 bits para sonda de calidad de agua (TDS en ppm).
-  * **Subhito 2.4**: Transductores de presión hidráulica (P1, P2, P3) y enclavamiento de TMP.
+  * **Subhito 2.4**: Instrumentación Manométrica Primaria ($P_1, P_2$) amortiguada en baño de glicerina e integración híbrida en SCADA para cálculo de Darcy en tiempo real (eliminando transductores electrónicos ruidosos de 0-10 bar).
 * **Archivos Clave**:
   * [`README.md`](./02_Hito2_Instrumentacion_Sensores/README.md): Hoja de ruta modular en 4 subhitos, ecuaciones de calibración y checklist.
   * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md): Guía de conexionado, factor K, prueba serie y calibración de microflujo YF-S401.
-  * [`02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_1_caudalimetros/subhito2_1_caudalimetros.ino): Firmware modular para probar el caudalímetro con menú serie interactivo para la bomba peristáltica.
-  * [`01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md): Dónde y cómo intercalar cada sensor en la cañería.
-  * [`01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Calibracion_ADC_ADS1115_y_Sensores.md): Fórmulas de conversión analógica, ganancia y compensación térmica.
-  * [`02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/firmware_sensores_test/firmware_sensores_test.ino): Firmware de prueba integral multivariable en formato CSV.
+  * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md): Protocolo de lectura en manómetros con baño de glicerina, carga asistida en SCADA y cálculo en vivo de Darcy.
+  * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): Firmware Oficial Activo (V6.4) con blanking de 3000 µs, datalogger en vivo y soporte para carga de presiones manométricas.
 
 ---
 
@@ -89,39 +87,48 @@ flowchart TD
   * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Protocolo completo de preparación de solución madre de *Opuntia*, dosificación y cálculo de remoción $\eta$.
   * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Guía de conexión pin a pin, modulación PWM y enclavamiento de nivel.
   * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware con Máquina de Estados Finitos (FSM) no bloqueante.
-  * [`03_Compras_y_Ferreteria_Hidraulica/Guia_Compras_Hidraulicas_y_Locales_Salta.md`](./03_Hito3_Reactor_Sedimentador_Agitador/03_Compras_y_Ferreteria_Hidraulica/Guia_Compras_Hidraulicas_y_Locales_Salta.md): Guía de adaptación de 1/2" a 1/4" con bujes de bronce, lista para mostrador y locales en Salta Capital.
 
 ---
 
 ### 📁 [`04_Hito4_Integracion_Automatizacion_IoT/`](./04_Hito4_Integracion_Automatizacion_IoT/)
 * **Objetivo de los Alumnos**: Poner en marcha la planta completa de manera sincronizada y autónoma.
 * **Qué aprenderán aquí**:
-  * Integración de los 3 transductores de presión hidráulica ($P_1, P_2, P_3$).
-  * Cálculo dinámico de la Presión Transmembrana:
-    $$\text{TMP} = \frac{P_1 + P_2}{2} - P_3$$
-  * **Enclavamiento de Seguridad Mandatorio**: Si $\text{TMP} > 0.50\text{ atm}$, el ESP32 apaga la bomba de inmediato para proteger los capilares de Polisulfona.
-  * Dashboard SCADA web unificado con control simultáneo de bomba, agitador, boya y telemetría.
+  * Integración híbrida en SCADA de manómetros de glicerina ($P_1, P_2$) y cálculo dinámico de Presión Transmembrana ($\text{TMP} = \frac{P_1 + P_2}{2} - P_3$).
+  * Enclavamientos de seguridad física (válvula de alivio a $0.70\text{ bar}$) y alarmas visuales/acústicas en web si $P_1 \ge 0.60\text{ bar}$ o $\text{TMP} \ge 0.45\text{ bar}$.
+  * Dashboard SCADA web unificado (`http://192.168.4.1`) con control simultáneo de bomba, agitador, boya, telemetría y exportación CSV.
 * **Archivos Clave**:
-  * [`README.md`](./04_Hito4_Integracion_Automatizacion_IoT/README.md): Arquitectura global del SCADA, enclavamientos y especificaciones de transductores.
+  * [`README.md`](./04_Hito4_Integracion_Automatizacion_IoT/README.md): Arquitectura global del SCADA y enclavamientos.
   * [`01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md`](./04_Hito4_Integracion_Automatizacion_IoT/01_Arquitectura_y_Enclavamientos/Guia_Enclavamientos_Seguridad_y_SCADA.md): Explicación detallada de enclavamientos, cálculo de TMP y endpoints REST.
   * [`02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino`](./04_Hito4_Integracion_Automatizacion_IoT/02_Firmware_SCADA_Master/firmware_planta_completa/firmware_planta_completa.ino): Firmware maestro integral del sistema.
 
 ---
 
 ### 📁 [`05_Hito5_Ensayos_Membrana_VidaUtil/`](./05_Hito5_Ensayos_Membrana_VidaUtil/)
-* **Objetivo de los Alumnos**: Obtención de los datos experimentales para la redacción final de la Tesis de Ingeniería Industrial y aportes a la Beca Doctoral.
+* **Objetivo de los Alumnos**: Obtención y modelado riguroso de los datos experimentales para la Tesis de Grado y la Beca Doctoral.
 * **Qué aprenderán aquí**:
-  * Modelo matemático de la Ley de Darcy para ultrafiltración:
-    $$J = \frac{Q_p}{A_m} = \frac{\text{TMP}}{\mu(T) \cdot (R_m + R_{\text{torta}} + R_{\text{irrev}})}$$
-  * Determinación experimental de la resistencia de la membrana limpia ($R_m$).
-  * Comparación de velocidad de ensuciamiento: Agua cruda turbia vs. Sobrenadante clarificado del Hito 3.
-  * Eficiencia del ciclo de Retrolavado (*Backwash*) para extender la vida útil del módulo FX100.
-  * Verificación de calidad de agua tratada según los estándares del Código Alimentario Argentino (CAA).
+  * Modelo de resistencias en serie de la Ley de Darcy y normalización térmica $J_{20}$ (Ecuación de Vogel).
+  * Determinación de resistencia intrínseca ($R_m$) y flujo crítico ($J_c$) por método escalonado.
+  * **Vinculación Hito 3 ◄► Hito 5**: Contraste riguroso entre la **Corrida Testigo sin pretratamiento** vs. las **3 réplicas del Punto Central pretratadas con *Opuntia*** ($70\text{ RPM}, 0.25\text{ bar}$).
+  * **Subhito 5.5**: Modelado cinético de mecanismos de ensuciamiento de Hermia ($n=2, 1.5, 1, 0$) y optimización factorial por Superficie de Respuesta (RSM 3D / ANOVA).
+  * **Subhito 5.6**: Autopsia morfológica destructiva post-mortem de fibras capilares Helixone® en Microscopio Electrónico de Barrido (SEM / EDS) para medir el espesor de torta $\delta_c\ [\mu\text{m}]$ y correlacionarlo con $R_{\text{torta}}$.
 * **Archivos Clave**:
   * [`README.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/README.md): Metodología experimental y diseño de ensayos de transporte.
-  * [`01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md): Protocolo completo de ensayos Darcy, factor de temperatura TCF y normas CAA.
-  * [`02_Planillas_y_Datos_Tesis/Guia_Analisis_Datos_Graficos_Tesis.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/Guia_Analisis_Datos_Graficos_Tesis.md): Guía de procesamiento de datos con script de Python para figuras de tesis a 300 DPI y guía de Excel.
-  * [`02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv`](./05_Hito5_Ensayos_Membrana_VidaUtil/02_Planillas_y_Datos_Tesis/plantilla_datos_ensayo_tesis.csv): Matriz de datos experimental segundo a segundo.
+  * [`01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/01_Protocolo_Ensayos_Darcy_y_Fouling/Protocolo_Ensayos_Darcy_y_VidaUtil.md): Protocolo completo de ensayos Darcy, factor TCF y normas CAA.
+  * [`03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/03_Modelado_Hermia_y_Optimizacion_RSM/Guia_Modelado_Hermia_y_Superficie_Respuesta.md): Modelado cinético de Hermia y ANOVA.
+  * [`04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md`](./05_Hito5_Ensayos_Membrana_VidaUtil/04_Autopsia_SEM_EDS_Fibras_Helixone/Protocolo_Autopsia_SEM_EDS_Membrana_FX100.md): Protocolo de disección, corte criogénico y microanálisis SEM/EDS.
+
+---
+
+### 📁 [`06_Hito6_Evaluacion_Industrial_Energia_Costos/`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/)
+* **Objetivo de los Alumnos**: Transformar la física del proceso en indicadores industriales tecno-económicos para la defensa de la Tesis de Ingeniería Industrial.
+* **Qué aprenderán aquí**:
+  * **Subhito 6.1**: Cálculo del Consumo Específico de Energía ($\text{SEC}$ en $\text{kWh/m}^3$) para cada combinación de RPM y TMP.
+  * **Subhito 6.2**: Modelado de vida útil de la membrana Fresenius FX100, proyección de degradación por ensuciamiento irreversible ($R_{\text{irrev}}$) y determinación de la frecuencia óptima de limpieza química (CIP).
+  * Estructura de costos operativos ($\text{OPEX}$ unitario en $\text{USD/m}^3$ y $\$AR/\text{m}^3$) para escalado en comunidades rurales.
+* **Archivos Clave**:
+  * [`README.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/README.md): Síntesis de indicadores industriales y balances energéticos.
+  * [`01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/01_Consumo_Energetico_SEC/Guia_Calculo_SEC_Consumo_Especifico.md): Ecuaciones de potencia, medición en DM860 y curvas de SEC.
+  * [`02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md`](./06_Hito6_Evaluacion_Industrial_Energia_Costos/02_Costos_y_Vida_Util/Guia_Vida_Util_Frecuencia_CIP_y_Costos_Operativos.md): Planilla de costos OPEX y vida útil de cartuchos capilares.
 
 ---
 

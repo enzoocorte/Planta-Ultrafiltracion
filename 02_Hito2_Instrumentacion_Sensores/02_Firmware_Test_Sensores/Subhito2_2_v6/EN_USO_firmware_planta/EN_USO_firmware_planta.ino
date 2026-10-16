@@ -61,6 +61,15 @@ struct RegistroCalibracion {
   float    k_alim;
   float    k_perm;
   float    j_lmh;
+  // Subhito 2.4: Presión manométrica primaria y modelo de Darcy en tiempo real
+  float    p1_bar;
+  float    p2_bar;
+  float    tmp_bar;
+  float    temp_c;
+  float    j20_lmh;
+  float    tcf;
+  float    r_total;
+  float    r_torta;
 };
 
 struct EnsayoInfo {
@@ -129,6 +138,13 @@ bool  flagCruceSensores = false;
 
 ModeloDarcy modeloDarcy;
 ResultadoDarcy resultadoDarcy;
+
+// Variables de Presión Primaria Manométrica y Modelo de Darcy (Subhito 2.4)
+float p1_manometro_bar  = 0.30f; // Manómetro Bourdon P1 (Alimentación)
+float p2_manometro_bar  = 0.20f; // Manómetro Bourdon P2 (Retentado)
+float p3_manometro_bar  = 0.00f; // Contrapresión Permeado / Columna hidrostática
+float temp_agua_C       = 20.0f; // Temperatura de proceso (°C)
+float tmp_efectiva_bar  = 0.25f; // TMP = ((P1 + P2) / 2) - P3
 
 uint32_t tLoop = 0;
 uint32_t tCaudal = 0;
@@ -228,6 +244,14 @@ void guardarMuestraDatalogger() {
   reg.k_alim         = sensorAlimentacion.getK();
   reg.k_perm         = sensorPermeado.getK();
   reg.j_lmh          = jLMH_actual;
+  reg.p1_bar         = p1_manometro_bar;
+  reg.p2_bar         = p2_manometro_bar;
+  reg.tmp_bar        = tmp_efectiva_bar;
+  reg.temp_c         = temp_agua_C;
+  reg.j20_lmh        = resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual;
+  reg.tcf            = resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f;
+  reg.r_total        = resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f;
+  reg.r_torta        = resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f;
 
   bufferLog[bufferHead] = reg;
   bufferHead = (bufferHead + 1) % MAX_REGISTROS;
@@ -235,9 +259,9 @@ void guardarMuestraDatalogger() {
     bufferCount++;
   }
 
-  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f (Merma:%.1f%%) | Q_Perm=%.1f (Merma:%.1f%%, J/J0:%.1f%%) | J=%.2f LMH\n",
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f | Q_Perm=%.1f | TMP=%.2f bar | J20=%.2f LMH | R_torta=%.2e m^-1\n",
                 (unsigned int)bufferCount, ensayoActualId, t_rel_s, reg.rpm,
-                reg.q_alim, reg.merma_alim_pct, reg.q_perm, reg.merma_perm_pct, reg.j_sobre_j0_pct, reg.j_lmh);
+                reg.q_alim, reg.q_perm, reg.tmp_bar, reg.j20_lmh, reg.r_torta);
 }
 
 // ------------------------------------------------------------------------------
@@ -343,7 +367,7 @@ void handleStatus() {
   uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
   if (prog > 100) prog = 100;
 
-  char buf[1350];
+  char buf[1800];
   int n = snprintf(buf, sizeof(buf),
     "{"
     "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
@@ -351,6 +375,8 @@ void handleStatus() {
     "\"f_perm\":%.2f,\"q_perm\":%.1f,\"vol_perm\":%.4f,\"q_ret\":%.1f,\"recov\":%.2f,"
     "\"q_alim_ref\":%.1f,\"merma_alim\":%.1f,\"q_perm_ref\":%.1f,\"merma_perm\":%.1f,\"j_j0\":%.1f,"
     "\"perm_manual\":%s,\"q_perm_man\":%.1f,"
+    "\"p1\":%.3f,\"p2\":%.3f,\"p3\":%.3f,\"tmp\":%.3f,\"temp\":%.1f,"
+    "\"j20\":%.2f,\"tcf\":%.3f,\"r_tot\":%.3e,\"r_torta\":%.3e,\"darcy_ok\":%s,"
     "\"flan_alim\":%lu,\"val_alim\":%lu,\"gl_alim\":%lu,"
     "\"flan_perm\":%lu,\"val_perm\":%lu,\"gl_perm\":%lu,"
     "\"modo_seco\":%s,\"solo_alim\":%s,\"ruido_seco\":%s,"
@@ -374,6 +400,12 @@ void handleStatus() {
     qRet_mLmin, recuperacion,
     qAlimRef_mLmin, mermaAlim_pct, qPermRef_mLmin, mermaPerm_pct, jSobreJ0_pct,
     usarPermManual ? "true" : "false", qPermManual_mLmin,
+    p1_manometro_bar, p2_manometro_bar, p3_manometro_bar, tmp_efectiva_bar, temp_agua_C,
+    resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual,
+    resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f,
+    resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f,
+    resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f,
+    resultadoDarcy.valido ? "true" : "false",
     (unsigned long)sensorAlimentacion.flancosBrutos(), (unsigned long)sensorAlimentacion.pulsosValidos(), (unsigned long)sensorAlimentacion.glitchesVentana(),
     (unsigned long)sensorPermeado.flancosBrutos(), (unsigned long)sensorPermeado.pulsosValidos(), (unsigned long)sensorPermeado.glitchesVentana(),
     sensorPermeado.modoSeco() ? "true" : "false",
@@ -491,6 +523,53 @@ void handleSetPermManual() {
     }
   }
   server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+// Endpoint para ingresar lecturas manométricas y temperatura (Subhito 2.4 - Ley de Darcy)
+void handleSetPresion() {
+  if (server.hasArg("p1")) {
+    float p1 = server.arg("p1").toFloat();
+    if (std::isfinite(p1) && p1 >= 0.0f && p1 <= 6.0f) {
+      p1_manometro_bar = p1;
+    }
+  }
+  if (server.hasArg("p2")) {
+    float p2 = server.arg("p2").toFloat();
+    if (std::isfinite(p2) && p2 >= 0.0f && p2 <= 6.0f) {
+      p2_manometro_bar = p2;
+    }
+  }
+  if (server.hasArg("p3")) {
+    float p3 = server.arg("p3").toFloat();
+    if (std::isfinite(p3) && p3 >= 0.0f && p3 <= 2.0f) {
+      p3_manometro_bar = p3;
+    }
+  }
+  if (server.hasArg("temp")) {
+    float t = server.arg("temp").toFloat();
+    if (std::isfinite(t) && t >= 2.0f && t <= 50.0f) {
+      temp_agua_C = t;
+    }
+  }
+
+  tmp_efectiva_bar = fmaxf(0.001f, ((p1_manometro_bar + p2_manometro_bar) / 2.0f) - p3_manometro_bar);
+  resultadoDarcy = modeloDarcy.calcular(qPermEfectivo_mLmin, tmp_efectiva_bar, temp_agua_C);
+
+  String json = "{";
+  json += "\"status\":\"ok\",";
+  json += "\"p1\":" + String(p1_manometro_bar, 3) + ",";
+  json += "\"p2\":" + String(p2_manometro_bar, 3) + ",";
+  json += "\"p3\":" + String(p3_manometro_bar, 3) + ",";
+  json += "\"tmp\":" + String(tmp_efectiva_bar, 3) + ",";
+  json += "\"temp\":" + String(temp_agua_C, 1) + ",";
+  json += "\"j20\":" + String(resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual, 2) + ",";
+  json += "\"tcf\":" + String(resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f, 3) + ",";
+  json += "\"r_total\":" + String(resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f, 2) + ",";
+  json += "\"r_torta\":" + String(resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f, 2) + ",";
+  json += "\"darcy_ok\":" + String(resultadoDarcy.valido ? "true" : "false");
+  json += "}";
+
+  server.send(200, "application/json", json);
 }
 
 void handleSetRPM() {
@@ -686,7 +765,8 @@ void handleExportCSV() {
                      "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Estable_1_0;Q_Bomba_Teorico_mLmin;"
                      "Frec_Alim_Hz;Q_Alim_mLmin;Q_Alim_Inicial_mLmin;Merma_Alim_Torta_Pct;Vol_Alim_L;"
                      "Modo_Perm;Frec_Perm_Hz;Q_Perm_mLmin;Q_Perm_Inicial_mLmin;Merma_Perm_Torta_Pct;Flujo_Relativo_J_J0_Pct;Vol_Perm_L;"
-                     "Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Pct;K_Alim;K_Perm;J_LMH\n");
+                     "Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Pct;K_Alim;K_Perm;J_LMH;"
+                     "P1_Alim_bar;P2_Ret_bar;TMP_bar;Temp_C;J20_LMH;TCF;R_Total_m1;R_Torta_m1\n");
 
   uint16_t filtroId = 0;
   if (targetEnsayo == "actual") {
@@ -695,7 +775,7 @@ void handleExportCSV() {
     filtroId = (uint16_t)targetEnsayo.toInt();
   }
 
-  char fila[320];
+  char fila[450];
   for (size_t i = 0; i < bufferCount; i++) {
     size_t idx = (bufferHead + MAX_REGISTROS - bufferCount + i) % MAX_REGISTROS;
     const RegistroCalibracion& r = bufferLog[idx];
@@ -711,13 +791,15 @@ void handleExportCSV() {
       "%u;%lu;%02lu:%02lu;%.1f;%d;%.1f;"
       "%.2f;%.1f;%.1f;%.2f;%.4f;"
       "%s;%.2f;%.1f;%.1f;%.2f;%.2f;%.4f;"
-      "%.1f;%.2f;%.2f;%.2f;%.2f;%.2f\n",
+      "%.1f;%.2f;%.2f;%.2f;%.2f;%.2f;"
+      "%.3f;%.3f;%.3f;%.1f;%.2f;%.3f;%.4e;%.4e\n",
       (unsigned)r.id_ensayo, (unsigned long)r.t_relativo_s, (unsigned long)mins, (unsigned long)secs,
       r.rpm, r.en_regimen ? 1 : 0, r.q_bomba,
       r.f_alim, r.q_alim, r.q_alim_ref, r.merma_alim_pct, r.vol_alim,
       r.perm_manual ? "PROBETA_MANUAL" : "SENSOR_TIEMPO_REAL",
       r.f_perm, r.q_perm, r.q_perm_ref, r.merma_perm_pct, r.j_sobre_j0_pct, r.vol_perm,
-      r.q_ret, r.recov, r.delta, r.k_alim, r.k_perm, r.j_lmh
+      r.q_ret, r.recov, r.delta, r.k_alim, r.k_perm, r.j_lmh,
+      r.p1_bar, r.p2_bar, r.tmp_bar, r.temp_c, r.j20_lmh, r.tcf, r.r_total, r.r_torta
     );
 
     if (len > 0 && (size_t)len < sizeof(fila)) {
@@ -837,6 +919,7 @@ void setup() {
   server.on("/cmd", HTTP_GET, handleCmd);
   server.on("/set", HTTP_GET, handleSetRPM);
   server.on("/set_perm_manual", HTTP_GET, handleSetPermManual);
+  server.on("/set_presion", HTTP_GET, handleSetPresion);
   server.on("/set_dev", HTTP_GET, handleSetDev);
   server.on("/reset_dev", HTTP_GET, handleResetDev);
   server.on("/iniciar_auto_cal", HTTP_GET, handleIniciarAutoCal);
@@ -958,7 +1041,7 @@ void loop() {
     qRet_mLmin   = fmaxf(0.0f, qAlimEfectivo_mLmin - qPermEfectivo_mLmin);
     recuperacion = (qAlimEfectivo_mLmin > 50.0f) ? ((qPermEfectivo_mLmin / qAlimEfectivo_mLmin) * 100.0f) : 0.0f;
     jLMH_actual  = (qPermEfectivo_mLmin * 0.06f) / AREA_MEMBRANA_M2;
-    resultadoDarcy = ResultadoDarcy{};
+    resultadoDarcy = modeloDarcy.calcular(qPermEfectivo_mLmin, tmp_efectiva_bar, temp_agua_C);
     deltaBomba   = (qBomba > 1.0f) ? (((qAlimEfectivo_mLmin - qBomba) / qBomba) * 100.0f) : 0.0f;
 
     // Máquina de estados de Auto-Calibración en régimen permanente
@@ -987,9 +1070,11 @@ void loop() {
       }
     }
 
-    Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min (Merma:%4.1f%%) | Q_Perm:%5.1f mL/min (Merma:%4.1f%%, J/J0:%5.1f%%) | J:%4.2f LMH\n",
-                  bomba.rpmActual(), qAlimEfectivo_mLmin, mermaAlim_pct,
-                  qPermEfectivo_mLmin, mermaPerm_pct, jSobreJ0_pct, jLMH_actual);
+    Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min | Q_Perm:%5.1f mL/min | TMP:%.2f bar | J20:%4.2f LMH | R_torta:%.2e m^-1\n",
+                  bomba.rpmActual(), qAlimEfectivo_mLmin,
+                  qPermEfectivo_mLmin, tmp_efectiva_bar,
+                  resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual,
+                  resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f);
   }
 
   // 3. Muestreo del Datalogger cada 10 segundos (SOLO cuando la bomba gira realmente y hay flujo)

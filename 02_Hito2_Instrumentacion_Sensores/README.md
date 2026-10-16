@@ -26,17 +26,19 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 │    • Lectura analógica en Canal A0, conversión a voltaje y ppm de sales disueltas.   │
 │    • Compensación de conductividad por temperatura normalizada a 25°C.                │
 ├────────────────────────────────────────────────────────────────────────────────────────┤
-│ 📊 SUBHITO 2.4: Transductores de Presión (P1, P2, P3) y Presión Transmembrana (TMP)   │
-│    • Conexión a Canales A1 (Feed), A2 (Retentado) y A3 (Permeado) del mismo ADS1115.  │
-│    • Algoritmo de cálculo en tiempo real: TMP = (P1 + P2)/2 - P3.                     │
-│    • Enclavamiento mandatorio: parada de emergencia de bomba si TMP > 0.50 atm.       │
+│ 📊 SUBHITO 2.4: Instrumentación Manométrica Primaria (P1, P2) e Integración Híbrida SCADA│
+│    • Manómetros mecánicos amortiguados con baño de glicerina (inmunes a EMI, sin deriva).│
+│    • Carga de P1 (Entrada) y P2 (Retentado) en vivo en SCADA web (http://192.168.4.1). │
+│    • Cálculo automático en tiempo real de TMP = (P1 + P2)/2 - P3 en módulo darcy.h.    │
+│    • Integración en cada fila del CSV: Vogel TCF, J20 (LMH), R_total y R_torta (m^-1). │
+│    • Enclavamiento de seguridad: válvula mecánica de alivio a 0.70 bar + alertas SCADA. │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## 🎯 Entregable Maestro del Hito 2
-* **Módulo de telemetría de instrumentación operando al 100%**: Adquisición periódica y continua (1 Hz) de Caudal de Entrada ($Q_1$), Caudal de Permeado ($Q_p$), Temperatura del agua ($^\circ\text{C}$), Sólidos Totales Disueltos ($\text{ppm}$) y Presión Transmembrana ($\text{TMP}$) transmitidos sin ruido eléctrico.
+* **Módulo de telemetría de instrumentación operando al 100%**: Adquisición periódica y continua (1 Hz) de Caudal de Entrada ($Q_1$), Caudal de Permeado ($Q_p$), Temperatura del agua ($^\circ\text{C}$), Sólidos Totales Disueltos ($\text{ppm}$), presiones manométricas ($P_1, P_2$) y Presión Transmembrana ($\text{TMP}$) transmitidos sin ruido eléctrico.
 
 ---
 
@@ -55,9 +57,13 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 - [ ] Bus I2C verificado en dirección `0x48` (`GPIO 21` SDA y `GPIO 22` SCL).
 - [ ] Canal A0 leyendo la sonda TDS con respuesta coherente en agua de canilla y agua destilada.
 
-### Fase 2.4: Presión y TMP
-- [ ] Transductores P1, P2 y P3 conectados a los canales A1, A2 y A3 del ADS1115.
-- [ ] Ecuación de TMP calculando en tiempo real y disparando enclavamiento si $\text{TMP} > 0.50\text{ atm}$.
+### Fase 2.4: Instrumentación Manométrica Primaria y SCADA Darcy
+- [ ] Manómetros con baño de glicerina instalados en impulsión ($P_1$) y retentado ($P_2$).
+- [ ] Válvula de alivio de seguridad calibrada a $0.70\text{ bar}$ instalada en la impulsión.
+- [ ] Carga en vivo de $P_1, P_2$ y Temperatura en la interfaz web del SCADA (`http://192.168.4.1`).
+- [ ] Ecuación de TMP calculando en tiempo real: $\text{TMP} = \frac{P_1 + P_2}{2} - P_3$.
+- [ ] Exportación en datalogger CSV de $J_{20}$, TCF de Vogel, $R_{\text{total}}$ y $R_{\text{torta}}$ en cada muestra.
+- [ ] Alerta de sobrepresión en SCADA comprobada ante $P_1 \ge 0.60\text{ bar}$ o $\text{TMP} \ge 0.45\text{ bar}$.
 
 ---
 
