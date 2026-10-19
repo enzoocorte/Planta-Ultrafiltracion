@@ -74,14 +74,14 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 
 ---
 
-## 🧪 3. Protocolo Resumido de Ensayo de Jar Test
+## 🧪 3. Protocolo Resumido de Ensayo de Jar Test (25 Litros)
 
-1. Llenar el reactor con $5\text{ Litros}$ de agua turbia sintética ($\approx 500\text{ NTU}$).
+1. Llenar el reactor con **$25\text{ Litros}$** de agua turbia sintética ($\approx 400 - 500\text{ NTU}$).
 2. Tomar muestra testigo inicial ($T_0$).
 3. Iniciar la secuencia automática en el firmware:
-   * Dosificar coagulante de *Opuntia* ($20\text{ mg/L}$).
-   * Mezcla Rápida ($150\text{ RPM}$) durante $60\text{ s}$.
-   * Mezcla Lenta ($30\text{ RPM}$) durante $15\text{ min}$.
+   * Dosificar coagulante de *Opuntia* ($20\text{ mg/L} \implies 50\text{ mL}$ de solución madre al 1%).
+   * Mezcla Rápida (**$100\text{ RPM}$**) durante $60\text{ s}$.
+   * Mezcla Lenta (**$30\text{ RPM}$**) durante $15\text{ min}$.
    * Sedimentación ($0\text{ RPM}$) durante $30\text{ min}$.
 4. Tomar muestra del sobrenadante clarificado ($T_f$) y calcular la eficiencia:
    $$\eta (\%) = \left(\frac{T_0 - T_f}{T_0}\right) \times 100$$
@@ -91,9 +91,10 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 ## 📂 Estructura y Navegación de Subcarpetas de este Hito:
 
 * 📁 **[`01_Protocolos_y_Teoria_Floculacion/`](./01_Protocolos_y_Teoria_Floculacion/)**:
-  * 🧪 **[`Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md)**: Protocolo químico detallado de extracción de mucílago de *Opuntia*, dimensionamiento del gradiente $G$, cinética de floculación, entregable y lista de verificación.
+  * 🧪 **[`Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md)**: Protocolo químico detallado de extracción de mucílago de *Opuntia*, dimensionamiento del gradiente $G$ para $25\text{ L}$, cinética de floculación, entregable y lista de verificación.
 * 📁 **[`02_Firmware_Control_Agitador/`](./02_Firmware_Control_Agitador/)**:
-  * ⚙️ **[`Guia_Control_Agitador_L298N_y_Boya.md`](./02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md)**: Manual de conexiones del Puente H, modulación PWM, seguridad de nivel, entregable y lista de verificación.
+  * ⚙️ **[`Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md)**: **Documento Maestro de Ingeniería Mecánica**. Cálculo de fuerzas hidrodinámicas para $25\text{ L}$ a $100\text{ RPM}$, inercia de arranque, especificación de torque ($15 - 25\text{ kg}\cdot\text{cm}$), potencia ($25 - 40\text{ W}$) y modelos recomendados en Argentina.
+  * ⚙️ **[`Guia_Control_Agitador_L298N_y_Boya.md`](./02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md)**: Manual de conexiones del Puente H L298N (modo paralelo para $3.5\text{ A}$), modulación PWM, seguridad de nivel, entregable y lista de verificación.
   * 💻 **[`firmware_sedimentador/firmware_sedimentador.ino`](./02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino)**: Sketch de Arduino para ESP32 con Máquina de Estados Finitos (FSM) no bloqueante.
 * 📁 **[`03_Compras_y_Ferreteria_Hidraulica/`](./03_Compras_y_Ferreteria_Hidraulica/)**:
   * 🚰 **[`Guia_Compras_Hidraulicas_y_Locales_Salta.md`](./03_Compras_y_Ferreteria_Hidraulica/Guia_Compras_Hidraulicas_y_Locales_Salta.md)**: Guía de adaptación de 1/2" a 1/4", ensamble con bujes de bronce, lista para mostrador y locales en Salta Capital.
@@ -107,8 +108,8 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 
 > [!WARNING]
 > **Cuello de Botella Técnico Mecánico en Hito 3:**
-> Se dispone físicamente de la **cuba cónica del sedimentador**, pero **el agitador no ha sido incorporado**. Las primeras pruebas en taller evidenciaron que el motorreductor de 12V actual **carece del torque y potencia necesarios** para vencer la viscosidad y resistencia hidrodinámica del fluido al girar las paletas.
-> **Acción Requerida:** Redimensionar el par motor ($T = P / \omega$) y seleccionar un motorreductor de mayor torque o con caja reductora más robusta antes de fabricar el acople definitivo.
+> Se dispone físicamente de la **cuba cónica del sedimentador (capacidad: 25 Litros)**, pero **el agitador no ha sido incorporado**. Las pruebas en taller evidenciaron que el motorreductor de 12V actual **carece del torque y potencia necesarios** para vencer la inercia de arranque y resistencia hidrodinámica de los 25 kg de agua al girar las paletas pesadas.
+> **Acción Requerida:** Adquirir un motorreductor de mayor par ($15\text{ a }25\text{ kg}\cdot\text{cm}$ nominal, $25 - 40\text{ W}$, sinfín-corona o JGB37-550) según la memoria de cálculo en [`Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md).
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |

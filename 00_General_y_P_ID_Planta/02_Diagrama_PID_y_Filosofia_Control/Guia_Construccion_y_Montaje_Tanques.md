@@ -45,15 +45,15 @@ Esta guía describe cómo construir, perforar, sellar e instrumentar los recipie
 ## 🛠️ 2. Especificación Técnica de Componentes para Tanque T-01
 
 ### A. Recipiente Principal
-* **Volumen sugerido**: 3 a 5 Litros.
-* **Geometría ideal**: Cilíndrico de fondo cónico (o cilíndrico estándar con el fondo ligeramente inclinado) en acrílico cristal o polipropileno alimentario. El fondo cónico permite que los flóculos pesados de bentonita decanten en el vértice inferior sin quedar esparcidos.
-* **Tapa superior**: Rígida (acrílico de 5 mm o polietileno), desmontable para limpieza profunda entre corridas experimentales.
+* **Volumen Real de Planta**: **$25\text{ Litros}$** ($0.025\text{ m}^3$).
+* **Geometría Real**: Cilíndrico con fondo cónico en **acero inoxidable** (existente físicamente en taller). El fondo cónico con ángulo de $60^\circ$ permite la decantación gravitacional de los lodos hacia la válvula de purga inferior.
+* **Tapa superior**: Metálica con orificio pasante para eje del agitador, soporte para motorreductor y boya de nivel de acero inoxidable.
 
-### B. Sistema de Agitación Lenta (Floculación)
-* **Motor**: Motorreductor DC 12V con caja reductora metálica (eje D-shaft de 4 a 6 mm), velocidad nominal de 30 a 60 RPM.
-* **Eje**: Varilla de acero inoxidable AISI 304 de 4 o 6 mm de diámetro.
-* **Paleta**: Tipo pala plana o rejilla rectangular (50 a 70 mm de ancho). La agitación debe ser suave (gradiente de velocidad $G \approx 20\text{ a }50\text{ s}^{-1}$) para favorecer la colisión y aglomeración de partículas con el mucílago de nopal sin romper las cadenas macromoleculares de los flóculos.
-* **Control**: Puente H L298N conectado a la fuente de 12V y comandado por PWM desde el ESP32 (`GPIO 4` y pines de sentido `GPIO 16` y `GPIO 17`).
+### B. Sistema de Agitación y Floculación (25 Litros)
+* **Motorreductor**: Motorreductor DC $12\text{V}$ reforzado con torque nominal de **$15 \text{ a } 25\text{ kg}\cdot\text{cm}$ ($1.5 - 2.5\text{ Nm}$)** y velocidad regulable hasta **$100\text{ RPM}$** (modelos recomendados: Sinfín-Corona 5840-31ZY / GW600 o JGB37-550/555). *(Ver memoria de cálculo en `03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`)*.
+* **Eje**: Varilla de acero inoxidable AISI 304 de $6\text{ mm}$ de diámetro montada con buje guía en tapa y acople flexible.
+* **Paleta**: Tipo pala plana rectangular reforzada de acero inoxidable ($140\text{ mm}$ de ancho $\times 50\text{ mm}$ de alto).
+* **Control**: Puente H L298N (modo paralelo para $3.5\text{ A}$) conectado a la fuente de $12\text{V}$ y comandado por PWM desde el ESP32 (`GPIO 4`, `GPIO 16`, `GPIO 17`) con corte de seguridad por boya de acero inoxidable (`GPIO 32`).
 
 ---
 

@@ -84,17 +84,18 @@ flowchart TD
 ---
 
 ### 📁 [`03_Hito3_Reactor_Sedimentador_Agitador/`](./03_Hito3_Reactor_Sedimentador_Agitador/)
-* **Objetivo de los Alumnos**: Automatizar el pretratamiento fisicoquímico en el reactor cónico antes de enviar el agua a la membrana.
+* **Objetivo de los Alumnos**: Automatizar el pretratamiento fisicoquímico en el reactor cónico de **$25\text{ Litros}$** antes de enviar el agua a la membrana.
 * **Qué aprenderán aquí**:
-  * Ecuación del Gradiente de Velocidad de Camp-Stein ($G = \sqrt{P / (\mu V)}$).
-  * Mezcla Rápida ($150\text{ RPM}$, $G \approx 400\text{ s}^{-1}$) para dispersión del biocoagulante (*Opuntia ficus-indica*).
+  * Ecuación del Gradiente de Velocidad de Camp-Stein ($G = \sqrt{P / (\mu V)}$) para $25\text{ L}$.
+  * Mezcla Rápida ($100\text{ RPM}$) para dispersión del biocoagulante (*Opuntia ficus-indica*).
   * Mezcla Lenta ($30\text{ RPM}$, $G \approx 35\text{ s}^{-1}$) para crecimiento de flóculos sin rotura por cizallamiento.
   * Sedimentación estática ($0\text{ RPM}$) y decantación de lodos.
-  * Control de velocidad PWM con el driver Puente H **L298N** y corte de seguridad por **boya de nivel de acero inoxidable**.
+  * Control de velocidad PWM con el driver Puente H **L298N** (en modo paralelo para $3.5\text{ A}$) y corte de seguridad por **boya de nivel de acero inoxidable**.
 * **Archivos Clave**:
   * [`README.md`](./03_Hito3_Reactor_Sedimentador_Agitador/README.md): Fundamentos de ingeniería química, gradiente $G$ y esquema de conexiones.
-  * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Protocolo completo de preparación de solución madre de *Opuntia*, dosificación y cálculo de remoción $\eta$.
-  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Guía de conexión pin a pin, modulación PWM y enclavamiento de nivel.
+  * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Protocolo completo de preparación de solución madre de *Opuntia*, dosificación para $25\text{ L}$ y cálculo de remoción $\eta$.
+  * [`02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md): Memoria de cálculo de torque ($15 - 25\text{ kg}\cdot\text{cm}$), inercia de $25\text{ kg}$ de agua y selección de motorreductor 12V.
+  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Guía de conexión pin a pin, modulación PWM, conexión en paralelo y enclavamiento de nivel.
   * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware con Máquina de Estados Finitos (FSM) no bloqueante.
 
 ---

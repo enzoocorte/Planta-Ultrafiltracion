@@ -69,7 +69,7 @@ La boya sumergible de acero inoxidable contiene en su vástago un sensor magnét
 
 ---
 
-## 🎛️ 3. Modulación PWM y Calibración de Velocidades
+## 🎛️ 3. Modulación PWM y Calibración de Velocidades (Reactor de 25 Litros)
 
 El ESP32 utiliza el módulo periférico LEDC para generar ondas cuadradas de alta frecuencia ($5\text{ kHz}$) con resolución de 8 bits ($0 \text{ a } 255$):
 
@@ -77,8 +77,15 @@ El ESP32 utiliza el módulo periférico LEDC para generar ondas cuadradas de alt
   `ledcWrite(PIN_AGIT_ENA, 0);`
 * **Mezcla Lenta de Floculación ($\approx 30\text{ RPM}$)**:
   `ledcWrite(PIN_AGIT_ENA, 80);` (Ciclo de trabajo $\approx 31\%$)
-* **Mezcla Rápida de Coagulación ($\approx 150\text{ RPM}$)**:
-  `ledcWrite(PIN_AGIT_ENA, 220);` (Ciclo de trabajo $\approx 86\%$)
+* **Mezcla Rápida de Coagulación ($\approx 100\text{ RPM}$)**:
+  `ledcWrite(PIN_AGIT_ENA, 255);` (Ciclo de trabajo $100\%$ — Máxima velocidad operativa para reactor de 25L)
+
+> [!TIP]
+> **Arranque Suave Anti-Stall en 25 Litros:**  
+> Debido a la inercia de los 25 kg de agua estática, al pasar de 0 a 30 RPM o 100 RPM se recomienda aplicar un pulso de $300\text{ ms}$ al 100% (`ledcWrite(PIN_AGIT_ENA, 255)`) para vencer el par de despegue y luego descender a la consigna de trabajo.
+> 
+> Si el motorreductor seleccionado consume más de $1.5\text{ A}$, conectar los dos puentes del módulo L298N en paralelo (OUT1 puenteado con OUT4, OUT2 con OUT3; IN1 con IN4, IN2 con IN3; ENA con ENB) para permitir hasta **$3.5\text{ A}$ continuos**.  
+> *(Ver detalles completos en [`Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md))*.
 
 ---
 

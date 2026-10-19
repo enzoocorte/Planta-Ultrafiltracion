@@ -6,16 +6,16 @@
 ---
 
 ## 🎯 Entregable Concreto de este Protocolo
-* **Protocolo experimental de Jar Test validado y estandarizado**: Ejecución de ensayos de remoción de turbidez en el reactor cónico de $5\text{ L}$ utilizando coagulante natural (*Opuntia ficus-indica* o Moringa), determinando la dosis óptima ($\text{mg/L}$), el tiempo de floculación y la eficiencia de clarificación ($\eta \ge 85\%$) para acondicionar el agua antes de su ingreso a la membrana FX100.
+* **Protocolo experimental de Jar Test validado y estandarizado**: Ejecución de ensayos de remoción de turbidez en el reactor cónico de **$25\text{ Litros}$** utilizando coagulante natural (*Opuntia ficus-indica* o Moringa), determinando la dosis óptima ($\text{mg/L}$), el tiempo de floculación y la eficiencia de clarificación ($\eta \ge 85\%$) para acondicionar el agua antes de su ingreso a la membrana FX100.
 
 ---
 
 ## 📋 Lista de Verificación (Checklist de Avance)
 - [ ] Solución madre de biopolímero coagulante (*Opuntia ficus-indica* al $1\%\text{ p/v}$) preparada y filtrada.
 - [ ] Agua sintética estandarizada con bentonita/arcilla coloidal a turbidez inicial conocida ($\approx 400 - 500\text{ NTU}$).
-- [ ] Boya de seguridad en acero inoxidable calibrada: corte inmediato si el nivel cae por debajo de $1\text{ L}$.
-- [ ] Ciclo de Mezcla Rápida verificado: $150\text{ RPM}$ ($G \approx 400\text{ s}^{-1}$) durante $60\text{ s}$ para dispersión del coagulante.
-- [ ] Ciclo de Mezcla Lenta verificado: $30\text{ RPM}$ ($G \approx 35\text{ s}^{-1}$) durante $15\text{ min}$ favoreciendo la colisión sin ruptura de flóculos.
+- [ ] Boya de seguridad en acero inoxidable calibrada: corte inmediato si el nivel cae por debajo de la cota de succión ($h \le 5\text{ cm}$ sobre la unión cilíndro-cono).
+- [ ] Ciclo de Mezcla Rápida verificado: **$100\text{ RPM}$** durante $60\text{ s}$ para dispersión del coagulante sin vórtice excesivo.
+- [ ] Ciclo de Mezcla Lenta verificado: **$30\text{ RPM}$** ($G \approx 25 - 45\text{ s}^{-1}$) durante $15\text{ min}$ favoreciendo la colisión sin ruptura de flóculos.
 - [ ] Período de sedimentación estática completado ($0\text{ RPM}$) durante $30\text{ min}$.
 - [ ] Muestra de sobrenadante extraída a $5\text{ cm}$ bajo la superficie sin perturbar el manto de lodos del fondo cónico.
 - [ ] Medición de turbidez final y cálculo de eficiencia de remoción $\eta$ registrado en planilla.
@@ -46,11 +46,13 @@ $$G = \sqrt{\frac{P}{\mu \cdot V}} = \sqrt{\frac{N_p \cdot \rho \cdot N^3 \cdot 
 Donde:
 * $P$: Potencia disipada transferida por el impulsor al fluido ($\text{W}$).
 * $\mu$: Viscosidad dinámica del agua a $20^\circ\text{C}$ ($\approx 1.002 \times 10^{-3}\text{ Pa}\cdot\text{s}$).
-* $\rho$: Densidad del agua ($\approx 1000\text{ kg/m}^3$).
-* $V$: Volumen útil del reactor ($5\text{ L} = 0.005\text{ m}^3$).
+* $\rho$: Densidad del agua ($\approx 1050\text{ kg/m}^3$).
+* $V$: Volumen útil del reactor (**$25\text{ Litros} = 0.025\text{ m}^3$**).
 * $N$: Frecuencia de rotación del agitador ($\text{rev/s} = \frac{\text{RPM}}{60}$).
-* $D$: Diámetro de la paleta agitadora ($\text{m}$).
-* $N_p$: Número de potencia adimensional característico de la geometría del impulsor.
+* $D$: Diámetro de la paleta agitadora ($0.14\text{ m}$).
+* $N_p$: Número de potencia adimensional característico de la geometría del impulsor ($N_p \approx 2.5$).
+
+*(Para el cálculo detallado de torque y selección de motorreductor, consultar [`Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](../02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md))*.
 
 ### 2.2. Parámetro Adimensional de Camp ($Gt$)
 El producto $Gt$ cuantifica el número total de oportunidades de colisión interparticular:
@@ -61,7 +63,7 @@ $$Gt = G \times t$$
 ┌──────────────────────────────┬──────────────────┬───────────────────┬──────────────┬────────────────────────────────────────────┐
 │ Etapa de Proceso             │ Velocidad (RPM)  │ Gradiente G (s⁻¹) │ Tiempo (t)   │ Objetivo Hidrodinámico                     │
 ├──────────────────────────────┼──────────────────┼───────────────────┼──────────────┼────────────────────────────────────────────┤
-│ 1. Mezcla Rápida (Coagulación)│ 150 RPM          │ ~ 350 - 450 s⁻¹   │ 60 s         │ Dispersión molecular homogénea (Gt ≈ 24000)│
+│ 1. Mezcla Rápida (Coagulación)│ 100 RPM          │ ~ 180 - 250 s⁻¹   │ 60 s         │ Dispersión homogénea sin vórtice destructivo│
 │ 2. Mezcla Lenta (Floculación) │ 30 RPM           │ ~ 25 - 45 s⁻¹     │ 900 s (15 m) │ Crecimiento de flóculos sin rotura (Gt ≈ 31500)│
 │ 3. Sedimentación Estática    │ 0 RPM (Apagado)  │ 0 s⁻¹             │ 1800 s (30 m)│ Decantación gravitacional hacia fondo cónico│
 └──────────────────────────────┴──────────────────┴───────────────────┴──────────────┴────────────────────────────────────────────┘
@@ -87,20 +89,20 @@ $$Gt = G \times t$$
 
 ---
 
-## 🧪 4. Procedimiento Experimental de Jar Test en el Reactor Cónico
+## 🧪 4. Procedimiento Experimental de Jar Test en el Reactor Cónico (25 Litros)
 
-1. **Llenado del Reactor**: Introducir $5.0\text{ L}$ de agua de ensayo en el reactor cónico.
+1. **Llenado del Reactor**: Introducir **$25.0\text{ L}$** de agua de ensayo en el reactor cónico.
 2. **Medición Testigo Inicial**: Tomar una alícuota de $50\text{ mL}$ y medir turbidez inicial ($T_0$, en $\text{NTU}$) y $\text{TDS}_0$ ($\text{ppm}$).
-3. **Dosificación del Coagulante**: Adicionar con pipeta graduada la dosis a evaluar:
-   * Dosis baja: $10\text{ mg/L}$ ($5\text{ mL}$ de solución madre en $5\text{ L}$).
-   * Dosis media (recomendada): $20\text{ mg/L}$ ($10\text{ mL}$ de solución madre en $5\text{ L}$).
-   * Dosis alta: $30\text{ mg/L}$ ($15\text{ mL}$ de solución madre en $5\text{ L}$).
+3. **Dosificación del Coagulante**: Adicionar con probeta o pipeta graduada la dosis calculada para los $25\text{ Litros}$:
+   * **Dosis baja ($10\text{ mg/L}$):** Adicionar **$25\text{ mL}$** de solución madre en los $25\text{ L}$.
+   * **Dosis media / Recomendada ($20\text{ mg/L}$):** Adicionar **$50\text{ mL}$** de solución madre en los $25\text{ L}$.
+   * **Dosis alta ($30\text{ mg/L}$):** Adicionar **$75\text{ mL}$** de solución madre en los $25\text{ L}$.
 4. **Ejecución de la Secuencia Automatizada**:
    * Enviar el comando `AUTO` por el Monitor Serie o presionar el botón correspondiente en el SCADA.
-   * El ESP32 activará el motor a $150\text{ RPM}$ por $60\text{ s}$.
-   * Automáticamente reducirá la marcha a $30\text{ RPM}$ por $15\text{ minutos}$.
-   * Detendrá el motor ($0\text{ RPM}$) durante $30\text{ minutos}$.
-5. **Muestreo del Sobrenadante**: Abrir con suavidad la válvula de purga superior (o pipetear a $5\text{ cm}$ de profundidad) y medir la turbidez final ($T_f$).
+   * El ESP32 activará el motorreductor a **$100\text{ RPM}$** por $60\text{ s}$.
+   * Automáticamente reducirá la marcha a **$30\text{ RPM}$** por $15\text{ minutos}$.
+   * Detendrá el motor ($0\text{ RPM}$) durante $30\text{ minutos}$ para sedimentación estática.
+5. **Muestreo del Sobrenadante**: Tomar muestra clarificada a $5\text{ cm}$ bajo la superficie libre del líquido y medir la turbidez final ($T_f$).
 
 ---
 

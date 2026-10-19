@@ -35,6 +35,21 @@ En el diseño preliminar se evaluó instalar transductores electrónicos piezore
 
 ---
 
+### 2.1. Análisis Técnico del Manómetro Seco Beyca 0–10 kg/cm² (Comprado en Mercado Libre)
+
+> [!WARNING]
+> **Evaluación del Manómetro Beyca 10 kg/cm² (63 mm, Seco) en la Membrana FX100:**
+> 1. **Fondo de Escala Descomunal (Error de Resolución Inadmisible):**
+>    * La membrana FX100 opera entre **$0.10\text{ y }0.40\text{ bar}$** (con límite de rotura a $0.50\text{ bar}$).
+>    * En un manómetro de $10\text{ kg/cm}^2$ ($\approx 10\text{ bar}$), todo el rango de trabajo de la planta se concentra en el **primer $1\%\text{ a }4\%$ del cuadrante**. La aguja casi no se despega del tope de cero y las divisiones mínimas son de $0.2\text{ a }0.5\text{ kg/cm}^2$, haciendo físicamente imposible leer diferencias sutiles entre $P_1$ y $P_2$ para calcular TMP.
+> 2. **Comportamiento ante Bomba Peristáltica (Ausencia de Glicerina):**
+>    * La bomba MBP-2000 genera pulsaciones cíclicas de presión en cada pasada de rodillo. En un manómetro seco, el mecanismo de engranajes transmite el golpe directo: **la aguja cabecea y vibra continuamente**, impidiendo fijar una lectura en reposo y desgastando prematuramente el mecanismo.
+> 3. **Dictamen de Ingeniería y Recomendación:**
+>    * **Cambio / Devolución en Mercado Libre (Recomendado):** Solicitar el cambio por un manómetro de **$0\text{ a }1.0\text{ bar}$** (o **$0\text{ a }1.6\text{ bar}$** / **$0\text{ a }15\text{ psi}$**) **CON BAÑO DE GLICERINA**, rosca inferior $1/4"\text{ BSP}$.
+>    * Si no se cambia: este manómetro Beyca 10 kg solo servirá como testigo de sobrepresión extrema o prueba hidrostática general, pero no aportará datos útiles para el modelado de Darcy de la tesis.
+
+---
+
 ## 🚰 3. Esquema de Montaje Hidráulico en la Planta
 
 ```text

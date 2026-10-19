@@ -98,9 +98,9 @@ El driver digital DM860 posee 8 pequeños interruptores deslizantes en su latera
  │ **SW2**   │ **OFF**      │ Trabajo (RMS)    │ de **~3.14A RMS (3.77A Pico)**. Entrega el      │
  │ **SW3**   │ **ON**       │                  │ torque completo de 4.5 Nm sin saturar bobinas.  │
  ├───────────┼──────────────┼──────────────────┼─────────────────────────────────────────────────┤
- │ **SW4**   │ ❗**OFF**❗   │ Reducción en     │ **STANDSTILL CURRENT AL 50% (OBLIGATORIO)**:     │
+ │ **SW4**   │ ❗**OFF**❗   │ Reducción en     │ **STANDSTILL CURRENT AL 50% (MANDATORIO)**:      │
  │           │              │ Reposo           │ Cuando la bomba frena, el driver baja la        │
- │           │              │                  │ corriente a 1.5A. **El motor se mantiene frío**.│
+ │           │              │                  │ corriente a 1.5A. **Reduce el calor en un 75%** │
  ├───────────┼──────────────┼──────────────────┼─────────────────────────────────────────────────┤
  │ **SW5**   │ **ON**       │                  │                                                 │
  │ **SW6**   │ **OFF**      │ Resolución de    │ **1600 PULSOS POR REVOLUCIÓN (8 micropasos)**:   │
@@ -108,6 +108,21 @@ El driver digital DM860 posee 8 pequeños interruptores deslizantes en su latera
  │ **SW8**   │ **ON**       │                  │ acústica y sin vibrar la manguera peristáltica. │
  └───────────┴──────────────┴──────────────────┴─────────────────────────────────────────────────┘
 ```
+
+---
+
+### 4.1. Análisis Crítico del Switch SW4 (¿OFF u ON?) y Gestión Térmica
+
+> [!CAUTION]
+> **SW4 DEBE ESTAR EN `OFF`:**
+> * **Si SW4 está en `ON` (Full Current 100%):** El driver suministra corriente nominal máxima permanente **incluso cuando la bomba está detenida o en pausa**. Toda esa energía eléctrica se disipa como calor puro por efecto Joule ($P = I^2 \cdot R$), provocando que el motor NEMA 34 hierva literalmente sin siquiera estar girando.
+> * **Si SW4 está en `OFF` (Half Current 50%):** Al detenerse el tren de pulsos (tras $\approx 0.3\text{ s}$ sin movimiento), el DM860 reduce automáticamente la corriente de retención a la mitad. La disipación térmica cae un $75\%$ ($0.5^2 = 0.25$), permitiendo que el motor se mantenga templado.
+
+#### ❄️ Incorporación de Disipador de Aluminio y Ventilador Forzado de 12V:
+* **Diagnóstico térmico:** Los motores paso a paso NEMA 34 tienen un régimen normal de $55^\circ\text{C}$ a $75^\circ\text{C}$. En ensayos continuos de ultrafiltración de varias horas, adosar refrigeración activa es una **práctica recomendada de ingeniería**:
+  1. **Disipador:** Montar un bloque de aluminio aleteado sobre una de las caras planas de la carcasa del motor utilizando **grasa siliconada térmica** para maximizar la conducción.
+  2. **Ventilador (Fan 12V):** Conectar el ventilador directamente a la salida de $12\text{V DC}$ de la fuente de alimentación (en paralelo con la alimentación del L298N).
+  3. **Resultado:** Se logra una reducción de temperatura de **$20^\circ\text{C} \text{ a } 30^\circ\text{C}$**, manteniendo la carcasa por debajo de $45^\circ\text{C}$ y protegiendo los sellos y rodamientos del cabezal peristáltico MBP-2000.
 
 ---
 

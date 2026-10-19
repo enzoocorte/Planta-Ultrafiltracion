@@ -89,9 +89,9 @@ A partir del análisis exhaustivo del documento preliminar y del material fotogr
 ```
 
 #### Modificaciones Mecánicas a Realizar:
-1. **Reemplazo del Motor por Motorreductor:**
-   * Descartar el motor de CD. Utilizar un **motorreductor DC 12V con caja reductora metálica (tipo JGA25-370 o TT metálico)** con velocidad nominal de **30 a 60 RPM** y torque mínimo de **$1.5 \text{ a } 3.0 \text{ kg}\cdot\text{cm}$**.
-   * Costo muy bajo, bajo consumo (< 300 mA), controlable por PWM desde el ESP32 mediante puente H (L298N o MOSFET simple).
+1. **Reemplazo del Motor por Motorreductor de Potencia para 25 Litros:**
+   * Descartar motores de juguete o subdimensionados (< 5 kg·cm). Para mover una masa líquida de **$25\text{ Litros}$ ($25\text{ kg}$)** con paleta pesada de acero a velocidades de hasta **$100\text{ RPM}$**, se requiere un **motorreductor DC 12V con torque nominal de $15 \text{ a } 25\text{ kg}\cdot\text{cm}$ ($1.5 - 2.5\text{ Nm}$)** y potencia de **$25 \text{ a } 40\text{ W}$** (modelos tipo Sinfín-Corona 5840-31ZY / GW600 o JGB37-550/555 reforzado).
+   * Controlable por modulación PWM desde el ESP32 mediante puente H L298N en modo canales paralelos ($3.5\text{ A}$). *(Consultar memoria de cálculo completa en `03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`)*.
 2. **Sistema de Guía en Tapa (Cojinete central):**
    * Perforar el centro de la tapa a Ø10 mm.
    * Montar un **pasamuros o portabuje de Delrin/Teflón o buje de bronce fosforoso autolubricado** para estabilizar el vástago de 32 cm. Esto elimina cualquier vibración o cabeceo excéntrico.

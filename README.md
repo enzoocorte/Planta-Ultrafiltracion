@@ -160,10 +160,12 @@ SistemaUF/
   * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE EN DESARROLLO (Pendiente de validación en ESP32)** con módulo Darcy (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
 
 ### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/` *(Avance: 20% — Cuello de Botella en Motorreductor)*
-* **¿Qué ponemos aquí?**: El subsistema químico y mecánico de coagulación-floculación en el reactor cónico.
-* **Situación real**: Se dispone físicamente del cuerpo/cono del sedimentador, pero **el agitador no está incorporado** debido a que el motorreductor actual carece de la potencia/torque requerida para mover las paletas con fluido.
+* **¿Qué ponemos aquí?**: El subsistema químico y mecánico de coagulación-floculación en el reactor cónico de **$25\text{ Litros}$**.
+* **Situación real**: Se dispone físicamente de la cuba de acero inoxidable de $25\text{ L}$, pero **el agitador no está incorporado** debido a que el motorreductor actual carece del torque necesario para mover la paleta pesada en $25\text{ kg}$ de fluido turbio a $100\text{ RPM}$.
 * **Archivos clave**:
-  * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Extracción de mucílago de cladodios de *Opuntia*, cálculo de gradiente $G$ y ensayo de Jar Test.
+  * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Extracción de mucílago de *Opuntia*, cálculo de gradiente $G$ para $25\text{ L}$ y ensayo de Jar Test.
+  * [`02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md): **Memoria de cálculo de torque** ($15 - 25\text{ kg}\cdot\text{cm}$, $25-40\text{ W}$), arrastre hidrodinámico y catálogo de modelos comerciales.
+  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Conexión del L298N en paralelo ($3.5\text{ A}$), PWM anti-stall y boya de nivel.
   * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware FSM no bloqueante para driver L298N con protección por boya de nivel.
   * [`04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html`](./03_Hito3_Reactor_Sedimentador_Agitador/04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html): Manual interactivo de conexionado y fotos de taller.
 
