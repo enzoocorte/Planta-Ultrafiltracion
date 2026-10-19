@@ -22,7 +22,7 @@ Como tienes acceso al repositorio y memoria persistente, no repetiremos todo el 
 En el **Hito 3** (`03_Hito3_Reactor_Sedimentador_Agitador/`), tenemos construido y disponible en taller el **tanque reactor sedimentador de 25 Litros útiles** en chapa de acero inoxidable con fondo cónico de $60^\circ$ y tapa metálica desmontable con orificio pasante (puedes ver las fotos reales de la cuba, la base trípode y la tapa en la carpeta `03_Hito3_Reactor_Sedimentador_Agitador/04_Galeria_y_Montaje_Mecanico/` y en `guia_conexion_sedimentador.html`).
 
 **El problema físico:**
-Actualmente el agitador no está incorporado porque el motorreductor de 12V que teníamos en banco **carece del torque y potencia necesarios**. Al probarlo con la paleta pesada de acero inoxidable sumergida en fluido, el motor se clava y no puede vencer la inercia de arranque ni la resistencia de los **25 kg de agua con turbidez (bentonita/arcilla ~500 NTU y biopolímero de *Opuntia ficus-indica*)**.
+Aún no lo probamos físicamente en agua con carga completa, pero **el técnico del laboratorio nos advirtió con firmeza que el motorreductor actual es claramente insuficiente y se va a clavar** al intentar arrastrar la paleta pesada de acero inoxidable sumergida en los **25 kg de agua con turbidez (bentonita/arcilla ~500 NTU y biopolímero de *Opuntia ficus-indica*)**. Coincidimos plenamente con su diagnóstico y preferimos redimensionar antes de dañar componentes.
 
 ---
 
@@ -42,7 +42,7 @@ Actualmente el agitador no está incorporado porque el motorreductor de 12V que 
 
 ## ❓ 3. Preguntas Concretas para tu Dictamen Técnico
 
-Queremos tu criterio técnico independiente sobre cuatro ejes clave:
+Queremos tu criterio técnico independiente sobre cinco ejes clave:
 
 ### A. Selección del Motorreductor: ¿Qué tipo y modelo nos recomiendas?
 Antigravity formuló una memoria preliminar en `03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md` estimando un torque nominal de $15\text{ a }25\text{ kg}\cdot\text{cm}$ ($1.5 - 2.5\text{ Nm}$) y potencia eléctrica de $25 - 40\text{ W}$.
@@ -63,7 +63,14 @@ Nuestra idea base es **montar el motor directamente sobre la tapa desmontable de
 * Para mover este motorreductor en 25 L (que consumirá entre 1.5A y 3.5A en los picos de arranque), ¿alcanza con conectar los dos canales del L298N en paralelo para duplicar su capacidad a 3.5A?
 * ¿O nos sugieres sustituir el L298N por un driver MOSFET más moderno y eficiente como el **BTS7960 (43A)** o un módulo MOSFET unidireccional simple? (Teniendo en cuenta que en un agitador no es imprescindible invertir el giro en marcha normal).
 
-### D. Puntos Ciegos y Recomendaciones Críticas
+### D. Arquitectura de Control: ¿1 ESP32 Centralizado vs. 2 ESP32 Distribuidos?
+Dado que la bomba de filtración y el agitador operan en etapas secuenciales y no simultáneas (primero coagulación/floculación/sedimentación y recién después filtración continua):
+* Estamos evaluando si colocar un **segundo ESP32 dedicado exclusivamente en el sedimentador**.
+  * **La ventaja:** Todo el cableado de potencia del motorreductor, driver L298N y boya queda concentrado localmente en el Módulo 1 (Sedimentador), evitando tirar cables largos hasta el maletín de control principal.
+  * **El desafío:** Es prioritario mantener **una sola aplicación/interfaz web unificada** para el usuario (no queremos tener que cambiar de red Wi-Fi en el smartphone para operar cada parte).
+* ¿Qué opinas? ¿Conviene mantener **1 solo ESP32 central** en el maletín comunicando el sedimentador mediante una manguera de cables con conector rápido industrial (tipo ficha circular GX16 de 4 pines: 2 motor + 2 boya)? ¿O recomiendas **2 ESP32 distribuidos** comunicándose de forma inalámbrica por protocolo **ESP-NOW** (un nodo esclavo en el sedimentador y el nodo maestro en el maletín con el servidor web SCADA)?
+
+### E. Puntos Ciegos y Recomendaciones Críticas
 * ¿Qué consideraciones hidrodinámicas o mecánicas crees que se nos pueden estar escapando al escalar de 5 a 25 litros (deflectores/baffles anti-vórtice, longitud del eje, efecto de la turbulencia sobre el manto de lodos del fondo cónico)?
 
 ---
