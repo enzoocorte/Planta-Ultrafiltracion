@@ -33,6 +33,6 @@ Garantizar la sincronización de trabajo, la trazabilidad de código y la cohere
 
 ## 📜 4. Reglas Operativas Mandatorias
 
-1. **Cero código suelto:** Todo firmware debe compilarse desde la carpeta oficial del hito en curso (`02_Hito2_.../02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`).
+1. **Cero código suelto:** Todo firmware debe compilarse desde la carpeta oficial del hito en curso (`02_Hito2_.../02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`).
 2. **Registro de bitácora:** Cada ensayo en banco debe quedar documentado con su respectivo archivo CSV descargado directamente del SCADA (`http://192.168.4.1/export_csv`).
 3. **Commit y Push diario:** Al concluir cada jornada en el laboratorio de la UNSa, se realiza `git add .`, `git commit` y `git push origin main`.

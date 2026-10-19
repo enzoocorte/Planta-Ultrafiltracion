@@ -10,6 +10,13 @@
 
 ---
 
+> [!TIP]
+> 🚀 **ACCESO DIRECTO AL FIRMWARE ACTIVO (V6.4):**
+> El código fuente maestro de producción para el ESP32 (con control de bomba NEMA 34, caudalímetros con blanking, web SCADA y cálculo de Darcy) se encuentra en:
+> 👉 **[`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/)**
+
+---
+
 ## 🎯 1. Objetivos del Proyecto de Tesis
 
 ### 1.1 Objetivo General
@@ -48,7 +55,7 @@ Diseñar, construir, instrumentar y validar experimentalmente una **Planta Pilot
 > **Estado Técnico Real de la Planta en Laboratorio (Sinceramiento de Hitos):**
 > * **Hito 0 (25%):** Se cuenta con los diagramas conceptuales de flujo y P&ID; la estructura física (bastidor modular de soporte, distribución y segregación) se encuentra **recién en etapa de diseño preliminar**.
 > * **Hito 1 (70%):** Accionamiento probado en banco con motor NEMA 34 y driver DM860. **Alerta técnica abierta:** se registran problemas de calentamiento en el motor durante funcionamiento continuo, requiriendo optimización térmica y de corriente.
-> * **Hito 2 (35%):** El último firmware preparado (`Subhito2_2_v6`) **está pendiente de compilar y validar en el ESP32 real**. Siguiendo la recomendación de Argon, **se descartaron los transductores de presión electrónicos** por deriva/ruido, adoptando manómetros mecánicos de glicerina.
+> * **Hito 2 (35%):** El último firmware preparado (`subhito2_2_v6`) **está pendiente de compilar y validar en el ESP32 real**. Siguiendo la recomendación de Argon, **se descartaron los transductores de presión electrónicos** por deriva/ruido, adoptando manómetros mecánicos de glicerina.
 > * **Hito 3 (20%):** Se dispone físicamente de la cuba cónica del sedimentador, pero **el agitador no se ha incorporado** debido a que el motorreductor actual no posee el torque/potencia necesaria para mover las paletas con fluido.
 > * **Hitos 4, 5 y 6 (5% c/u):** **No comenzados a nivel físico.** Se cuenta con la arquitectura de enclavamientos, el plan de ensayos de filtración (matriz $3^2$, Hermia, autopsia SEM) y los scripts teóricos de cálculo de energía y costos en Python.
 
@@ -91,7 +98,7 @@ SistemaUF/
 ├── 📁 02_Hito2_Instrumentacion_Sensores/      ──> 📊 Metrología, Sensores y Modelo Darcy
 │   ├── 📁 01_Guias_Montaje_y_Calibracion/    ──> Guía Subhito 2.4 (Manómetros), manual docx, filtro RC
 │   ├── 📁 02_Firmware_Test_Sensores/
-│   │   ├── 📁 Subhito2_2_v6/                 ──> ⭐ FIRMWARE ACTIVO EN ESP32 (V6.4 Darcy en tiempo real)
+│   │   ├── 📁 subhito2_2_v6/                 ──> ⭐ FIRMWARE ACTIVO EN ESP32 (V6.4 Darcy en tiempo real)
 │   │   ├── 📁 subhito2_2_v4/                 ──> Firmware blindado tras auditoría 4 IAs
 │   │   └── 📁 subhito2_2_v3/                 ──> Firmware histórico de probeta
 │   ├── 📁 Datos/                             ──> Planillas de calibración en probeta y CSVs
@@ -153,11 +160,11 @@ SistemaUF/
 
 ### 📊 `02_Hito2_Instrumentacion_Sensores/` *(Avance: 35% — En Desarrollo y Ajuste de Firmware)*
 * **¿Qué ponemos aquí?**: La instrumentación física, acondicionamiento de señales y firmware en desarrollo para el ESP32.
-* **Situación real**: Siguiendo la recomendación técnica de Argon, **se descartaron definitivamente los transductores de presión electrónicos** (por deriva térmica y ruido EMI); la lectura de presiones se realiza con manómetros con baño de glicerina. El último firmware preparado (`Subhito2_2_v6`) **aún no se ha compilado ni probado físicamente en el ESP32**.
+* **Situación real**: Siguiendo la recomendación técnica de Argon, **se descartaron definitivamente los transductores de presión electrónicos** (por deriva térmica y ruido EMI); la lectura de presiones se realiza con manómetros con baño de glicerina. El último firmware preparado (`subhito2_2_v6`) **aún no se ha compilado ni probado físicamente en el ESP32**.
 * **Archivos clave**:
   * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md): Especificación de manómetros Bourdon de glicerina (inmunes a EMI) e ingesta asistida en SCADA.
   * [`01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md): Demostración matemática del filtro de ruido de 81 Hz para el informe de tesis.
-  * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE EN DESARROLLO (Pendiente de validación en ESP32)** con módulo Darcy (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
+  * [`02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE EN DESARROLLO (Pendiente de validación en ESP32)** con módulo Darcy (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
 
 ### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/` *(Avance: 20% — Cuello de Botella en Motorreductor)*
 * **¿Qué ponemos aquí?**: El subsistema químico y mecánico de coagulación-floculación en el reactor cónico de **$25\text{ Litros}$**.

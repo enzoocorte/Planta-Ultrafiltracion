@@ -82,8 +82,8 @@ Para avanzar con método científico y validación segura paso a paso en el banc
   * 🚰 **[`Guia_Montaje_Hidraulico_Sensores.md`](./01_Guias_Montaje_y_Calibracion/Guia_Montaje_Hidraulico_Sensores.md)**: Instalación física de caudalímetros y sondas en tubería con entregable y checklist.
 
 * 📁 **[`02_Firmware_Test_Sensores/`](./02_Firmware_Test_Sensores/)**:
-  * 🌟 **[`Subhito2_2_v6/`](./02_Firmware_Test_Sensores/Subhito2_2_v6/)**: **FIRMWARE ACTIVO DE PRODUCCIÓN (GRABADO EN ESP32)**:
-    * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/)**: Integración de Manómetros Bourdon de Glicerina, endpoint `/set_presion`, cálculo continuo de Ley de Darcy (`darcy.h`), factor TCF de Vogel, exportación CSV de 8 columnas metrológicas y panel visual interactivo SCADA.
+  * 🌟 **[`subhito2_2_v6/`](./02_Firmware_Test_Sensores/subhito2_2_v6/)**: **FIRMWARE ACTIVO DE PRODUCCIÓN (GRABADO EN ESP32)**:
+    * ⭐ **[`EN_USO_firmware_planta/`](./02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/)**: Integración de Manómetros Bourdon de Glicerina, endpoint `/set_presion`, cálculo continuo de Ley de Darcy (`darcy.h`), factor TCF de Vogel, exportación CSV de 8 columnas metrológicas y panel visual interactivo SCADA.
   * 🚀 **[`subhito2_2_v4/`](./02_Firmware_Test_Sensores/subhito2_2_v4/)**: Firmware previo refactorizado tras auditoría cruzada de 4 IAs.
   * 🌟 **[`subhito2_2_v3/`](./02_Firmware_Test_Sensores/subhito2_2_v3/)**: Versión previa de consolidación de banco.
   * 🚀 **[`subhito2_2_v2/`](./02_Firmware_Test_Sensores/subhito2_2_v2/)**: Firmware modular base previo con arquitectura C++ (Bomba y Caudalímetro).
@@ -101,7 +101,7 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 > [!IMPORTANT]
 > **Decisiones Técnicas y Realidad de Taller en el Hito 2:**
 > 1. **Descarte de Transductores Electrónicos de Presión (Decisión de Argon):** Se eliminan del diseño los transductores analógicos piezoeléctricos genéricos (0-10 bar) y el canal de presión del ADS1115 debido al alto error de deriva a bajas presiones (0.1–0.4 bar) y ruido EMI del motor. Se emplean **manómetros mecánicos Bourdon con baño de glicerina** montados directamente en línea.
-> 2. **Firmware ESP32:** El sketch preparado (`Subhito2_2_v6`) que incorpora los filtros, blanking y módulo Darcy **aún no ha sido compilado ni testeado en el ESP32 físico**; se encuentra pendiente de verificación en el hardware real del laboratorio.
+> 2. **Firmware ESP32:** El sketch preparado (`subhito2_2_v6`) que incorpora los filtros, blanking y módulo Darcy **aún no ha sido compilado ni testeado en el ESP32 físico**; se encuentra pendiente de verificación en el hardware real del laboratorio.
 
 | Subhito / Actividad | Estado | Porcentaje | Observaciones |
 | :--- | :---: | :---: | :--- |
@@ -114,7 +114,7 @@ Para avanzar con método científico y validación segura paso a paso en el banc
 
 ## 🏁 Criterios de Aceptación y Entregables para Pasar al Hito 3 y 4
 
-1. [ ] **Compilación y Flasheo Exitoso en ESP32:** Demostrar que el firmware `Subhito2_2_v6` compila sin errores de librerías ni desbordamientos de memoria en el ESP32 físico del laboratorio.
+1. [ ] **Compilación y Flasheo Exitoso en ESP32:** Demostrar que el firmware `subhito2_2_v6` compila sin errores de librerías ni desbordamientos de memoria en el ESP32 físico del laboratorio.
 2. [ ] **Medición Estable de Caudal en Vivo:** Caudalímetros YF-S401 respondiendo con el algoritmo de blanking y filtro RC sin conteo fantasma inducido por EMI.
 3. [ ] **Manómetros de Glicerina Montados:** Instalación física de los manómetros Bourdon en entrada ($P_1$) y retentado ($P_2$).
 4. [ ] **Cálculo de Darcy Asistido en Web SCADA:** Verificación del cálculo en tiempo real de TMP y resistencias al ingresar $P_1$ y $P_2$ desde la interfaz.

@@ -36,7 +36,7 @@ flowchart TD
 > **Estado Técnico Real de los Hitos en Taller / Laboratorio:**
 > * **Hito 0 (25% — En Diseño Preliminar):** Se definieron los diagramas conceptuales y P&ID; la estructura del bastidor y montaje físico está **recién en diseño**.
 > * **Hito 1 (70% — En Ensayos de Banco):** Bomba peristáltica y NEMA 34 probados en banco; **alerta abierta:** calentamiento del motor en régimen continuo bajo estudio.
-> * **Hito 2 (35% — En Desarrollo de Firmware):** Siguiendo la recomendación de Argon, **se descartaron los sensores de presión electrónicos** (se usan manómetros de glicerina). El firmware `Subhito2_2_v6` **está pendiente de compilar y probar en el ESP32 real**.
+> * **Hito 2 (35% — En Desarrollo de Firmware):** Siguiendo la recomendación de Argon, **se descartaron los sensores de presión electrónicos** (se usan manómetros de glicerina). El firmware `subhito2_2_v6` **está pendiente de compilar y probar en el ESP32 real**.
 > * **Hito 3 (20% — Cuello de Botella Mecánico):** Cuba cónica del sedimentador disponible, pero **el agitador no está incorporado** debido a que el motorreductor actual carece del torque/potencia requerida para mover las paletas con fluido.
 > * **Hitos 4, 5 y 6 (5% c/u — Solo Planificación):** Aún **no iniciados a nivel físico/experimental**. Se cuenta con la arquitectura teórica, protocolos de laboratorio y modelos matemáticos de proyección tecno-económica.
 
@@ -79,7 +79,7 @@ flowchart TD
   * [`README.md`](./02_Hito2_Instrumentacion_Sensores/README.md): Hoja de ruta modular en 4 subhitos, ecuaciones de calibración y checklist.
   * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_1_Caudalimetros.md): Guía de conexionado, factor K, prueba serie y calibración de microflujo YF-S401.
   * [`01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Guia_Subhito2_4_Manometros_Glicerina_y_Darcy_SCADA.md): Protocolo de lectura en manómetros con baño de glicerina, carga asistida en SCADA y cálculo en vivo de Darcy.
-  * [`02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/Subhito2_2_v6/EN_USO_firmware_planta/): Firmware Oficial Activo (V6.4) con blanking de 3000 µs, datalogger en vivo y soporte para carga de presiones manométricas.
+  * [`02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/): Firmware Oficial Activo (V6.4) con blanking de 3000 µs, datalogger en vivo y soporte para carga de presiones manométricas.
 
 ---
 
