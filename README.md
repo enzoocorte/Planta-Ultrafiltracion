@@ -44,7 +44,7 @@ Diseñar, construir, instrumentar y validar experimentalmente una **Planta Pilot
 │ 📁 0 │ Arquitectura General, Estructura DFM y P&ID     │   25%    │ 🟡 En Diseño       │
 │ 📁 1 │ Accionamiento NEMA 34 + DM860 (Bomba MBP-2000)  │   70%    │ 🟡 En Ensayos (⚠️) │
 │ 📁 2 │ Instrumentación, Filtro RC, Manómetros y Darcy  │   35%    │ 🟡 En Desarrollo   │
-│ 📁 3 │ Reactor Sedimentador, Paleta 12V y Opuntia      │   20%    │ 🔴 Inicial (Torque)│
+│ 📁 3 │ Reactor Sedimentador, Paleta 12V y Opuntia      │   25%    │ 🟡 Especificado    │
 │ 📁 4 │ Integración SCADA Web, IoT y Enclavamientos     │    5%    │ ⚪ Solo Plan       │
 │ 📁 5 │ Ensayos FX100, Matriz 3², Hermia y Autopsia SEM │    5%    │ ⚪ Solo Plan       │
 │ 📁 6 │ Evaluación Industrial: Energía (SEC) y OPEX     │    5%    │ ⚪ Modelos Teóricos│
@@ -56,7 +56,7 @@ Diseñar, construir, instrumentar y validar experimentalmente una **Planta Pilot
 > * **Hito 0 (25%):** Se cuenta con los diagramas conceptuales de flujo y P&ID; la estructura física (bastidor modular de soporte, distribución y segregación) se encuentra **recién en etapa de diseño preliminar**.
 > * **Hito 1 (70%):** Accionamiento probado en banco con motor NEMA 34 y driver DM860. **Alerta técnica abierta:** se registran problemas de calentamiento en el motor durante funcionamiento continuo, requiriendo optimización térmica y de corriente.
 > * **Hito 2 (35%):** El último firmware preparado (`subhito2_2_v6`) **está pendiente de compilar y validar en el ESP32 real**. Siguiendo la recomendación de Argon, **se descartaron los transductores de presión electrónicos** por deriva/ruido, adoptando manómetros mecánicos de glicerina.
-> * **Hito 3 (20%):** Se dispone físicamente de la cuba cónica del sedimentador, pero **el agitador no se ha incorporado** debido a que el motorreductor actual no posee el torque/potencia necesaria para mover las paletas con fluido.
+> * **Hito 3 (25%):** Especificación técnica definitiva **cerrada tras auditoría cruzada Antigravity & Argon**. Se definió el motorreductor sinfín-corona 5840-31ZY / limpiaparabrisas ($20 - 35\text{ kg}\cdot\text{cm}$), chumacera KFL08 en tapa con sándwich de Grilón anti-vibración, driver MOSFET BTS7960 (43A) y manguera umbilical con conector GX16-4. Pendiente adquisición y mecanizado en taller.
 > * **Hitos 4, 5 y 6 (5% c/u):** **No comenzados a nivel físico.** Se cuenta con la arquitectura de enclavamientos, el plan de ensayos de filtración (matriz $3^2$, Hermia, autopsia SEM) y los scripts teóricos de cálculo de energía y costos en Python.
 
 ---
@@ -166,14 +166,14 @@ SistemaUF/
   * [`01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md`](./02_Hito2_Instrumentacion_Sensores/01_Guias_Montaje_y_Calibracion/Diagnostico_y_Resolucion_Problemas_Instrumentacion.md): Demostración matemática del filtro de ruido de 81 Hz para el informe de tesis.
   * [`02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/): **FIRMWARE EN DESARROLLO (Pendiente de validación en ESP32)** con módulo Darcy (`darcy.h`), factor TCF de Vogel y exportación CSV ampliada.
 
-### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/` *(Avance: 20% — Cuello de Botella en Motorreductor)*
+### 🌪️ `03_Hito3_Reactor_Sedimentador_Agitador/` *(Avance: 25% — Especificación Cerrada / Pendiente Taller)*
 * **¿Qué ponemos aquí?**: El subsistema químico y mecánico de coagulación-floculación en el reactor cónico de **$25\text{ Litros}$**.
-* **Situación real**: Se dispone físicamente de la cuba de acero inoxidable de $25\text{ L}$, pero **el agitador no está incorporado** debido a que el motorreductor actual carece del torque necesario para mover la paleta pesada en $25\text{ kg}$ de fluido turbio a $100\text{ RPM}$.
+* **Situación real**: Especificación técnica cerrada tras dictamen cruzado. Se dispone de la cuba de $25\text{ L}$ en acero inoxidable; pendiente adquisición del motorreductor ($20-35\text{ kg}\cdot\text{cm}$), chumacera KFL08, placa de Grilón y mecanizado excéntrico en tapa.
 * **Archivos clave**:
   * [`01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md`](./03_Hito3_Reactor_Sedimentador_Agitador/01_Protocolos_y_Teoria_Floculacion/Protocolo_Ensayo_Coagulacion_Floculacion_JarTest.md): Extracción de mucílago de *Opuntia*, cálculo de gradiente $G$ para $25\text{ L}$ y ensayo de Jar Test.
-  * [`02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md): **Memoria de cálculo de torque** ($15 - 25\text{ kg}\cdot\text{cm}$, $25-40\text{ W}$), arrastre hidrodinámico y catálogo de modelos comerciales.
-  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Conexión del L298N en paralelo ($3.5\text{ A}$), PWM anti-stall y boya de nivel.
-  * [`02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/firmware_sedimentador/firmware_sedimentador.ino): Firmware FSM no bloqueante para driver L298N con protección por boya de nivel.
+  * [`02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md): **Memoria de cálculo de torque, montaje KFL08 y dictamen Argon**.
+  * [`03_Compras_y_Ferreteria_Hidraulica/Lista_Ferreteria_Mecanica_y_Electrica_Agitador_Hito3.md`](./03_Hito3_Reactor_Sedimentador_Agitador/03_Compras_y_Ferreteria_Hidraulica/Lista_Ferreteria_Mecanica_y_Electrica_Agitador_Hito3.md): **Planilla consolidada de compras**: motor 5840-31ZY, chumacera KFL08, acople spider, driver BTS7960 y ficha GX16-4.
+  * [`02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md`](./03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Control_Agitador_L298N_y_Boya.md): Guía de conexionado y transición a driver MOSFET BTS7960.
   * [`04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html`](./03_Hito3_Reactor_Sedimentador_Agitador/04_Galeria_y_Montaje_Mecanico/guia_conexion_sedimentador.html): Manual interactivo de conexionado y fotos de taller.
 
 ### 🌐 `04_Hito4_Integracion_Automatizacion_IoT/` *(Avance: 5% — Solo Planificación Técnica)*

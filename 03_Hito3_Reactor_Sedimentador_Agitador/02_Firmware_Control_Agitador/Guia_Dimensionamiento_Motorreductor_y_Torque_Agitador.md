@@ -108,55 +108,118 @@ Aplicando un factor de servicio de ingeniería para agitación pesada ($FS = 4.0
 
 ## 🛒 6. Opciones Concretas de Motorreductores en el Mercado (Argentina)
 
-Para comprar en Mercado Libre o distribuidores de automatización en Salta/Argentina:
+Para adquirir en distribuidores locales o plataformas comerciales (Mercado Libre / distribuidores industriales):
 
-### 🥇 Opción 1: Motorreductor Sinfín-Corona 12V Tipo 5840-31ZY o GW600 (⭐ LA MEJOR OPCIÓN)
-* **Descripción:** Motor DC acoplado a una caja reductora ortogonal de tornillo sinfín y engranajes de bronce/acero templado con salida a $90^\circ$.
-* **Velocidad:** Elegir versión de **$100\text{ RPM}$ o $160\text{ RPM}$**.
-* **Torque Nominal:** **$20\text{ a }35\text{ kg}\cdot\text{cm}$**.
-* **Torque de Bloqueo:** **$> 70\text{ kg}\cdot\text{cm}$**.
-* **Ventajas para el Sedimentador:**
-  1. **Torque demoledor:** Mueve los 25 litros sin pestañear, incluso arrancando cargado de bentonita.
-  2. **Irreversible (Autoblocante):** El peso de la paleta y el agua no pueden hacer girar el motor hacia atrás.
-  3. **Eje robusto:** Eje de salida de $8\text{ mm}$ roscado o con rebaje plano D.
+### 🥇 Opción 1 Comercial (Compra Recomendada #1): Motorreductor Sinfín-Corona 12V Tipo 5840-31ZY (100 RPM)
+* **Descripción:** Motor DC acoplado a reductora ortogonal de tornillo sinfín de acero y corona de bronce de alta resistencia con salida a $90^\circ$.
+* **Velocidad Nominal:** **$100\text{ RPM}$** (permite regular por PWM hasta $20 - 30\text{ RPM}$ para floculación).
+* **Torque Nominal:** **$20\text{ a }35\text{ kg}\cdot\text{cm}$ ($2.0 - 3.5\text{ Nm}$)**.
+* **Torque de Bloqueo (*Stall*):** **$> 70\text{ kg}\cdot\text{cm}$ ($> 7\text{ Nm}$)**.
+* **Eje de Salida:** Eje macizo de **$8\text{ mm}$ con plano (D-shaft)**.
+* **Ventajas Críticas:**
+  1. **Torque demoledor:** Mueve los $25\text{ kg}$ de agua con bentonita y *Opuntia* sin riesgo de atasco.
+  2. **Irreversible (Autoblocante):** En reposo ($0\text{ RPM}$), el peso de la paleta y el fluido no pueden girar el motor hacia atrás.
+  3. **Perfil chato:** El motor se monta horizontalmente sobre la tapa, bajando el centro de gravedad del reactor.
 
-### 🥈 Opción 2: Motorreductor Cilíndrico de 37 mm Reforzado Tipo JGB37-550 o JGB37-555 (12V)
-* **Descripción:** Caja reductora planetaria o de cascada cilíndrica de metal de $37\text{ mm}$ con motor tamaño 550 o 555.
-* **Velocidad:** **$100\text{ RPM}$ o $120\text{ RPM}$**.
-* **Torque Nominal:** **$12\text{ a }18\text{ kg}\cdot\text{cm}$**.
-* **Torque de Bloqueo:** **$35\text{ a }45\text{ kg}\cdot\text{cm}$**.
-* **Ventajas:** Diseño recto, compacto, eje de $6\text{ mm}$ con rebaje en D, fácil de montar verticalmente sobre la torreta de la tapa.
-
-### 🥉 Opción 3: Motorreductor de Limpiaparabrisas o Alzacristales Automotriz 12V (Solución Rápida de Taller)
-* **Descripción:** Motores auxiliares de automotor (Bosch / Valeo / universal).
-* **Características:** Operan a $12\text{V}$, tienen caja reductora sinfín-corona integrada, giran a $\approx 60 - 90\text{ RPM}$ y entregan más de **$30\text{ kg}\cdot\text{cm}$** de par. Son prácticamente indestructibles para mover 25 L.
+### 🥈 Opción Reciclada (Solución Ideal de Taller #1): Motor de Limpiaparabrisas Automotriz 12V DC
+* **Descripción:** Motores de limpiaparabrisas de automotor (Bosch, Valeo, o universales de desarmadero/taller).
+* **Velocidad:** Giran habitualmente a **$50 - 60\text{ RPM}$ (baja)** y **$80 - 100\text{ RPM}$ (alta)**.
+* **Torque:** **$30\text{ a }80\text{ kg}\cdot\text{cm}$ ($3.0 - 8.0\text{ Nm}$)**. Prácticamente indestructibles, diseñados para trabajo continuo bajo lluvia y carga pesada.
+* **Fijación:** Poseen brida con 3 puntos de anclaje roscados **M6**.
+* **⚠️ Precauciones Mandatorias si se utiliza Limpiaparabrisas:**
+  1. **Aislamiento de Chasis vs. Masa (GND):** En muchos modelos antiguos, el polo negativo (-) está internamente conectado a la carcasa metálica. **Es obligatorio medir con multímetro continuidad entre los cables y la carcasa**. Si hay continuidad, montar el motor con bujes/arandelas aislantes de nylon o goma para evitar poner toda la cuba de acero inoxidable a GND (evitando cortocircuitos con la conmutación PWM).
+  2. **Conexión de Escobillas:** Poseen 3 bornes (Común, Baja y Alta). Conectar el terminal de **Alta Velocidad (~90-100 RPM)** y regular la velocidad hacia abajo mediante modulación PWM.
+  3. **Pico de Corriente de Arranque (*Inrush*):** En régimen consume $1.5 - 3.0\text{ A}$, pero en el instante inicial ($t=0$) puede demandar picos de **$12 - 20\text{ A}$**. Requiere fuente de al menos $10\text{ A}$ y rampa de aceleración suave (*soft-start*) en software.
 
 ---
 
-## ⚡ 7. Conexión Eléctrica y Optimización del Driver L298N
+## 🛠️ 7. Montaje Mecánico sobre la Tapa de Acero Inoxidable
 
-Si el nuevo motor consume entre $1.5\text{ A}$ y $3.0\text{ A}$ en los picos de arranque, el módulo L298N tradicional (que tiene límite de 2A por puente individual) debe conectarse en **PARALELO** para duplicar su capacidad de corriente a **$3.5\text{ A}$ continuos / $4.0\text{ A}$ pico**:
+El eje del agitador de $50 - 70\text{ cm}$ de longitud actúa en el fluido como una viga en voladizo (*cantilever*). Las asimetrías hidrodinámicas generan momentos flectores severos sobre el motor. **Es terminantemente prohibido acoplar el eje rígidamente al eje del motorreductor.**
 
 ```
-      CONEXIÓN EN PARALELO DEL L298N PARA MAYOR POTENCIA (3.5A)
-      ==========================================================
+                     ARQUITECTURA DE MONTAJE MECÁNICO EN TAPA
+                     ========================================
 
-      ESP32 DevKit V1                        DRIVER PUENTE H L298N
-    ┌─────────────────┐                     ┌────────────────────────┐
-    │ GPIO 4 (PWM) ───┼────────────────────►│ ENA y ENB (Puenteados)  │
-    │ GPIO 16 (DIR) ──┼───┬────────────────►│ IN1                    │
-    │                 │   └────────────────►│ IN4                    │
-    │ GPIO 17 (DIR) ──┼───┬────────────────►│ IN2                    │
-    │                 │   └────────────────►│ IN3                    │
-    │             GND ┼────────────────────►│ GND (Masa Común)       │
-    └─────────────────┘                     │                        │
-                                            │ OUT1 ──┬───────────────┼──► Cable Motor (+)
-                                            │ OUT4 ──┘               │
-                                            │ OUT2 ──┬───────────────┼──► Cable Motor (-)
-                                            │ OUT3 ──┘               │
-                                            └────────────────────────┘
+                 [ MOTORREDUCTOR 12V (5840-31ZY o Limpiaparabrisas) ]
+                                          │
+                 [ 3 o 4 Separadores / Standoffs M6 (40 - 50 mm) ]
+                                          │
+                 [ Acoplamiento Elástico Spider / Mandíbula (8mm - 8mm) ]
+                                          │
+    ═════════════[ Chumacera con Brida KFL08 (Rodamiento Autoalineante) ]═════════════
+   │ ┌──────────────────────────────────────────────────────────────────────────┐ │
+   │ │            Placa de Refuerzo de Grilón/Nylon (120x120 mm, e = 8-10 mm)    │ │
+   │ ├──────────────────────────────────────────────────────────────────────────┤ │
+   │ │            Tapa de Chapa de Acero Inoxidable del Sedimentador             │ │
+   │ ├──────────────────────────────────────────────────────────────────────────┤ │
+   │ │            Retén de Labio (Nitrilo) o Arandela PTFE (Escudo Antisalpicadura)│ │
+   │ └──────────────────────────────────────────────────────────────────────────┘ │
+    ══════════════════════════════════════════════════════════════════════════════════
+                                          │
+                                 [ Eje Inox Ø 8 mm ]
+                                          │
+                     [ Paleta 11 - 14 cm a 5-8 cm sobre Cono 60° ]
 ```
 
-> [!TIP]
-> **Estrategia de Arranque en Software (Anti-Stall):**  
-> Para arrancar la paleta pesada en los 25 litros de agua, en el firmware no se debe aplicar una velocidad baja directa. Se debe enviar un pulso de **PWM = 255 (100%) durante 300 ms** para romper la inercia de despegue y luego reducir inmediatamente al PWM deseado (p. ej. PWM = 90 para mezcla lenta de 30 RPM o PWM = 200 para 100 RPM).
+1. **Torreta con Separadores (*Standoffs*):** El motor se eleva $40 - 50\text{ mm}$ sobre la tapa mediante 3 o 4 pilares roscados M6.
+2. **Acoplamiento Elástico (*Spider / Jaw Coupling* de 8mm a 8mm):** Absorbe desalineaciones angulares o radiales, evitando que el eje "latiguee" o sobrecargue los engranajes del motor.
+3. **Chumacera Bridada Tipo KFL08 (8 mm):** Atornillada firmemente sobre la cara superior de la tapa. Su rodamiento autoalineante absorbe el **100% de las fuerzas radiales y el peso axial del eje y la paleta**, transmitiendo al motor únicamente esfuerzo de torsión pura.
+4. **Placa de Refuerzo Sándwich Anti-Pandeo:** Para evitar que la chapa de la tapa ($1.0 - 1.5\text{ mm}$) vibre ("efecto tambor"), se instala una placa de refuerzo de **Grilón / Nylon de $120 \times 120\text{ mm}$ ($8 - 10\text{ mm}$ de espesor)** que actúa además como amortiguador acústico y aislador eléctrico.
+5. **Estanqueidad Antisalpicaduras:** Por debajo de la tapa, se coloca un retén de labio de nitrilo o arandela de PTFE para evitar que el vapor o condensación haciendan al rodamiento KFL08.
+
+---
+
+## ⚡ 8. Etapa de Potencia: Descarte de L298N y Adopción de Driver BTS7960 (43A)
+
+> [!CAUTION]
+> **Descarte Definitivo del L298N:**  
+> El integrado bipolar L298N provoca una caída de tensión de **$2.0 - 3.5\text{ V}$**. En $12\text{V}$, el motor solo recibe $\approx 9\text{V}$, perdiendo el $25\%$ del torque y velocidad de diseño. Además, su límite térmico ($2\text{A}$ por canal) se destruiría ante los picos de arranque del nuevo motorreductor. Se prohíbe también el uso del módulo rojo **IRF520** (no es de nivel lógico y se recalienta a $3.3\text{V}$).
+
+### Driver Oficial Seleccionado: Módulo BTS7960 (IBT-2 de 43A)
+* **Capacidad:** $43\text{ A}$ pico / $20\text{ A}$ continuos con disipador macizo de aluminio integrado.
+* **Compatibilidad de Señal:** Entradas lógicas compatibles con **$3.3\text{V}$ nativos del ESP32**.
+* **Frenado Activo (*Active Braking*):** Permite frenar dinámicamente de $100\text{ RPM}$ a $20\text{ RPM}$ al concluir el minuto de mezcla rápida sin desbordar el tiempo de floculación.
+* **Frecuencia PWM Ultrasónica:** Se configura el periférico `LEDC` del ESP32 a **$18\text{ kHz}$** (rango inaudible para el oído humano), eliminando por completo el silbido (*coil whine*) en el laboratorio durante los 20 minutos de floculación.
+* **Rampa Soft-Start por Firmware:** Arranque progresivo de 0 a 100% en **2.5 segundos** para eliminar el pico de corriente (*inrush*) y el golpe mecánico sobre el eje.
+
+---
+
+## 🌐 9. Arquitectura de Control: 1 ESP32 Centralizado + Manguera Umbilical GX16-4
+
+Siguiendo el dictamen de ingeniería, **se adopta un único microcontrolador ESP32 centralizado en el maletín de control**, descartando la arquitectura distribuida por ESP-NOW (evitando congestión de radio 2.4 GHz, pérdidas de paquetes Wi-Fi y desincronización de estados).
+
+```
+   MALETÍN DE CONTROL CENTRAL                               REACTOR SEDIMENTADOR (25 L)
+ ┌───────────────────────────────────────┐                 ┌─────────────────────────────┐
+ │ • ESP32 DevKit V1 (SCADA + WebServer) │                 │ • Motor 12V (5840-31ZY)     │
+ │ • Driver BTS7960 (43A)                │                 │ • Chumacera KFL08 en Tapa   │
+ │ • Fuente de Potencia 12V / 10A        │                 │ • Boya de Nivel Inoxidable  │
+ │                                       │                 │                             │
+ │   [ Ficha Chasis Hembra GX16-4 ]      │  MANGUERA 4x1.0 │   [ Ficha Aérea Macho GX16 ]│
+ │   • Pin 1: Motor PWM (+) ─────────────┼─────────────────┼──► Borne Motor (+)          │
+ │   • Pin 2: Motor PWM (-) ─────────────┼─────────────────┼──► Borne Motor (-)          │
+ │   • Pin 3: Boya Señal (GPIO 32) ──────┼─────────────────┼──► Contacto Boya (C1)       │
+ │   • Pin 4: GND Filtro ────────────────┼─────────────────┼──► Contacto Boya (C2)       │
+ └───────────────────────────────────────┘                 └─────────────────────────────┘
+```
+
+* **Filtro de Ruido en Entrada de Boya:** En el maletín, se coloca una resistencia *pull-up* física externa de **$2.2\text{ k}\Omega$ a $3.3\text{V}$** y un capacitor cerámico de **$100\text{ nF}$ a GND** en el pin `GPIO 32` del ESP32 para suprimir cualquier transitorio inducido por el cableado del motor.
+
+---
+
+## 🌊 10. Reglas de Diseño Hidrodinámico para el Reactor de 25 Litros
+
+1. **Supresión de Rotación en Bloque (Anti-Vórtice) sin Soldaduras:**  
+   Las paredes lisas de acero inoxidable generan vórtice central y giro en masa del agua. Para evitarlo sin tener que soldar bafles interiores al tanque:
+   * **Montaje Excéntrico:** Se perfora la tapa desplazando el centro del eje a una distancia de **$1/6$ a $1/4$ del radio del tanque** (unos $2.5 - 4\text{ cm}$ del centro). La asimetría rompe el vórtice central e incrementa el gradiente $G$ de cizalla.
+   * *Alternativa:* Introducir una canasta/aro portabafles desmontable con 4 deflectores verticales de $\approx 3\text{ cm}$ de ancho.
+2. **Control de Velocidad Tangencial ($V_{tip}$):**  
+   Para no cizallar los macroflóculos frágiles formados por *Opuntia*:
+   * Diámetro de la paleta: **$d = 11\text{ a }14\text{ cm}$** ($0.35 - 0.45 \cdot D_{\text{tanque}}$).
+   * A $25\text{ RPM}$, la velocidad tangencial en la punta es de apenas **$0.16\text{ m/s}$**, muy por debajo del umbral destructivo de flóculos ($0.35\text{ m/s}$).
+3. **Altura de la Paleta y Protección del Cono de 60°:**  
+   La paleta debe montarse en el tercio inferior del cilindro recto, **$5\text{ a }8\text{ cm}$ por encima de la línea de soldadura donde comienza el cono**. Esto mantiene el fondo cónico como una **zona quieta de decantación y espesamiento de lodos (*sludge blanket*)**, impidiendo su resuspensión.
+4. **Toma de Succión hacia Ultrafiltración:**  
+   La extracción de agua clarificada debe realizarse **$3\text{ a }5\text{ cm}$ por encima de la transición cilindro-cono** o mediante un pescante lateral, reservando la válvula del vértice inferior del cono **únicamente para la purga de barros**.
+
