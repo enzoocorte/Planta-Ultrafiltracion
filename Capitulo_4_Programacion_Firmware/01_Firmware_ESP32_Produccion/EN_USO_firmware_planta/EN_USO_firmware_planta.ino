@@ -1134,15 +1134,19 @@ void loop() {
   if (tAhora - tCaudal >= 1000) {
     tCaudal = tAhora;
 
-    // Lectura asíncrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4)
+    // Lectura asincrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4) con filtro anti-parpadeo
+    static uint8_t fallosConsecutivosDS18 = 0;
     float tLeida = 0.0f;
     if (DS18B20_Native::leerTemperatura(tLeida)) {
       ds18b20_activo = true;
+      fallosConsecutivosDS18 = 0;
       if (modoTempAuto) {
         temp_agua_C = tLeida;
       }
     } else {
-      ds18b20_activo = false;
+      if (++fallosConsecutivosDS18 >= 3) {
+        ds18b20_activo = false;
+      }
     }
     DS18B20_Native::iniciarConversion(); // Inicia la conversión para el próximo segundo
 
