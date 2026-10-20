@@ -1,15 +1,10 @@
 #pragma once
 // ==============================================================================
-// CLASE CAUDALÍMETRO — VERSIÓN V6.2 (Sensor de Efecto Hall YF-S401 - Tesis UNSa)
+// CLASE CAUDALÍMETRO — VERSIÓN V6.4 (Sensor de Efecto Hall YF-S401 - Tesis UNSa)
 // - Interrupción por flanco FALLING con Blanking Físico Diferenciado:
-//   * Alimentación (GPIO 14): 2800 us (máx 357 Hz)
-//   * Permeado (GPIO 27):     8000 us (máx 125 Hz -> bloquea ruidos de 189/369 Hz)
-// - Estimador Híbrido de Frecuencia (Recíproco de Ráfaga + Conteo de Ventana):
-//   * Mide span_us = t_ultimo - t_primero exclusivamente dentro de la ventana actual
-//     (sin arrastrar tiempos muertos de ventanas previas).
-//   * Valida que span_us cubra al menos 400 ms de flujo continuo antes de aplicar
-//     período recíproco; de lo contrario usa conteo directo n / dt_ventana, haciendo
-//     matemáticamente imposible que 2 pulsos cercanos disparen 189 Hz o 369 Hz.
+//   * Alimentación (GPIO 14): 1200 us (máx 833 Hz)
+//   * Permeado (GPIO 27):     3500 us (máx 285 Hz -> bloquea ruidos espurios)
+// - Estimador Híbrido de Frecuencia (Recíproco de Ráfaga + Conteo de Ventana)
 // - Filtro Mediana de 3 puntos + EMA para lectura estable en tiempo real.
 // ==============================================================================
 
@@ -90,7 +85,7 @@ public:
   uint64_t pulsosLiquidoAcumulados()  const { return _ultimaMuestra.pulsosMedicion; }
   uint64_t rechazosAcumulados()       const { return _ultimaMuestra.rechazados; }
 
-  bool  setK(double nuevoK);
+  bool  setK(double nuevoK, bool calibracionDocumentada = false);
   float getK()                        const { return (float)_cfg.k_Hz_por_Lmin; }
   bool  setQMinDetectable(double nuevoQMin_mLmin);
   float getQMinDetectable()           const { return (float)_cfg.qMinDetectable_mLmin; }

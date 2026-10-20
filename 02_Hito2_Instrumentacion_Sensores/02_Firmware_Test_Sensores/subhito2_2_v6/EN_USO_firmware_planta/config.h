@@ -1,8 +1,8 @@
 #pragma once
 // ==============================================================================
-// CONFIGURACIÓN TÉCNICA — PLANTA DE ULTRAFILTRACIÓN (UNSa 2026) — VERSIÓN V6
+// CONFIGURACIÓN TÉCNICA — PLANTA DE ULTRAFILTRACIÓN (UNSa 2026) — VERSIÓN V6.4
 // Tesistas: Antonella Guitián & Owen Cañizares | Codirector: Ing. Enzo Corte
-// Parámetros Cinemáticos Calibrados (Ensayos 2 y 3), Anti-EMI y Monitoreo de Torta
+// Parámetros Cinemáticos Calibrados (Ensayos 2 y 3), Anti-EMI, DS18B20 y Torta
 // ==============================================================================
 
 #include <Arduino.h>
@@ -18,9 +18,12 @@ constexpr uint8_t PIN_DIR                = 19;  // DM860 DIR+ (DIR- a GND común
 constexpr uint8_t PIN_ENA                = 23;  // DM860 ENA+ (ENA- a GND: HIGH = Driver deshabilitado)
 constexpr uint8_t PIN_LED_BOMBA          = 2;   // LED Azul Onboard (indicador de marcha)
 
-// Caudalímetros de Efecto Hall YF-S401
-constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Sensor de Alimentación (Borne 12 Sup)
-constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup, Pull-up externo a 3.3V)
+// Caudalímetros de Efecto Hall YF-S401 (Pull-up externo 4.7k a 3.3V en bornera verde)
+constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Sensor de Alimentación (Borne 12 Sup - D14)
+constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup - D27)
+
+// Sensor de Temperatura Sumergible DS18B20 (Protocolo 1-Wire con Pull-up 4.7k a 3.3V)
+constexpr uint8_t PIN_SENSOR_TEMP_DS18B20 = 4;   // Sonda Temperatura DS18B20 (Borne 8 Inf - D4)
 
 // Puertos I2C para ADS1115 (Subhito 2.3 - Transductores de Presión y Sonda TDS)
 constexpr uint8_t PIN_I2C_SDA             = 21;  // ESP32 SDA
@@ -30,6 +33,7 @@ constexpr uint8_t PIN_I2C_SCL             = 22;  // ESP32 SCL
 constexpr uint8_t PINES_SISTEMA[] = {
   PIN_PUL, PIN_DIR, PIN_ENA, PIN_LED_BOMBA,
   PIN_SENSOR_ALIMENTACION, PIN_SENSOR_PERMEADO,
+  PIN_SENSOR_TEMP_DS18B20,
   PIN_I2C_SDA, PIN_I2C_SCL
 };
 
@@ -52,14 +56,17 @@ constexpr float ML_POR_VUELTA     = 13.5496f; // Calibración Ensayo 2 (20 a 90 
 // Rango de Operación en RPM
 constexpr float RPM_MIN           = 15.0f;    // ~203 mL/min
 constexpr float RPM_MAX           = 100.0f;   // ~1355 mL/min (Habilitado para diseño factorial experimental en agua)
-constexpr float RPM_INICIO        = 25.0f;    // Consigna de arranque suave (~339 mL/min)
+constexpr float RPM_INICIO        = 50.0f;    // Consigna inicial nominal (~677 mL/min - flujo continuo visible)
 constexpr float RPM_ALARMA_MEMBRANA = 44.0f;  // 44.28 RPM = 600 mL/min (Umbral clínico hemodiálisis / referencia)
 
-// Rampas de Aceleración y Frenado (< 1.5s parada garantizada)
-constexpr float ACEL_ARRANQUE_RPM_S  = 2.0f;   // 2.0 RPM/s despegue inicial suave y confiable
-constexpr float ACEL_NOMINAL_RPM_S   = 3.5f;   // 3.5 RPM/s aceleración progresiva
-constexpr float DESACEL_AJUSTE_RPM_S = 8.0f;   // 8.0 RPM/s desaceleración en marcha
-constexpr float FRENADO_PARADA_RPM_S = 70.0f;  // 70.0 RPM/s frenado rápido garantizado (< 1.43s desde 100 RPM)
+// Rampas de Aceleración y Frenado Fluidas (Arranque ágil en ~1.3s sin resonancia ni calentamiento)
+constexpr float RPM_DESPEGUE         = 6.0f;   // 6.0 RPM despegue instantáneo sin resonancia (320 Hz)
+constexpr float ACEL_ARRANQUE_RPM_S  = 12.0f;  // 12.0 RPM/s aceleración inicial dinámica y suave
+constexpr float ACEL_NOMINAL_RPM_S   = 18.0f;  // 18.0 RPM/s aceleración progresiva fluida
+constexpr float DESACEL_AJUSTE_RPM_S = 16.0f;  // 16.0 RPM/s desaceleración ágil en marcha
+constexpr float FRENADO_PARADA_RPM_S = 60.0f;  // 60.0 RPM/s frenado controlado en ~0.5s
+constexpr float DT_MAX_RAMPA_S       = 0.10f;  // Límite máximo de avance temporal por ciclo (evita tirones si el loop se atrasa)
+constexpr uint32_t TIEMPO_ENA_MS     = 100;    // Tiempo de establecimiento de potencia en driver DM860 tras ENA=LOW (ms)
 
 // ------------------------------------------------------------------------------
 // 3. ESPECIFICACIONES DE LA MEMBRANA FRESENIUS FX100 (HELIXONE®)
@@ -73,7 +80,7 @@ constexpr float P1_MAX_SEGURA_BAR      = 0.60f;   // Límite máximo de presión
 constexpr float Q_CLINICO_SANGRE_MAX   = 600.0f;  // mL/min (límite en hemodiálisis clínica)
 
 // ------------------------------------------------------------------------------
-// 4. ESTRUCTURA METROLÓGICA Y CALIBRACIÓN DE CAUDALÍMETROS YF-S401 (VERSIÓN V6)
+// 4. ESTRUCTURA METROLÓGICA Y CALIBRACIÓN DE CAUDALÍMETROS YF-S401 (VERSIÓN V6.4)
 // ------------------------------------------------------------------------------
 // Ambos sensores son del mismo modelo físico (YF-S401) y comparten el factor K
 // calibrado en laboratorio en el Ensayo 3: K = 205.98 Hz/(L/min) (12,359 pulsos/L).
@@ -127,12 +134,10 @@ constexpr float    K_PERMEADO           = 205.98f;
 constexpr uint8_t  VERSION_CALIBRACION  = 6; // Versión V6: homologa ambos K en 205.98 y cilindrada en 13.55 en NVS
 
 // ------------------------------------------------------------------------------
-// 5. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN (10 SEGUNDOS / 600 REGISTROS = 100 MIN)
+// 5. PARÁMETROS DEL DATALOGGER MULTI-SESIÓN (10 SEGUNDOS / 300 REGISTROS = 50 MIN)
 // ------------------------------------------------------------------------------
-// CORRECCIÓN OBSERVACIÓN WORD: Muestreo cada 10 segundos desde t = 0 s con capacidad
-// de 600 registros (100 minutos continuos), evitando que se pisen las muestras de 20 RPM.
 constexpr uint32_t INTERVALO_LOG_MS   = 10000;  // Muestreo cada 10 segundos exactos
-constexpr size_t   MAX_REGISTROS      = 600;    // 600 muestras en buffer circular (100 minutos continuos sin sobrescribir)
+constexpr size_t   MAX_REGISTROS      = 300;    // 300 muestras en buffer circular (50 minutos continuos sin sobrescribir)
 constexpr size_t   MAX_ENSAYOS        = 20;     // Hasta 20 ensayos/sesiones independientes
 constexpr uint8_t  MUESTRAS_AUTO_CAL  = 15;     // 15 muestras (15 s) para auto-calibración en régimen permanente
 

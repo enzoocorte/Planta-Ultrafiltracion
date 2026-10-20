@@ -17,6 +17,9 @@
  *      del umbral mecánico de giro de la turbina YF-S401 (< 10 mL/min), el operador
  *      puede ingresar un valor puntual medido con probeta en vivo sin detener el
  *      ensayo para que quede registrado en las curvas y en el archivo Excel (.CSV).
+ * 4. Sonda Térmica Digital 1-Wire DS18B20 en GPIO 4 (D4):
+ *    - Lectura nativa 1-Wire no bloqueante (sin librerías externas) que actualiza
+ *      automáticamente temp_agua_C en tiempo real si la sonda está conectada en D4.
  * ============================================================================== */
 
 #include <WiFi.h>
@@ -35,13 +38,117 @@ DNSServer dnsServer;
 constexpr uint16_t DNS_PORT = 53;
 
 // ------------------------------------------------------------------------------
+// DRIVER NATIVO 1-WIRE NO BLOQUEANTE PARA SONDA DS18B20 EN GPIO 4 (D4)
+// Permite compilar directo en Arduino IDE sin instalar librerías externas.
+// ------------------------------------------------------------------------------
+namespace DS18B20_Native {
+  static portMUX_TYPE owMux = portMUX_INITIALIZER_UNLOCKED;
+
+  // CRC-8 Dallas/Maxim (polinomio x^8 + x^5 + x^4 + 1, 0x8C reflejado)
+  static uint8_t crc8(const uint8_t* d, uint8_t n) {
+    uint8_t crc = 0;
+    while (n--) {
+      uint8_t b = *d++;
+      for (uint8_t i = 8; i; i--) {
+        uint8_t mix = (crc ^ b) & 1;
+        crc >>= 1;
+        if (mix) crc ^= 0x8C;
+        b >>= 1;
+      }
+    }
+    return crc;
+  }
+
+  static bool reset() {
+    pinMode(PIN_SENSOR_TEMP_DS18B20, OUTPUT);
+    digitalWrite(PIN_SENSOR_TEMP_DS18B20, LOW);
+    delayMicroseconds(480);
+    pinMode(PIN_SENSOR_TEMP_DS18B20, INPUT_PULLUP);
+    delayMicroseconds(70);
+    bool presence = (digitalRead(PIN_SENSOR_TEMP_DS18B20) == LOW);
+    delayMicroseconds(410);
+    return presence;
+  }
+
+  static void writeBit(uint8_t bit) {
+    portENTER_CRITICAL(&owMux);
+    pinMode(PIN_SENSOR_TEMP_DS18B20, OUTPUT);
+    digitalWrite(PIN_SENSOR_TEMP_DS18B20, LOW);
+    if (bit) {
+      delayMicroseconds(6);
+      pinMode(PIN_SENSOR_TEMP_DS18B20, INPUT_PULLUP);
+      delayMicroseconds(64);
+    } else {
+      delayMicroseconds(60);
+      pinMode(PIN_SENSOR_TEMP_DS18B20, INPUT_PULLUP);
+      delayMicroseconds(10);
+    }
+    portEXIT_CRITICAL(&owMux);
+  }
+
+  static uint8_t readBit() {
+    portENTER_CRITICAL(&owMux);
+    pinMode(PIN_SENSOR_TEMP_DS18B20, OUTPUT);
+    digitalWrite(PIN_SENSOR_TEMP_DS18B20, LOW);
+    delayMicroseconds(3);
+    pinMode(PIN_SENSOR_TEMP_DS18B20, INPUT_PULLUP);
+    delayMicroseconds(10);
+    uint8_t r = digitalRead(PIN_SENSOR_TEMP_DS18B20);
+    delayMicroseconds(53);
+    portEXIT_CRITICAL(&owMux);
+    return r;
+  }
+
+  static void writeByte(uint8_t data) {
+    for (uint8_t i = 0; i < 8; i++) {
+      writeBit(data & 0x01);
+      data >>= 1;
+    }
+  }
+
+  static uint8_t readByte() {
+    uint8_t r = 0;
+    for (uint8_t i = 0; i < 8; i++) {
+      r >>= 1;
+      if (readBit()) r |= 0x80;
+    }
+    return r;
+  }
+
+  static bool iniciarConversion() {
+    if (!reset()) return false;
+    writeByte(0xCC); // Skip ROM
+    writeByte(0x44); // Convert T
+    return true;
+  }
+
+  static bool leerTemperatura(float& tempOut) {
+    if (!reset()) return false;
+    writeByte(0xCC); // Skip ROM
+    writeByte(0xBE); // Read Scratchpad
+    uint8_t sp[9];
+    for (uint8_t i = 0; i < 9; i++) sp[i] = readByte();
+    if (crc8(sp, 8) != sp[8]) return false; // P1-2: Descarta lecturas corruptas por ruido o ISRs
+    int16_t raw = (int16_t)((sp[1] << 8) | sp[0]);
+    float t = (float)raw / 16.0f;
+    // Ignorar valor de power-on reset (85.0 °C exactos) o fuera de rango físico
+    if (t < 1.0f || t > 65.0f || fabsf(t - 85.0f) < 0.01f) {
+      return false;
+    }
+    tempOut = t;
+    return true;
+  }
+}
+
+// ------------------------------------------------------------------------------
 // ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y MONITOREO DE TORTA
 // ------------------------------------------------------------------------------
 struct RegistroCalibracion {
   uint16_t id_ensayo;
+  bool     en_regimen;     // Empaquetado con id_ensayo y perm_manual (4 bytes exactos)
+  bool     perm_manual;    // false = Sensor YF-S401 en tiempo real, true = Asistido por probeta
   uint32_t t_relativo_s;
   float    rpm;
-  bool     en_regimen;
   float    q_bomba;
   float    f_alim;
   float    q_alim;
@@ -53,7 +160,6 @@ struct RegistroCalibracion {
   float    q_perm_ref;     // Caudal inicial de permeado con filtro limpio (Q_Perm_0)
   float    merma_perm_pct; // % de merma de permeado por ensuciamiento (1 - J/J0)
   float    j_sobre_j0_pct; // Flujo normalizado J(t)/J0 en %
-  bool     perm_manual;    // false = Sensor YF-S401 en tiempo real, true = Asistido por probeta
   float    vol_perm;
   float    q_ret;
   float    recov;
@@ -84,8 +190,9 @@ struct EnsayoInfo {
   float    merma_perm_final;
 };
 
-// Buffer circular en RAM (250 registros = 41.6 minutos a 1 muestra cada 10 s)
-RegistroCalibracion bufferLog[MAX_REGISTROS];
+// Buffer circular en Heap dinámico (300 registros = 50 minutos a 1 muestra cada 10 s)
+// Asignado en setup() para liberar completamente el segmento estático .dram0.bss del ESP32
+RegistroCalibracion* bufferLog = nullptr;
 size_t bufferHead = 0;
 size_t bufferCount = 0;
 
@@ -126,6 +233,7 @@ RegistroEnsayos registroEnsayos;
 Bomba bomba;
 WebServer server(80);
 Preferences prefs;
+static char ipStr[16] = "192.168.4.1";
 
 // Variables hidráulicas calculadas cada 1 segundo
 float qAlimEfectivo_mLmin = 0.0f;
@@ -143,8 +251,10 @@ ResultadoDarcy resultadoDarcy;
 float p1_manometro_bar  = 0.30f; // Manómetro Bourdon P1 (Alimentación)
 float p2_manometro_bar  = 0.20f; // Manómetro Bourdon P2 (Retentado)
 float p3_manometro_bar  = 0.00f; // Contrapresión Permeado / Columna hidrostática
-float temp_agua_C       = 20.0f; // Temperatura de proceso (°C)
+float temp_agua_C       = 20.0f; // Temperatura de proceso (°C) — actualizada por DS18B20 en D4 o Web SCADA
 float tmp_efectiva_bar  = 0.25f; // TMP = ((P1 + P2) / 2) - P3
+bool  ds18b20_activo    = false;
+bool  modoTempAuto      = true;  // true = Medición continua con sonda DS18B20 en D4; false = Manual
 
 uint32_t tLoop = 0;
 uint32_t tCaudal = 0;
@@ -181,8 +291,8 @@ void cargarParametrosNVS() {
     guardarParametrosNVS(ka, kp, ml, pul);
   }
 
-  sensorAlimentacion.setK(ka);
-  sensorPermeado.setK(kp);
+  sensorAlimentacion.setK(ka, fabsf(ka - K_ALIMENTACION) < 0.05f);
+  sensorPermeado.setK(kp, false);
   bomba.setMlPorVuelta(ml);
   bomba.setPulsosPorRev(pul);
 
@@ -194,10 +304,6 @@ double volumenPermeadoTotal_L() {
   return sensorPermeado.volumen_L() + volPermManualAcum_L;
 }
 
-// Verifica si la bomba está realmente girando e impulsando fluido:
-// Como el motor paso a paso no tiene encoder, la confirmación física de que el driver DM860
-// y el motor están encendidos y girando es la presencia de pulsos en el caudalímetro de alimentación
-// (salvo que el operador active explícitamente el Modo Seco para pruebas de motor en vacío).
 bool bombaGirandoReal() {
   return bomba.enMarcha();
 }
@@ -214,6 +320,7 @@ float caudalTeoricoConfirmado_mLmin() {
 // FUNCIÓN PARA GUARDAR MUESTRA EN EL DATALOGGER (CADA 10 SEGUNDOS)
 // ------------------------------------------------------------------------------
 void guardarMuestraDatalogger() {
+  if (!bufferLog) return;
   if (tInicioEnsayo_ms == 0) {
     tInicioEnsayo_ms = millis();
   }
@@ -259,15 +366,16 @@ void guardarMuestraDatalogger() {
     bufferCount++;
   }
 
-  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f | Q_Perm=%.1f | TMP=%.2f bar | J20=%.2f LMH | R_torta=%.2e m^-1\n",
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f | Q_Perm=%.1f | TMP=%.2f bar | T=%.1f C | J20=%.2f LMH | R_torta=%.2e m^-1\n",
                 (unsigned int)bufferCount, ensayoActualId, t_rel_s, reg.rpm,
-                reg.q_alim, reg.q_perm, reg.tmp_bar, reg.j20_lmh, reg.r_torta);
+                reg.q_alim, reg.q_perm, reg.tmp_bar, reg.temp_c, reg.j20_lmh, reg.r_torta);
 }
 
 // ------------------------------------------------------------------------------
 // GESTIÓN AUTOMÁTICA DE SESIONES Y ENSAYOS
 // ------------------------------------------------------------------------------
 void finalizarEnsayoActual() {
+  if (!bufferLog) return;
   uint32_t duracion_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
   uint16_t muestrasEnsayo = 0;
   for (size_t i = 0; i < bufferCount; i++) {
@@ -330,8 +438,10 @@ void fijarReferenciasTortaActuales() {
 
 void iniciarNuevoEnsayo(float consignaRpm) {
   uint16_t muestrasPrevias = 0;
-  for (size_t i = 0; i < bufferCount; i++) {
-    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+  if (bufferLog) {
+    for (size_t i = 0; i < bufferCount; i++) {
+      if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+    }
   }
   if (muestrasPrevias > 0) {
     ensayoActualId++;
@@ -367,7 +477,7 @@ void handleStatus() {
   uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
   if (prog > 100) prog = 100;
 
-  char buf[1800];
+  char buf[1536];
   int n = snprintf(buf, sizeof(buf),
     "{"
     "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
@@ -376,6 +486,7 @@ void handleStatus() {
     "\"q_alim_ref\":%.1f,\"merma_alim\":%.1f,\"q_perm_ref\":%.1f,\"merma_perm\":%.1f,\"j_j0\":%.1f,"
     "\"perm_manual\":%s,\"q_perm_man\":%.1f,"
     "\"p1\":%.3f,\"p2\":%.3f,\"p3\":%.3f,\"tmp\":%.3f,\"temp\":%.1f,"
+    "\"ds18b20\":%s,\"temp_auto\":%s,"
     "\"j20\":%.2f,\"tcf\":%.3f,\"r_tot\":%.3e,\"r_torta\":%.3e,\"darcy_ok\":%s,"
     "\"flan_alim\":%lu,\"val_alim\":%lu,\"gl_alim\":%lu,"
     "\"flan_perm\":%lu,\"val_perm\":%lu,\"gl_perm\":%lu,"
@@ -392,7 +503,7 @@ void handleStatus() {
     bomba.sentidoHorario() ? "true" : "false",
     bomba.enRegimenEstable() ? "true" : "false",
     bomba.enEmergencia() ? "true" : "false",
-    WiFi.softAPIP().toString().c_str(),
+    ipStr,
     !sensorAlimentacion.sinSenal() ? "true" : "false",
     (!sensorPermeado.sinSenal() || usarPermManual) ? "true" : "false",
     sensorAlimentacion.frecuencia_Hz(), qAlimEfectivo_mLmin, sensorAlimentacion.volumen_L(),
@@ -401,6 +512,7 @@ void handleStatus() {
     qAlimRef_mLmin, mermaAlim_pct, qPermRef_mLmin, mermaPerm_pct, jSobreJ0_pct,
     usarPermManual ? "true" : "false", qPermManual_mLmin,
     p1_manometro_bar, p2_manometro_bar, p3_manometro_bar, tmp_efectiva_bar, temp_agua_C,
+    ds18b20_activo ? "true" : "false", modoTempAuto ? "true" : "false",
     resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual,
     resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f,
     resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f,
@@ -424,7 +536,8 @@ void handleStatus() {
     autoCalMensaje = "";
   }
 
-  if (n >= (int)sizeof(buf)) {
+  if (n < 0 || n >= (int)sizeof(buf)) {
+    Serial.println(F("[STATUS] Alerta: JSON supero limite de buffer"));
     n = sizeof(buf) - 1;
   }
 
@@ -497,6 +610,10 @@ void handleCmd() {
     volPermManualAcum_L = 0.0;
     volAlimInicioEnsayo = 0.0f;
     volPermInicioEnsayo = 0.0f;
+  } else if (act == "TEMP_AUTO_ON") {
+    modoTempAuto = true;
+  } else if (act == "TEMP_AUTO_OFF") {
+    modoTempAuto = false;
   }
   server.send(200, "text/plain", "OK");
 }
@@ -549,25 +666,23 @@ void handleSetPresion() {
     float t = server.arg("temp").toFloat();
     if (std::isfinite(t) && t >= 2.0f && t <= 50.0f) {
       temp_agua_C = t;
+      modoTempAuto = false; // Si se ingresa manual, se desactiva el seguimiento auto
     }
   }
 
   tmp_efectiva_bar = fmaxf(0.001f, ((p1_manometro_bar + p2_manometro_bar) / 2.0f) - p3_manometro_bar);
   resultadoDarcy = modeloDarcy.calcular(qPermEfectivo_mLmin, tmp_efectiva_bar, temp_agua_C);
 
-  String json = "{";
-  json += "\"status\":\"ok\",";
-  json += "\"p1\":" + String(p1_manometro_bar, 3) + ",";
-  json += "\"p2\":" + String(p2_manometro_bar, 3) + ",";
-  json += "\"p3\":" + String(p3_manometro_bar, 3) + ",";
-  json += "\"tmp\":" + String(tmp_efectiva_bar, 3) + ",";
-  json += "\"temp\":" + String(temp_agua_C, 1) + ",";
-  json += "\"j20\":" + String(resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual, 2) + ",";
-  json += "\"tcf\":" + String(resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f, 3) + ",";
-  json += "\"r_total\":" + String(resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f, 2) + ",";
-  json += "\"r_torta\":" + String(resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f, 2) + ",";
-  json += "\"darcy_ok\":" + String(resultadoDarcy.valido ? "true" : "false");
-  json += "}";
+  char json[288];
+  snprintf(json, sizeof(json),
+    "{\"status\":\"ok\",\"p1\":%.3f,\"p2\":%.3f,\"p3\":%.3f,\"tmp\":%.3f,\"temp\":%.1f,"
+    "\"j20\":%.2f,\"tcf\":%.3f,\"r_total\":%.3e,\"r_torta\":%.3e,\"darcy_ok\":%s}",
+    p1_manometro_bar, p2_manometro_bar, p3_manometro_bar, tmp_efectiva_bar, temp_agua_C,
+    resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual,
+    resultadoDarcy.valido ? resultadoDarcy.TCF : 1.0f,
+    resultadoDarcy.valido ? resultadoDarcy.R_total : 0.0f,
+    resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f,
+    resultadoDarcy.valido ? "true" : "false");
 
   server.send(200, "application/json", json);
 }
@@ -579,10 +694,6 @@ void handleSetRPM() {
       server.send(400, "text/plain", "ERROR: RPM fuera de rango");
       return;
     }
-
-    float rpmActualConsigna = bomba.rpmObjetivo();
-
-    // Mantener el mismo Ensayo_ID cuando se cambian las RPM en marcha para no fragmentar el CSV
 
     if (bomba.setRPM(nuevoRpm)) {
       reiniciarReferenciasTorta();
@@ -719,21 +830,18 @@ void handleCalibrarRpmQ() {
   guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
                        bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
 
-  String json = "{";
-  json += "\"status\":\"ok\",";
-  json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
-  json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
-  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2) + ",";
-  json += "\"ka_actualizado\":" + String(kaOk ? "true" : "false") + ",";
-  json += "\"kp_actualizado\":" + String(kpOk ? "true" : "false");
-  json += "}";
+  char json[192];
+  snprintf(json, sizeof(json),
+    "{\"status\":\"ok\",\"ml_rev\":%.4f,\"k_alim\":%.2f,\"k_perm\":%.2f,\"ka_actualizado\":%s,\"kp_actualizado\":%s}",
+    bomba.getMlPorVuelta(), sensorAlimentacion.getK(), sensorPermeado.getK(),
+    kaOk ? "true" : "false", kpOk ? "true" : "false");
 
   server.send(200, "application/json", json);
 }
 
 void handleResetDev() {
-  sensorAlimentacion.setK(K_ALIMENTACION);
-  sensorPermeado.setK(K_PERMEADO);
+  sensorAlimentacion.setK(K_ALIMENTACION, true);
+  sensorPermeado.setK(K_PERMEADO, false);
   bomba.setMlPorVuelta(ML_POR_VUELTA);
   bomba.setPulsosPorRev(PULSOS_POR_REV);
 
@@ -775,7 +883,15 @@ void handleExportCSV() {
     filtroId = (uint16_t)targetEnsayo.toInt();
   }
 
+  if (!bufferLog) {
+    server.sendContent("ERROR: Buffer no inicializado.\n");
+    return;
+  }
+
   char fila[450];
+  char blk[1400];
+  size_t used = 0;
+
   for (size_t i = 0; i < bufferCount; i++) {
     size_t idx = (bufferHead + MAX_REGISTROS - bufferCount + i) % MAX_REGISTROS;
     const RegistroCalibracion& r = bufferLog[idx];
@@ -802,13 +918,22 @@ void handleExportCSV() {
       r.p1_bar, r.p2_bar, r.tmp_bar, r.temp_c, r.j20_lmh, r.tcf, r.r_total, r.r_torta
     );
 
-    if (len > 0 && (size_t)len < sizeof(fila)) {
-      server.sendContent(fila, len);
-    } else if (len >= (int)sizeof(fila)) {
-      server.sendContent(fila, sizeof(fila) - 1);
+    if (len > 0) {
+      if ((size_t)len >= sizeof(fila)) len = sizeof(fila) - 1;
+      if (used + len > sizeof(blk)) {
+        server.sendContent(blk, used);
+        used = 0;
+      }
+      memcpy(blk + used, fila, len);
+      used += len;
     }
 
     if ((i & 15) == 0) yield();
+  }
+
+  if (used > 0) {
+    server.sendContent(blk, used);
+    used = 0;
   }
 
   server.sendContent("");
@@ -830,14 +955,14 @@ void handleClearCSV() {
 class ServerPrintAdapter : public Print {
 public:
   WebServer& _s;
-  char _buf[256];
+  char _buf[1024];
   size_t _idx = 0;
 
   ServerPrintAdapter(WebServer& s) : _s(s) {}
 
   size_t write(uint8_t c) override {
     _buf[_idx++] = (char)c;
-    if (_idx >= sizeof(_buf) - 1 || c == '\n') {
+    if (_idx >= sizeof(_buf) - 1) {
       _buf[_idx] = '\0';
       _s.sendContent(_buf, _idx);
       _idx = 0;
@@ -870,6 +995,14 @@ void handleExportMetrologia() {
 // SETUP DEL MICROCONTROLADOR ESP32
 // ------------------------------------------------------------------------------
 void setup() {
+  // P0-1: Driver deshabilitado y líneas de control seguras desde el primer instante físico
+  pinMode(PIN_ENA, OUTPUT);
+  digitalWrite(PIN_ENA, LOW);  // Driver listo (habilitado para arrancar)
+  pinMode(PIN_PUL, OUTPUT);
+  digitalWrite(PIN_PUL, LOW);  // Pin de pulsos amarrado a GND sin oscilación ni glitches
+  pinMode(PIN_DIR, OUTPUT);
+  digitalWrite(PIN_DIR, LOW);  // Dirección predeterminada (Horario / Filtración)
+
   Serial.begin(115200);
   delay(500);
 
@@ -880,6 +1013,25 @@ void setup() {
 
   pinMode(PIN_LED_BOMBA, OUTPUT);
   digitalWrite(PIN_LED_BOMBA, LOW);
+
+  // Asignación segura del buffer de datalogger en Heap (elimina 74.4 KB de .dram0.bss)
+  bufferLog = new (std::nothrow) RegistroCalibracion[MAX_REGISTROS]{};
+  if (bufferLog) {
+    Serial.printf("[DATALOGGER] Buffer circular de %u registros asignado en Heap (%u bytes).\n",
+                  (unsigned)MAX_REGISTROS, (unsigned)(MAX_REGISTROS * sizeof(RegistroCalibracion)));
+  } else {
+    Serial.println("[DATALOGGER] ERROR: No se pudo asignar memoria para bufferLog.");
+  }
+
+  // Inicializar sonda térmica DS18B20 en GPIO 4 (D4) con pull-up externo de 4.7 kOhm a 3.3V
+  pinMode(PIN_SENSOR_TEMP_DS18B20, INPUT_PULLUP);
+  if (DS18B20_Native::iniciarConversion()) {
+    ds18b20_activo = true;
+    Serial.printf("[DS18B20] Sonda termica 1-Wire detectada en GPIO %u (D4).\n", PIN_SENSOR_TEMP_DS18B20);
+  } else {
+    Serial.printf("[DS18B20] Sin respuesta en GPIO %u (D4). Usando temperatura manual por defecto (%.1f C).\n",
+                  PIN_SENSOR_TEMP_DS18B20, temp_agua_C);
+  }
 
   const bool inicioAlim = sensorAlimentacion.begin();
   const bool inicioPerm = sensorPermeado.begin();
@@ -902,6 +1054,7 @@ void setup() {
   IPAddress subnet(255, 255, 255, 0);
   WiFi.softAPConfig(local_IP, gateway, subnet);
   WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4);
+  strlcpy(ipStr, WiFi.softAPIP().toString().c_str(), sizeof(ipStr));
 
   Serial.println("[WIFI] Punto de Acceso Estable Creado:");
   Serial.printf("       SSID: %s | Pass: %s\n", SSID_AP, PASS_AP);
@@ -981,6 +1134,18 @@ void loop() {
   if (tAhora - tCaudal >= 1000) {
     tCaudal = tAhora;
 
+    // Lectura asíncrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4)
+    float tLeida = 0.0f;
+    if (DS18B20_Native::leerTemperatura(tLeida)) {
+      ds18b20_activo = true;
+      if (modoTempAuto) {
+        temp_agua_C = tLeida;
+      }
+    } else {
+      ds18b20_activo = false;
+    }
+    DS18B20_Native::iniciarConversion(); // Inicia la conversión para el próximo segundo
+
     bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
     float qBomba = bomba.caudalTeorico_mLmin();
 
@@ -992,11 +1157,9 @@ void loop() {
     qAlimEfectivo_mLmin = sensorAlimentacion.caudal_mLmin();
     float qPermSensor   = sensorPermeado.caudal_mLmin();
 
-    // Si el sensor de permeado detecta giro real de la turbina (> 2 mL/min), usa el sensor en tiempo real.
-    // Si la turbina se detuvo por caudal ultra-bajo y el operador cargó probeta manual, usa el valor manual.
     if (usarPermManual && bombaEmpuja && !sensorPermeado.bloqueado()) {
       qPermEfectivo_mLmin = qPermManual_mLmin;
-      volPermManualAcum_L += (double)qPermManual_mLmin / 60000.0; // Integra mL/min a Litros cada 1 s
+      volPermManualAcum_L += (double)qPermManual_mLmin / 60000.0;
     } else {
       qPermEfectivo_mLmin = qPermSensor;
     }
@@ -1070,9 +1233,9 @@ void loop() {
       }
     }
 
-    Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min | Q_Perm:%5.1f mL/min | TMP:%.2f bar | J20:%4.2f LMH | R_torta:%.2e m^-1\n",
+    Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min | Q_Perm:%5.1f mL/min | T:%4.1f C | TMP:%.2f bar | J20:%4.2f LMH | R_torta:%.2e m^-1\n",
                   bomba.rpmActual(), qAlimEfectivo_mLmin,
-                  qPermEfectivo_mLmin, tmp_efectiva_bar,
+                  qPermEfectivo_mLmin, temp_agua_C, tmp_efectiva_bar,
                   resultadoDarcy.valido ? resultadoDarcy.J20_LMH : jLMH_actual,
                   resultadoDarcy.valido ? resultadoDarcy.R_adicional : 0.0f);
   }

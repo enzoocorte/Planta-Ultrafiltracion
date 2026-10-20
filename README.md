@@ -11,7 +11,7 @@
 ---
 
 > [!TIP]
-> 🚀 **ACCESO DIRECTO AL FIRMWARE ACTIVO (V6.4):**
+> 🚀 **ACCESO DIRECTO AL FIRMWARE ACTIVO (V6.5 - Producción):**
 > El código fuente maestro de producción para el ESP32 (con control de bomba NEMA 34, caudalímetros con blanking, web SCADA y cálculo de Darcy) se encuentra en:
 > 👉 **[`02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/`](./02_Hito2_Instrumentacion_Sensores/02_Firmware_Test_Sensores/subhito2_2_v6/EN_USO_firmware_planta/)**
 
@@ -98,7 +98,7 @@ SistemaUF/
 ├── 📁 02_Hito2_Instrumentacion_Sensores/      ──> 📊 Metrología, Sensores y Modelo Darcy
 │   ├── 📁 01_Guias_Montaje_y_Calibracion/    ──> Guía Subhito 2.4 (Manómetros), manual docx, filtro RC
 │   ├── 📁 02_Firmware_Test_Sensores/
-│   │   ├── 📁 subhito2_2_v6/                 ──> ⭐ FIRMWARE ACTIVO EN ESP32 (V6.4 Darcy en tiempo real)
+│   │   ├── 📁 subhito2_2_v6/                 ──> ⭐ FIRMWARE ACTIVO EN ESP32 (V6.5 - DS18B20 1-Wire, Heap Datalogger, 50 RPM, Darcy)
 │   │   ├── 📁 subhito2_2_v4/                 ──> Firmware blindado tras auditoría 4 IAs
 │   │   └── 📁 subhito2_2_v3/                 ──> Firmware histórico de probeta
 │   ├── 📁 Datos/                             ──> Planillas de calibración en probeta y CSVs

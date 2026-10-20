@@ -1,0 +1,634 @@
+/* ==============================================================================
+ * PLANTA PILOTO DE ULTRAFILTRACIÓN — TESIS INGENIERÍA INDUSTRIAL (UNSa 2026)
+ * Firmware de Control, Adquisición, Modo Desarrollador, Auto-Calibración y Datalogger
+ * Arquitectura C++ Optimizada y Wi-Fi SoftAP de Alta Estabilidad (Anti-Desconexión)
+ * ============================================================================== */
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ESPmDNS.h>
+#include <Preferences.h>
+#include "config.h"
+#include "caudalimetro.h"
+#include "Bomba.h"
+#include "index_html.h"
+
+// ------------------------------------------------------------------------------
+// ESTRUCTURAS DE DATOS PARA EL DATALOGGER Y GESTIÓN DE ENSAYOS
+// ------------------------------------------------------------------------------
+struct RegistroCalibracion {
+  uint8_t  id_ensayo;
+  uint32_t t_relativo_s;
+  float    rpm;
+  float    q_bomba;
+  float    f_alim;
+  float    q_alim;
+  float    vol_alim;
+  float    f_perm;
+  float    q_perm;
+  float    vol_perm;
+  float    q_ret;
+  float    recov;
+  float    delta;
+  float    k_alim;
+  float    k_perm;
+};
+
+struct EnsayoInfo {
+  uint8_t  id;
+  float    rpm_consigna;
+  uint32_t t_inicio_ms;
+  uint32_t duracion_s;
+  uint16_t muestras;
+  float    vol_alim;
+  float    vol_perm;
+};
+
+// Buffers de almacenamiento en RAM
+RegistroCalibracion bufferLog[MAX_REGISTROS];
+size_t numRegistros = 0;
+
+EnsayoInfo listaEnsayos[MAX_ENSAYOS];
+size_t numEnsayos = 0;
+uint8_t ensayoActualId = 1;
+
+// Variables de estado del ensayo actual
+uint32_t tInicioEnsayo_ms = 0;
+float volAlimInicioEnsayo = 0.0f;
+float volPermInicioEnsayo = 0.0f;
+bool  bombaEnMarchaAnterior = false;
+
+// Variables de Auto-Calibración en Marcha
+bool    autoCalibrando = false;
+uint8_t autoCalMuestras = 0;
+float   autoCalSumFrecAlim = 0.0f;
+float   autoCalSumFrecPerm = 0.0f;
+String  autoCalMensaje = "";
+
+// Instanciación de componentes
+Caudalimetro sensorAlimentacion(PIN_SENSOR_ALIMENTACION, K_ALIMENTACION, "ALIMENTACION");
+Caudalimetro sensorPermeado(PIN_SENSOR_PERMEADO, K_PERMEADO, "PERMEADO");
+Bomba bomba;
+WebServer server(80);
+Preferences prefs;
+
+// Variables hidráulicas y de control
+float qRet_mLmin = 0.0f;
+float recuperacion = 0.0f;
+float deltaBomba = 0.0f;
+
+uint32_t tLoop = 0;
+uint32_t tCaudal = 0;
+uint32_t tDatalogger = 0;
+
+// ------------------------------------------------------------------------------
+// GESTIÓN DE PREFERENCES (MEMORIA FLASH NVS)
+// ------------------------------------------------------------------------------
+void cargarParametrosNVS() {
+  prefs.begin("planta_uf", false);
+  float ka = prefs.getFloat("k_alim", K_ALIMENTACION);
+  float kp = prefs.getFloat("k_perm", K_PERMEADO);
+  float ml = prefs.getFloat("ml_rev", ML_POR_VUELTA);
+  uint16_t pul = prefs.getUShort("pul_rev", PULSOS_POR_REV);
+
+  sensorAlimentacion.setK(ka);
+  sensorPermeado.setK(kp);
+  bomba.setMlPorVuelta(ml);
+  bomba.setPulsosPorRev(pul);
+
+  Serial.printf("\n[NVS] Parametros cargados: K_Alim=%.2f | K_Perm=%.2f | mL/rev=%.4f | Pul/Rev=%u\n",
+                ka, kp, ml, pul);
+}
+
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+  prefs.putFloat("k_alim", ka);
+  prefs.putFloat("k_perm", kp);
+  prefs.putFloat("ml_rev", ml);
+  prefs.putUShort("pul_rev", pul);
+  Serial.println("[NVS] Parametros guardados en memoria Flash con exito.");
+}
+
+// ------------------------------------------------------------------------------
+// FUNCIÓN PARA GUARDAR MUESTRA EN EL DATALOGGER (CADA 10 SEGUNDOS)
+// ------------------------------------------------------------------------------
+void guardarMuestraDatalogger() {
+  if (tInicioEnsayo_ms == 0) {
+    tInicioEnsayo_ms = millis();
+  }
+
+  uint32_t t_rel_s = (millis() - tInicioEnsayo_ms) / 1000;
+
+  // Desplazamiento FIFO circular si el buffer se llena
+  if (numRegistros >= MAX_REGISTROS) {
+    for (size_t i = 0; i < MAX_REGISTROS - 1; i++) {
+      bufferLog[i] = bufferLog[i + 1];
+    }
+    numRegistros = MAX_REGISTROS - 1;
+  }
+
+  RegistroCalibracion reg;
+  reg.id_ensayo    = ensayoActualId;
+  reg.t_relativo_s = t_rel_s;
+  reg.rpm          = bomba.rpmActual();
+  reg.q_bomba      = bomba.caudalTeorico_mLmin();
+  reg.f_alim       = sensorAlimentacion.frecuencia_Hz();
+  reg.q_alim       = sensorAlimentacion.caudal_mLmin();
+  reg.vol_alim     = sensorAlimentacion.volumen_L();
+  reg.f_perm       = sensorPermeado.frecuencia_Hz();
+  reg.q_perm       = sensorPermeado.caudal_mLmin();
+  reg.vol_perm     = sensorPermeado.volumen_L();
+  reg.q_ret        = qRet_mLmin;
+  reg.recov        = recuperacion;
+  reg.delta        = deltaBomba;
+  reg.k_alim       = sensorAlimentacion.getK();
+  reg.k_perm       = sensorPermeado.getK();
+
+  bufferLog[numRegistros++] = reg;
+
+  Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f mL/min | Q_Perm=%.1f mL/min | Y=%.1f%%\n",
+                (unsigned int)numRegistros, ensayoActualId, t_rel_s, reg.rpm, reg.q_alim, reg.q_perm, reg.recov);
+}
+
+// ------------------------------------------------------------------------------
+// MANEJADORES DE RUTAS DEL SERVIDOR WEB
+// ------------------------------------------------------------------------------
+void handleRoot() {
+  server.send_P(200, "text/html", INDEX_HTML);
+}
+
+void handleStatus() {
+  String json;
+  json.reserve(1024);
+  json = "{";
+  json += "\"rpm\":" + String(bomba.rpmActual(), 1) + ",";
+  json += "\"obj_rpm\":" + String(bomba.rpmObjetivo(), 1) + ",";
+  json += "\"on\":" + String(bomba.enMarcha() ? "true" : "false") + ",";
+  json += "\"inv\":" + String(bomba.invirtiendo() ? "true" : "false") + ",";
+  json += "\"dir\":" + String(bomba.sentidoHorario() ? "true" : "false") + ",";
+  json += "\"en_regimen\":" + String(bomba.enRegimenEstable() ? "true" : "false") + ",";
+  json += "\"ip\":\"" + WiFi.softAPIP().toString() + "\",";
+  json += "\"alim_ok\":" + String(!sensorAlimentacion.sinSenal() ? "true" : "false") + ",";
+  json += "\"perm_ok\":" + String(!sensorPermeado.sinSenal() ? "true" : "false") + ",";
+  json += "\"f_alim\":" + String(sensorAlimentacion.frecuencia_Hz(), 2) + ",";
+  json += "\"q_alim\":" + String(sensorAlimentacion.caudal_mLmin(), 1) + ",";
+  json += "\"vol_alim\":" + String(sensorAlimentacion.volumen_L(), 4) + ",";
+  json += "\"f_perm\":" + String(sensorPermeado.frecuencia_Hz(), 2) + ",";
+  json += "\"q_perm\":" + String(sensorPermeado.caudal_mLmin(), 1) + ",";
+  json += "\"vol_perm\":" + String(sensorPermeado.volumen_L(), 4) + ",";
+  json += "\"q_ret\":" + String(qRet_mLmin, 1) + ",";
+  json += "\"recov\":" + String(recuperacion, 2) + ",";
+  json += "\"pump_ml\":" + String(bomba.caudalTeorico_mLmin(), 1) + ",";
+  json += "\"delta\":" + String(deltaBomba, 2) + ",";
+  
+  // Parámetros de Calibración / Modo Dev
+  json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2) + ",";
+  json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
+  json += "\"pul_rev\":" + String(bomba.getPulsosPorRev()) + ",";
+  
+  // Auto-Calibración
+  json += "\"auto_cal\":" + String(autoCalibrando ? "true" : "false") + ",";
+  uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
+  if (prog > 100) prog = 100;
+  json += "\"auto_cal_prog\":" + String(prog) + ",";
+  json += "\"auto_cal_res\":\"" + autoCalMensaje + "\",";
+
+  // Datos de Sesión y Datalogger
+  json += "\"n_logs\":" + String(numRegistros) + ",";
+  json += "\"ensayo_act\":" + String(ensayoActualId) + ",";
+  uint32_t t_act_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
+  json += "\"t_ensayo_s\":" + String(t_act_s) + ",";
+
+  // Lista de ensayos finalizados
+  json += "\"ensayos\":[";
+  for (size_t i = 0; i < numEnsayos; i++) {
+    if (i > 0) json += ",";
+    json += "{";
+    json += "\"id\":" + String(listaEnsayos[i].id) + ",";
+    json += "\"rpm\":" + String(listaEnsayos[i].rpm_consigna, 1) + ",";
+    json += "\"duracion_s\":" + String(listaEnsayos[i].duracion_s) + ",";
+    json += "\"muestras\":" + String(listaEnsayos[i].muestras) + ",";
+    json += "\"vol_alim\":" + String(listaEnsayos[i].vol_alim, 4) + ",";
+    json += "\"vol_perm\":" + String(listaEnsayos[i].vol_perm, 4);
+    json += "}";
+  }
+  json += "]}";
+
+  server.send(200, "application/json", json);
+}
+
+void handleCmd() {
+  if (!server.hasArg("act")) {
+    server.send(400, "text/plain", "Falta argumento act");
+    return;
+  }
+  String act = server.arg("act");
+  if (act == "START") {
+    bomba.arrancar();
+  } else if (act == "STOP") {
+    bomba.detener();
+    if (autoCalibrando) {
+      autoCalibrando = false;
+      autoCalMensaje = "Auto-calibracion cancelada al apagar bomba.";
+    }
+  } else if (act == "DIR") {
+    bomba.toggleSentido();
+  } else if (act == "RESET_VOL") {
+    sensorAlimentacion.resetVolumen();
+    sensorPermeado.resetVolumen();
+  }
+  server.send(200, "text/plain", "OK");
+}
+
+void handleSetRPM() {
+  if (server.hasArg("rpm")) {
+    float rpm = server.arg("rpm").toFloat();
+    bomba.setRPM(rpm);
+    server.send(200, "text/plain", "OK");
+  } else {
+    server.send(400, "text/plain", "Falta argumento rpm");
+  }
+}
+
+// Configuración en Modo Desarrollador
+void handleSetDev() {
+  if (server.hasArg("ka")) {
+    float ka = server.arg("ka").toFloat();
+    sensorAlimentacion.setK(ka);
+  }
+  if (server.hasArg("kp")) {
+    float kp = server.arg("kp").toFloat();
+    sensorPermeado.setK(kp);
+  }
+  if (server.hasArg("ml")) {
+    float ml = server.arg("ml").toFloat();
+    bomba.setMlPorVuelta(ml);
+  }
+  if (server.hasArg("pul")) {
+    uint16_t pul = (uint16_t)server.arg("pul").toInt();
+    bomba.setPulsosPorRev(pul);
+  }
+
+  bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
+  if (saveNvs) {
+    guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                         bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+  }
+
+  server.send(200, "application/json", "{\"status\":\"ok\"}");
+}
+
+// Iniciar Auto-Calibración Inteligente en Régimen Permanente
+void handleIniciarAutoCal() {
+  if (!bomba.enMarcha()) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Enciende la bomba primero\"}");
+    return;
+  }
+  autoCalibrando = true;
+  autoCalMuestras = 0;
+  autoCalSumFrecAlim = 0.0f;
+  autoCalSumFrecPerm = 0.0f;
+  autoCalMensaje = "";
+  server.send(200, "application/json", "{\"status\":\"iniciada\"}");
+}
+
+void handleCancelarAutoCal() {
+  autoCalibrando = false;
+  autoCalMensaje = "Auto-calibracion cancelada.";
+  server.send(200, "application/json", "{\"status\":\"cancelada\"}");
+}
+
+// Calibrador Completo por RPM y Caudal de Probeta
+void handleCalibrarRpmQ() {
+  if (!server.hasArg("rpm") || !server.hasArg("qa") || !server.hasArg("qp")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Faltan argumentos\"}");
+    return;
+  }
+
+  float rpm = server.arg("rpm").toFloat();
+  float qa  = server.arg("qa").toFloat();
+  float qp  = server.arg("qp").toFloat();
+
+  if (rpm <= 0.0f || qa <= 0.0f || qp <= 0.0f) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"msg\":\"Valores deben ser mayores a 0\"}");
+    return;
+  }
+
+  // 1. Cilindrada real de la bomba
+  float nuevaCilindrada = qa / rpm;
+  bomba.setMlPorVuelta(nuevaCilindrada);
+
+  // 2. Factores K basados en frecuencia actual
+  float fa = sensorAlimentacion.frecuencia_Hz();
+  float fp = sensorPermeado.frecuencia_Hz();
+
+  if (fa > 1.0f) {
+    float nuevoKa = (fa * 1000.0f) / qa;
+    sensorAlimentacion.setK(nuevoKa);
+  }
+  if (fp > 0.3f) {
+    float nuevoKp = (fp * 1000.0f) / qp;
+    sensorPermeado.setK(nuevoKp);
+  }
+
+  guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                       bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+  String json = "{";
+  json += "\"status\":\"ok\",";
+  json += "\"ml_rev\":" + String(bomba.getMlPorVuelta(), 4) + ",";
+  json += "\"k_alim\":" + String(sensorAlimentacion.getK(), 2) + ",";
+  json += "\"k_perm\":" + String(sensorPermeado.getK(), 2);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+// Restablecer parámetros de fábrica
+void handleResetDev() {
+  sensorAlimentacion.setK(K_ALIMENTACION);
+  sensorPermeado.setK(K_PERMEADO);
+  bomba.setMlPorVuelta(ML_POR_VUELTA);
+  bomba.setPulsosPorRev(PULSOS_POR_REV);
+  
+  guardarParametrosNVS(K_ALIMENTACION, K_PERMEADO, ML_POR_VUELTA, PULSOS_POR_REV);
+  server.send(200, "application/json", "{\"status\":\"reset_ok\"}");
+}
+
+// Exportación a Excel (.CSV) con filtrado por Ensayo o Histórico Completo
+void handleExportCSV() {
+  String targetEnsayo = server.hasArg("ensayo") ? server.arg("ensayo") : "all";
+  
+  String filename = "PlantaUF_Calibracion_";
+  if (targetEnsayo == "all") {
+    filename += "HistoricoCompleto.csv";
+  } else if (targetEnsayo == "actual") {
+    filename += "Ensayo_" + String(ensayoActualId) + "_EnVivo.csv";
+  } else {
+    filename += "Ensayo_" + targetEnsayo + ".csv";
+  }
+
+  server.sendHeader("Content-Type", "text/csv; charset=UTF-8");
+  server.sendHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+  server.sendHeader("Connection", "close");
+  
+  String csv = "sep=;\n";
+  csv += "PLANTA DE ULTRAFILTRACION FX100 - REGISTRO DE ENSAYOS Y CALIBRACION\n";
+  csv += "Ensayo_ID;Tiempo_s;Tiempo_MinSec;RPM_Bomba;Q_Bomba_Teorico_mLmin;Frec_Alimentacion_Hz;Q_Alimentacion_mLmin;Vol_Alimentacion_L;Frec_PERMEADO_Hz;Q_PERMEADO_mLmin;Vol_PERMEADO_L;Q_Retentado_mLmin;Recuperacion_Y_Pct;Desviacion_Bomba_Alim_Pct;K_Alim;K_Perm\n";
+  
+  server.sendContent(csv);
+
+  uint8_t filtroId = 0;
+  if (targetEnsayo == "actual") {
+    filtroId = ensayoActualId;
+  } else if (targetEnsayo != "all") {
+    filtroId = (uint8_t)targetEnsayo.toInt();
+  }
+
+  String chunk = "";
+  chunk.reserve(1024);
+  for (size_t i = 0; i < numRegistros; i++) {
+    RegistroCalibracion& r = bufferLog[i];
+    
+    if (filtroId > 0 && r.id_ensayo != filtroId) {
+      continue;
+    }
+
+    uint32_t mins = r.t_relativo_s / 60;
+    uint32_t secs = r.t_relativo_s % 60;
+    char timeStr[10];
+    snprintf(timeStr, sizeof(timeStr), "%02u:%02u", mins, secs);
+
+    chunk += String(r.id_ensayo) + ";";
+    chunk += String(r.t_relativo_s) + ";";
+    chunk += String(timeStr) + ";";
+    chunk += String(r.rpm, 1) + ";";
+    chunk += String(r.q_bomba, 1) + ";";
+    chunk += String(r.f_alim, 2) + ";";
+    chunk += String(r.q_alim, 1) + ";";
+    chunk += String(r.vol_alim, 4) + ";";
+    chunk += String(r.f_perm, 2) + ";";
+    chunk += String(r.q_perm, 1) + ";";
+    chunk += String(r.vol_perm, 4) + ";";
+    chunk += String(r.q_ret, 1) + ";";
+    chunk += String(r.recov, 2) + ";";
+    chunk += String(r.delta, 2) + ";";
+    chunk += String(r.k_alim, 2) + ";";
+    chunk += String(r.k_perm, 2) + "\n";
+
+    if (chunk.length() > 800) {
+      server.sendContent(chunk);
+      chunk = "";
+    }
+  }
+
+  if (chunk.length() > 0) {
+    server.sendContent(chunk);
+  }
+}
+
+void handleClearCSV() {
+  numRegistros = 0;
+  numEnsayos = 0;
+  ensayoActualId = 1;
+  tInicioEnsayo_ms = millis();
+  server.send(200, "text/plain", "LOGS_CLEARED");
+}
+
+// ------------------------------------------------------------------------------
+// SETUP DEL MICROCONTROLADOR ESP32
+// ------------------------------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  Serial.println("\n==================================================");
+  Serial.println(" PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   ");
+  Serial.println(" Rampa S-Curve, Auto-Calibracion & Datalogger     ");
+  Serial.println("==================================================");
+
+  // 1. Cargar parámetros de calibración desde NVS Flash
+  cargarParametrosNVS();
+
+  // 2. Inicialización de Hardware
+  pinMode(PIN_LED_BOMBA, OUTPUT);
+  digitalWrite(PIN_LED_BOMBA, LOW);
+
+  sensorAlimentacion.begin();
+  sensorPermeado.begin();
+  bomba.begin();
+
+  // 3. Configuración Wi-Fi Robusta (AP Dedicado Anti-Desconexión)
+  WiFi.disconnect(true);           // Limpiar estados previos
+  delay(100);
+  WiFi.mode(WIFI_AP);              // Modo AP Puro (evita escaneos STA que botan clientes)
+  WiFi.setSleep(false);            // CRÍTICO: Desactiva ahorro de energía del módem
+  WiFi.setTxPower(WIFI_POWER_19_5dBm); // Máxima potencia de transmisión RF
+
+  IPAddress local_IP(192, 168, 4, 1);
+  IPAddress gateway(192, 168, 4, 1);
+  IPAddress subnet(255, 255, 255, 0);
+  WiFi.softAPConfig(local_IP, gateway, subnet);
+  WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4); // Canal 1 fijo, SSID visible, hasta 4 clientes
+
+  Serial.println("[WIFI] Punto de Acceso Estable Creado:");
+  Serial.printf("       SSID: %s | Pass: %s\n", SSID_AP, PASS_AP);
+  Serial.printf("       IP AP: http://%s\n", WiFi.softAPIP().toString().c_str());
+
+  if (MDNS.begin("bomba")) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("[mDNS] Servidor publicado en: http://bomba.local");
+  }
+
+  // 4. Enrutamiento del Servidor Web
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/status", HTTP_GET, handleStatus);
+  server.on("/cmd", HTTP_GET, handleCmd);
+  server.on("/set", HTTP_GET, handleSetRPM);
+  server.on("/set_dev", HTTP_GET, handleSetDev);
+  server.on("/reset_dev", HTTP_GET, handleResetDev);
+  server.on("/iniciar_auto_cal", HTTP_GET, handleIniciarAutoCal);
+  server.on("/cancelar_auto_cal", HTTP_GET, handleCancelarAutoCal);
+  server.on("/calibrar_rpm_q", HTTP_GET, handleCalibrarRpmQ);
+  server.on("/export_csv", HTTP_GET, handleExportCSV);
+  server.on("/clear_csv", HTTP_GET, handleClearCSV);
+
+  server.begin();
+  Serial.println("[HTTP] Servidor Web SCADA iniciado con exito en puerto 80.\n");
+
+  tLoop = millis();
+  tCaudal = millis();
+  tDatalogger = millis();
+  tInicioEnsayo_ms = millis();
+}
+
+// ------------------------------------------------------------------------------
+// BUCLE PRINCIPAL (LOOP NO BLOQUEANTE)
+// ------------------------------------------------------------------------------
+void loop() {
+  server.handleClient();
+
+  uint32_t tAhora = millis();
+
+  // 1. Control cinemático de la bomba cada 50 ms (Rampa S-Curve Progresiva)
+  if (tAhora - tLoop >= 50) {
+    float dt = (tAhora - tLoop) / 1000.0f;
+    tLoop = tAhora;
+    bomba.tick(dt);
+
+    // Testigo LED onboard
+    digitalWrite(PIN_LED_BOMBA, (bomba.rpmActual() > 0.5f) ? HIGH : LOW);
+
+    // Detección de flancos de la bomba para registro de ensayos
+    bool enMarcha = bomba.enMarcha();
+    
+    // Flanco de subida: Iniciar sesión de ensayo
+    if (enMarcha && !bombaEnMarchaAnterior) {
+      uint16_t muestrasPrevias = 0;
+      for (size_t i = 0; i < numRegistros; i++) {
+        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
+      }
+      if (muestrasPrevias > 0) {
+        ensayoActualId++;
+      }
+      tInicioEnsayo_ms = millis();
+      volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
+      volPermInicioEnsayo = sensorPermeado.volumen_L();
+      Serial.printf("\n>>> [ENSAYO #%u INICIADO] Consigna: %.1f RPM <<<\n", ensayoActualId, bomba.rpmObjetivo());
+    }
+    
+    // Flanco de bajada: Finalizar sesión y registrar
+    if (!enMarcha && bombaEnMarchaAnterior) {
+      uint32_t duracion_s = (millis() - tInicioEnsayo_ms) / 1000;
+      uint16_t muestrasEnsayo = 0;
+      for (size_t i = 0; i < numRegistros; i++) {
+        if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
+      }
+
+      if (muestrasEnsayo > 0 && numEnsayos < MAX_ENSAYOS) {
+        listaEnsayos[numEnsayos].id           = ensayoActualId;
+        listaEnsayos[numEnsayos].rpm_consigna = bomba.rpmObjetivo();
+        listaEnsayos[numEnsayos].t_inicio_ms  = tInicioEnsayo_ms;
+        listaEnsayos[numEnsayos].duracion_s   = duracion_s;
+        listaEnsayos[numEnsayos].muestras     = muestrasEnsayo;
+        listaEnsayos[numEnsayos].vol_alim     = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
+        listaEnsayos[numEnsayos].vol_perm     = sensorPermeado.volumen_L() - volPermInicioEnsayo;
+        numEnsayos++;
+
+        Serial.printf("\n<<< [ENSAYO #%u FINALIZADO Y REGISTRADO] Duracion: %us | Muestras: %u | Vol Perm: %.3f L >>>\n\n",
+                      ensayoActualId, duracion_s, muestrasEnsayo, sensorPermeado.volumen_L() - volPermInicioEnsayo);
+      }
+    }
+
+    bombaEnMarchaAnterior = enMarcha;
+  }
+
+  // 2. Adquisición y cálculo de caudales cada 1000 ms (1 segundo)
+  if (tAhora - tCaudal >= 1000) {
+    float dt = (tAhora - tCaudal) / 1000.0f;
+    tCaudal = tAhora;
+
+    bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
+    sensorAlimentacion.actualizar(dt, bombaEmpuja);
+    sensorPermeado.actualizar(dt, bombaEmpuja);
+
+    float qAlim = sensorAlimentacion.caudal_mLmin();
+    float qPerm = sensorPermeado.caudal_mLmin();
+
+    // Balance Hidráulico Tangencial
+    qRet_mLmin   = max(0.0f, qAlim - qPerm);
+    recuperacion = (qAlim > 1.0f) ? ((qPerm / qAlim) * 100.0f) : 0.0f;
+
+    float qBomba = bomba.caudalTeorico_mLmin();
+    deltaBomba   = (qBomba > 1.0f) ? (((qAlim - qBomba) / qBomba) * 100.0f) : 0.0f;
+
+    // Máquina de estados de Auto-Calibración en régimen permanente
+    if (autoCalibrando) {
+      if (bomba.enRegimenEstable()) {
+        autoCalSumFrecAlim += sensorAlimentacion.frecuencia_Hz();
+        autoCalSumFrecPerm += sensorPermeado.frecuencia_Hz();
+        autoCalMuestras++;
+
+        Serial.printf("[AUTO-CAL] Muestra %u/%u | F_Alim=%.2f Hz | F_Perm=%.2f Hz\n",
+                      autoCalMuestras, MUESTRAS_AUTO_CAL, sensorAlimentacion.frecuencia_Hz(), sensorPermeado.frecuencia_Hz());
+
+        if (autoCalMuestras >= MUESTRAS_AUTO_CAL) {
+          float fPromAlim = autoCalSumFrecAlim / (float)MUESTRAS_AUTO_CAL;
+          float fPromPerm = autoCalSumFrecPerm / (float)MUESTRAS_AUTO_CAL;
+          float qRefAlim  = bomba.rpmActual() * bomba.getMlPorVuelta();
+
+          if (qRefAlim > 10.0f && fPromAlim > 1.0f) {
+            float nuevoKa = (fPromAlim * 1000.0f) / qRefAlim;
+            sensorAlimentacion.setK(nuevoKa);
+          }
+          if (fPromPerm > 0.2f) {
+            float targetPerm = bomba.rpmActual() * 2.0f;
+            float nuevoKp = (fPromPerm * 1000.0f) / targetPerm;
+            sensorPermeado.setK(nuevoKp);
+          }
+
+          guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
+                               bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+
+          autoCalibrando = false;
+          autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " | K_Perm=" + String(sensorPermeado.getK(), 2);
+          Serial.printf("\n>>> %s <<<\n\n", autoCalMensaje.c_str());
+        }
+      } else {
+        Serial.println("[AUTO-CAL] Esperando estabilizacion de RPM...");
+      }
+    }
+
+    // Telemetría periódica por Serial
+    Serial.printf("[TELEMETRIA] RPM: %4.1f | Q_Alim: %5.1f mL/min | Q_Perm: %5.1f mL/min | Q_Ret: %5.1f mL/min | Y: %4.1f%% | V_Perm: %.3f L\n",
+                  bomba.rpmActual(), qAlim, qPerm, qRet_mLmin, recuperacion, sensorPermeado.volumen_L());
+  }
+
+  // 3. Muestreo del Datalogger cada 10 segundos
+  if (tAhora - tDatalogger >= INTERVALO_LOG_MS) {
+    tDatalogger = tAhora;
+    if (bomba.enMarcha() || sensorAlimentacion.caudal_mLmin() > 10.0f || sensorPermeado.caudal_mLmin() > 5.0f) {
+      guardarMuestraDatalogger();
+    }
+  }
+}

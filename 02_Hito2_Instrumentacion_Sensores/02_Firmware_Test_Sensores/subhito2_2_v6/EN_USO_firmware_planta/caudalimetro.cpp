@@ -5,8 +5,7 @@
 
 // ==============================================================================
 // IMPLEMENTACIÓN DE CAUDALÍMETRO — VERSIÓN V6.4 (Estabilidad Total + Anti-Picos)
-// - Blanking de 3000 us en ISR (rechaza de raíz cualquier chispazo > 333 Hz como
-//   el de 373 Hz, dejando pasar el 100% del rango de 0 a 100 RPM = 0 a 230 Hz).
+// - Blanking de 1200 us (Alim) y 3500 us (Perm) en ISR.
 // - Filtro de Mediana de 3 puntos (mediana3) + Suavizado Exponencial (EMA) para
 //   eliminar variaciones bruscas de 1 segundo sin usar capacitores que ahoguen
 //   la señal a altas RPM.
@@ -32,14 +31,14 @@ void ARDUINO_ISR_ATTR Caudalimetro::reiniciarEstimadorLocked() {
   _pulsosVentana     = 0;
 }
 
-bool Caudalimetro::setK(double nuevoK) {
+bool Caudalimetro::setK(double nuevoK, bool documentada) {
   if (!std::isfinite(nuevoK) || nuevoK < 10.0 || nuevoK > 1000.0) {
     return false;
   }
 
   portENTER_CRITICAL(&_mux);
   _cfg.k_Hz_por_Lmin = nuevoK;
-  _cfg.calibracionDocumentada = false;
+  _cfg.calibracionDocumentada = documentada;
   ++_epoca;
 
   _pulsosOffset = _pulsosMedicion;
@@ -227,7 +226,8 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
 
   int64_t dtVentana_us = m.t_us - _tCapturaPrev_us;
   _tCapturaPrev_us = m.t_us;
-  if (dtVentana_us < 500000LL || dtVentana_us > 2500000LL) {
+  // P0-6: No forzar 1s si el loop se demoró; solo corregir glitches de reloj iniciales (< 200ms)
+  if (dtVentana_us < 200000LL) {
     dtVentana_us = 1000000LL;
   }
 
@@ -305,8 +305,6 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
                            : (0.35f * qMed + 0.65f * _qSuavizadoDisplay);
     _cerosConsecutivos = 0;
   } else {
-    // Si la bomba sigue en marcha pero hubo una ventana aislada sin pulso, no borrar de golpe.
-    // Solo si se confirman 2 ventanas consecutivas sin pulsos o si la bomba se detuvo, resetear a 0.
     _cerosConsecutivos++;
     if (_cerosConsecutivos >= 2 || !bombaEmpuja || bloqueado) {
       _qHist[0] = _qHist[1] = _qHist[2] = 0.0f;

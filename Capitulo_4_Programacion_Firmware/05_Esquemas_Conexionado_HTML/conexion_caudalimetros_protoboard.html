@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Esquema de Conexión: Caudalímetros YF-S401 en Protoboard para ESP32</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --primary: #38bdf8;
+      --primary-dark: #0284c7;
+      --accent-perm: #10b981;
+      --accent-ret: #f59e0b;
+      --vcc-red: #ef4444;
+      --gnd-black: #64748b;
+      --signal-yellow: #eab308;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 24px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .badge {
+      align-self: flex-start;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      color: #ffffff;
+      font-weight: 800;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .controls-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      align-items: center;
+    }
+
+    .btn-filter {
+      background: #334155;
+      color: var(--text);
+      border: 1px solid transparent;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-filter:hover {
+      background: #475569;
+    }
+
+    .btn-filter.active {
+      background: var(--primary-dark);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .diagram-card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      overflow-x: auto;
+    }
+
+    .diagram-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* SVG Styles */
+    svg {
+      width: 100%;
+      min-width: 900px;
+      height: auto;
+      display: block;
+      user-select: none;
+    }
+
+    .wire {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: all 0.3s ease;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    }
+
+    .wire-highlight {
+      stroke-width: 6px !important;
+      filter: drop-shadow(0 0 8px currentColor) !important;
+    }
+
+    .wire-dimmed {
+      opacity: 0.15;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 860px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tag-color {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+    }
+
+    .color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .alert-box {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 14px 18px;
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .alert-icon {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .code-block {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      padding: 16px;
+      border-radius: 10px;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      line-height: 1.45;
+    }
+
+    .kw { color: #f43f5e; font-weight: bold; }
+    .fn { color: #38bdf8; }
+    .var { color: #fbbf24; }
+    .num { color: #a78bfa; }
+    .cmt { color: #64748b; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- Header -->
+    <header>
+      <div class="badge">UNSa – Tesis Ultrafiltración FX100</div>
+      <h1>Esquema de Cableado de Caudalímetros en Protoboard</h1>
+      <p class="subtitle">Conexión de 2 sensores de turbina YF-S401 (Permeado $Q_p$ y Retentado $Q_c$) con el ESP32 NodeMCU-32S</p>
+    </header>
+
+    <!-- Barra de Filtros Interactivos -->
+    <div class="controls-bar">
+      <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-muted);">Visualizar:</span>
+      <button class="btn-filter active" onclick="setHighlight('all')">🌐 Todo el Circuito</button>
+      <button class="btn-filter" onclick="setHighlight('perm')">💧 Caudalímetro Permeado (GPIO 27)</button>
+      <button class="btn-filter" onclick="setHighlight('ret')">🔄 Caudalímetro Retentado (GPIO 14)</button>
+      <button class="btn-filter" onclick="setHighlight('power')">⚡ Alimentación (3.3V y GND)</button>
+    </div>
+
+    <!-- Tarjeta del Diagrama Gráfico SVG -->
+    <div class="diagram-card">
+      <div class="diagram-title">
+        <span>Dibujo Vectorial de Conexión en Protoboard</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">💡 Haz clic en los botones superiores para resaltar líneas</span>
+      </div>
+
+      <svg id="schematic" viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Gradientes -->
+          <linearGradient id="protoBg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#f8fafc" />
+            <stop offset="100%" stop-color="#e2e8f0" />
+          </linearGradient>
+
+          <linearGradient id="esp32Bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e293b" />
+            <stop offset="100%" stop-color="#0f172a" />
+          </linearGradient>
+
+          <linearGradient id="sensorBg1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#065f46" />
+            <stop offset="100%" stop-color="#022c22" />
+          </linearGradient>
+
+          <linearGradient id="sensorBg2" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#854d0e" />
+            <stop offset="100%" stop-color="#451a03" />
+          </linearGradient>
+
+          <linearGradient id="metalPlate" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#94a3b8" />
+            <stop offset="50%" stop-color="#cbd5e1" />
+            <stop offset="100%" stop-color="#64748b" />
+          </linearGradient>
+
+          <!-- Patrón de Agujeros de Protoboard -->
+          <pattern id="holePattern" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+            <rect x="3" y="3" width="6" height="6" rx="1.5" fill="#334155" opacity="0.3" />
+          </pattern>
+        </defs>
+
+        <!-- ============================================== -->
+        <!-- 1. PROTOBOARD (Breadboard)                     -->
+        <!-- ============================================== -->
+        <g id="breadboard">
+          <!-- Base de la protoboard -->
+          <rect x="240" y="40" width="720" height="540" rx="16" fill="url(#protoBg)" stroke="#cbd5e1" stroke-width="3" filter="drop-shadow(0 15px 25px rgba(0,0,0,0.4))" />
+          
+          <!-- Riel de Alimentación Superior (+ y -) -->
+          <rect x="260" y="60" width="680" height="40" rx="6" fill="#f1f5f9" stroke="#e2e8f0" />
+          <line x1="270" y1="72" x2="930" y2="72" stroke="#ef4444" stroke-width="2" stroke-dasharray="8 4" />
+          <text x="265" y="76" fill="#ef4444" font-size="14" font-weight="bold">+</text>
+          <line x1="270" y1="88" x2="930" y2="88" stroke="#3b82f6" stroke-width="2" stroke-dasharray="8 4" />
+          <text x="265" y="92" fill="#3b82f6" font-size="16" font-weight="bold">-</text>
+
+          <!-- Riel de Alimentación Inferior (+ y -) -->
+          <rect x="260" y="520" width="680" height="40" rx="6" fill="#f1f5f9" stroke="#e2e8f0" />
+          <line x1="270" y1="532" x2="930" y2="532" stroke="#ef4444" stroke-width="2" stroke-dasharray="8 4" />
+          <text x="265" y="536" fill="#ef4444" font-size="14" font-weight="bold">+</text>
+          <line x1="270" y1="548" x2="930" y2="548" stroke="#3b82f6" stroke-width="2" stroke-dasharray="8 4" />
+          <text x="265" y="552" fill="#3b82f6" font-size="16" font-weight="bold">-</text>
+
+          <!-- Canal Divisor Central -->
+          <rect x="260" y="295" width="680" height="25" fill="#e2e8f0" />
+          <line x1="260" y1="307" x2="940" y2="307" stroke="#cbd5e1" stroke-width="2" />
+
+          <!-- Área de tie-points (agujeros) -->
+          <rect x="260" y="115" width="680" height="170" fill="url(#holePattern)" />
+          <rect x="260" y="330" width="680" height="175" fill="url(#holePattern)" />
+
+          <!-- Etiquetas de filas y columnas -->
+          <text x="600" y="55" fill="#64748b" font-size="11" font-weight="bold" text-anchor="middle">PROTOBOARD ESTÁNDAR 830 PUNTOS</text>
+          <text x="275" y="28" fill="#ef4444" font-size="11" font-weight="bold">RIEL 3.3V (VCC)</text>
+          <text x="275" y="580" fill="#3b82f6" font-size="11" font-weight="bold">RIEL GND (MASA COMÚN)</text>
+        </g>
+
+        <!-- ============================================== -->
+        <!-- 2. ESP32 NodeMCU-32S (Insertado en Protoboard) -->
+        <!-- ============================================== -->
+        <g id="esp32" transform="translate(460, 150)">
+          <!-- PCB Negro -->
+          <rect x="0" y="0" width="280" height="310" rx="10" fill="url(#esp32Bg)" stroke="#475569" stroke-width="2" filter="drop-shadow(0 8px 16px rgba(0,0,0,0.5))" />
+
+          <!-- Tapa metálica blindada WiFi/BT -->
+          <rect x="70" y="30" width="140" height="140" rx="6" fill="url(#metalPlate)" stroke="#475569" stroke-width="1.5" />
+          <text x="140" y="90" fill="#1e293b" font-size="14" font-weight="bold" text-anchor="middle">ESP-WROOM-32</text>
+          <text x="140" y="110" fill="#334155" font-size="10" font-weight="600" text-anchor="middle">Wi-Fi & Bluetooth</text>
+
+          <!-- Conector USB-C / MicroUSB -->
+          <rect x="100" y="-12" width="80" height="24" rx="4" fill="#94a3b8" stroke="#334155" stroke-width="1.5" />
+          <rect x="115" y="-6" width="50" height="12" rx="2" fill="#1e293b" />
+
+          <!-- Botones EN y BOOT -->
+          <rect x="20" y="20" width="22" height="22" rx="3" fill="#cbd5e1" />
+          <circle cx="31" cy="31" r="6" fill="#1e293b" />
+          <text x="31" y="55" fill="#94a3b8" font-size="9" text-anchor="middle">EN</text>
+
+          <rect x="238" y="20" width="22" height="22" rx="3" fill="#cbd5e1" />
+          <circle cx="249" cy="31" r="6" fill="#1e293b" />
+          <text x="249" y="55" fill="#94a3b8" font-size="9" text-anchor="middle">BOOT</text>
+
+          <!-- Pines Lado Izquierdo (3V3, EN, D36, ..., GND) -->
+          <!-- Pin 3V3 (Fila superior izquierda) -->
+          <circle cx="12" cy="75" r="5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+          <text x="24" y="80" fill="#fca5a5" font-size="11" font-weight="bold">3V3</text>
+
+          <!-- Pin GND Izquierdo -->
+          <circle cx="12" cy="275" r="5" fill="#64748b" stroke="#ffffff" stroke-width="1.5" />
+          <text x="24" y="280" fill="#cbd5e1" font-size="11" font-weight="bold">GND</text>
+
+          <!-- Pin GPIO 14 (D14) - Izquierda inferior -->
+          <circle id="pin-d14" cx="12" cy="225" r="6" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+          <text x="24" y="230" fill="#fde68a" font-size="12" font-weight="bold">D14 (Qc Retentado)</text>
+
+          <!-- Pines Lado Derecho (CLK, ..., D27, ..., VIN) -->
+          <!-- Pin GPIO 27 (D27) - Derecha medio -->
+          <circle id="pin-d27" cx="268" cy="175" r="6" fill="#10b981" stroke="#ffffff" stroke-width="2" />
+          <text x="256" y="180" fill="#6ee7b7" font-size="12" font-weight="bold" text-anchor="end">D27 (Qp Permeado)</text>
+
+          <!-- Pin VIN (Derecha inferior) -->
+          <circle cx="268" cy="275" r="5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+          <text x="256" y="280" fill="#fca5a5" font-size="11" font-weight="bold" text-anchor="end">VIN (5V)</text>
+
+          <!-- Texto central modelo -->
+          <text x="140" y="240" fill="#38bdf8" font-size="13" font-weight="bold" text-anchor="middle">ESP32 NodeMCU-32S</text>
+          <text x="140" y="260" fill="#64748b" font-size="10" text-anchor="middle">38 PINES - LÓGICA 3.3V</text>
+        </g>
+
+        <!-- ============================================== -->
+        <!-- 3. CAUDALÍMETRO 1: PERMEADO (YF-S401)          -->
+        <!-- ============================================== -->
+        <g id="sensor-perm" transform="translate(30, 80)">
+          <!-- Cuerpo del sensor -->
+          <rect x="0" y="0" width="160" height="150" rx="14" fill="url(#sensorBg1)" stroke="#10b981" stroke-width="2.5" filter="drop-shadow(0 10px 18px rgba(0,0,0,0.4))" />
+          
+          <!-- Espigas de entrada / salida hidráulica -->
+          <rect x="55" y="-18" width="50" height="22" rx="4" fill="#047857" stroke="#10b981" />
+          <text x="80" y="-4" fill="#a7f3d0" font-size="9" font-weight="bold" text-anchor="middle">▲ ENTRADA</text>
+
+          <rect x="55" y="146" width="50" height="22" rx="4" fill="#047857" stroke="#10b981" />
+          <text x="80" y="160" fill="#a7f3d0" font-size="9" font-weight="bold" text-anchor="middle">▼ SALIDA</text>
+
+          <!-- Rotor / Turbina interna (representación) -->
+          <circle cx="80" cy="70" r="34" fill="#064e3b" stroke="#34d399" stroke-width="2" stroke-dasharray="6 3" />
+          <circle cx="80" cy="70" r="10" fill="#10b981" />
+
+          <!-- Títulos y especificaciones -->
+          <text x="80" y="32" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">CAUDALÍMETRO 1</text>
+          <text x="80" y="48" fill="#34d399" font-size="11" font-weight="bold" text-anchor="middle">PERMEADO (Qp)</text>
+          <text x="80" y="118" fill="#a7f3d0" font-size="10" text-anchor="middle">Modelo: YF-S401</text>
+          <text x="80" y="132" fill="#6ee7b7" font-size="9" text-anchor="middle">98 pulsos / Litro</text>
+
+          <!-- Bornera de salida de 3 cables -->
+          <circle id="p1-vcc" cx="160" cy="50" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+          <circle id="p1-gnd" cx="160" cy="75" r="6" fill="#334155" stroke="#ffffff" stroke-width="1.5" />
+          <circle id="p1-sig" cx="160" cy="100" r="6" fill="#eab308" stroke="#ffffff" stroke-width="1.5" />
+
+          <!-- Etiquetas de cables -->
+          <text x="148" y="44" fill="#fca5a5" font-size="9" font-weight="bold" text-anchor="end">ROJO (3.3V)</text>
+          <text x="148" y="70" fill="#cbd5e1" font-size="9" font-weight="bold" text-anchor="end">NEGRO (GND)</text>
+          <text x="148" y="96" fill="#fef08a" font-size="9" font-weight="bold" text-anchor="end">AMARILLO (D27)</text>
+        </g>
+
+        <!-- ============================================== -->
+        <!-- 4. CAUDALÍMETRO 2: RETENTADO (YF-S401)         -->
+        <!-- ============================================== -->
+        <g id="sensor-ret" transform="translate(30, 360)">
+          <!-- Cuerpo del sensor -->
+          <rect x="0" y="0" width="160" height="150" rx="14" fill="url(#sensorBg2)" stroke="#f59e0b" stroke-width="2.5" filter="drop-shadow(0 10px 18px rgba(0,0,0,0.4))" />
+          
+          <!-- Espigas de entrada / salida hidráulica -->
+          <rect x="55" y="-18" width="50" height="22" rx="4" fill="#78350f" stroke="#f59e0b" />
+          <text x="80" y="-4" fill="#fde68a" font-size="9" font-weight="bold" text-anchor="middle">▲ ENTRADA</text>
+
+          <rect x="55" y="146" width="50" height="22" rx="4" fill="#78350f" stroke="#f59e0b" />
+          <text x="80" y="160" fill="#fde68a" font-size="9" font-weight="bold" text-anchor="middle">▼ SALIDA</text>
+
+          <!-- Rotor / Turbina interna (representación) -->
+          <circle cx="80" cy="70" r="34" fill="#451a03" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6 3" />
+          <circle cx="80" cy="70" r="10" fill="#f59e0b" />
+
+          <!-- Títulos y especificaciones -->
+          <text x="80" y="32" fill="#ffffff" font-size="12" font-weight="bold" text-anchor="middle">CAUDALÍMETRO 2</text>
+          <text x="80" y="48" fill="#fbbf24" font-size="11" font-weight="bold" text-anchor="middle">RETENTADO (Qc)</text>
+          <text x="80" y="118" fill="#fde68a" font-size="10" text-anchor="middle">Modelo: YF-S401</text>
+          <text x="80" y="132" fill="#fcd34d" font-size="9" text-anchor="middle">98 pulsos / Litro</text>
+
+          <!-- Bornera de salida de 3 cables -->
+          <circle id="p2-vcc" cx="160" cy="50" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="1.5" />
+          <circle id="p2-gnd" cx="160" cy="75" r="6" fill="#334155" stroke="#ffffff" stroke-width="1.5" />
+          <circle id="p2-sig" cx="160" cy="100" r="6" fill="#eab308" stroke="#ffffff" stroke-width="1.5" />
+
+          <!-- Etiquetas de cables -->
+          <text x="148" y="44" fill="#fca5a5" font-size="9" font-weight="bold" text-anchor="end">ROJO (3.3V)</text>
+          <text x="148" y="70" fill="#cbd5e1" font-size="9" font-weight="bold" text-anchor="end">NEGRO (GND)</text>
+          <text x="148" y="96" fill="#fef08a" font-size="9" font-weight="bold" text-anchor="end">AMARILLO (D14)</text>
+        </g>
+
+        <!-- ============================================== -->
+        <!-- 5. CABLES Y RUTEO VECTORIAL (WIRES)            -->
+        <!-- ============================================== -->
+        <g id="wires-layer">
+
+          <!-- 5.1 CABLES DE ALIMENTACIÓN INTERNA ESP32 -> RIEL -->
+          <!-- Cable ESP32 Pin 3V3 -> Riel Superior (+) -->
+          <path class="wire wire-power" d="M 472 225 C 440 225, 410 72, 490 72" stroke="#ef4444" stroke-width="3.5" />
+          <!-- Cable ESP32 Pin GND -> Riel Inferior (-) -->
+          <path class="wire wire-power" d="M 472 425 C 440 425, 410 548, 520 548" stroke="#3b82f6" stroke-width="3.5" />
+
+          <!-- 5.2 CABLES CAUDALÍMETRO PERMEADO (Qp) -->
+          <!-- VCC (Rojo) -> Riel Superior (+) -->
+          <path class="wire wire-perm wire-power" d="M 190 130 C 230 130, 260 72, 360 72" stroke="#ef4444" stroke-width="3.5" />
+          <!-- GND (Negro) -> Riel Inferior (-) -->
+          <path class="wire wire-perm wire-power" d="M 190 155 C 220 155, 230 548, 360 548" stroke="#3b82f6" stroke-width="3.5" />
+          <!-- SEÑAL (Amarillo) -> Pin GPIO 27 (D27 en ESP32) -->
+          <path class="wire wire-perm" d="M 190 180 C 300 180, 680 120, 728 325" stroke="#10b981" stroke-width="4" stroke-dasharray="none" />
+
+          <!-- 5.3 CABLES CAUDALÍMETRO RETENTADO (Qc) -->
+          <!-- VCC (Rojo) -> Riel Superior (+) -->
+          <path class="wire wire-ret wire-power" d="M 190 410 C 220 410, 250 72, 420 72" stroke="#ef4444" stroke-width="3.5" />
+          <!-- GND (Negro) -> Riel Inferior (-) -->
+          <path class="wire wire-ret wire-power" d="M 190 435 C 230 435, 260 548, 420 548" stroke="#3b82f6" stroke-width="3.5" />
+          <!-- SEÑAL (Amarillo) -> Pin GPIO 14 (D14 en ESP32) -->
+          <path class="wire wire-ret" d="M 190 460 C 320 460, 390 375, 472 375" stroke="#f59e0b" stroke-width="4" />
+
+          <!-- Puntos de Conexión (Jumpers / Tie-points) -->
+          <circle cx="490" cy="72" r="4" fill="#ef4444" stroke="#fff" />
+          <circle cx="520" cy="548" r="4" fill="#3b82f6" stroke="#fff" />
+          <circle cx="360" cy="72" r="4" fill="#ef4444" stroke="#fff" />
+          <circle cx="360" cy="548" r="4" fill="#3b82f6" stroke="#fff" />
+          <circle cx="420" cy="72" r="4" fill="#ef4444" stroke="#fff" />
+          <circle cx="420" cy="548" r="4" fill="#3b82f6" stroke="#fff" />
+          <circle cx="728" cy="325" r="5" fill="#10b981" stroke="#fff" stroke-width="1.5" />
+          <circle cx="472" cy="375" r="5" fill="#f59e0b" stroke="#fff" stroke-width="1.5" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- Sección de Información Técnica y Mapeo -->
+    <div class="grid-2">
+      
+      <!-- Tarjeta 1: Tabla de Conexiones -->
+      <div class="card">
+        <div class="card-title">
+          <span>📋 Mapeo Detallado de Terminales</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Color Cable</th>
+              <th>Destino en Protoboard / ESP32</th>
+              <th>Función</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td rowspan="3" style="font-weight: bold; color: var(--accent-perm);">Permeado (Qp)<br><small>Agua Filtrada</small></td>
+              <td><span class="tag-color"><span class="color-dot" style="background:#ef4444;"></span> Rojo</span></td>
+              <td>Riel <strong>3.3V (VCC)</strong></td>
+              <td>Alimentación Sensor Hall</td>
+            </tr>
+            <tr>
+              <td><span class="tag-color"><span class="color-dot" style="background:#64748b;"></span> Negro</span></td>
+              <td>Riel <strong>GND (Masa Común)</strong></td>
+              <td>Retorno 0V</td>
+            </tr>
+            <tr>
+              <td><span class="tag-color"><span class="color-dot" style="background:#10b981;"></span> Amarillo</span></td>
+              <td>Pin <strong>GPIO 27 (D27)</strong></td>
+              <td>Pulsos Hall (98 p/L)</td>
+            </tr>
+
+            <tr>
+              <td rowspan="3" style="font-weight: bold; color: var(--accent-ret);">Retentado (Qc)<br><small>Concentrado</small></td>
+              <td><span class="tag-color"><span class="color-dot" style="background:#ef4444;"></span> Rojo</span></td>
+              <td>Riel <strong>3.3V (VCC)</strong></td>
+              <td>Alimentación Sensor Hall</td>
+            </tr>
+            <tr>
+              <td><span class="tag-color"><span class="color-dot" style="background:#64748b;"></span> Negro</span></td>
+              <td>Riel <strong>GND (Masa Común)</strong></td>
+              <td>Retorno 0V</td>
+            </tr>
+            <tr>
+              <td><span class="tag-color"><span class="color-dot" style="background:#f59e0b;"></span> Amarillo</span></td>
+              <td>Pin <strong>GPIO 14 (D14)</strong></td>
+              <td>Pulsos Hall (98 p/L)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Alerta de Tensión -->
+        <div class="alert-box" style="margin-top: 16px;">
+          <span class="alert-icon">⚠️</span>
+          <div>
+            <strong>Regla de Oro de Seguridad Eléctrica:</strong><br>
+            Alimentar siempre el cable rojo de los caudalímetros a <strong>3.3V (pin 3V3)</strong> y <u>NUNCA a 5V</u>. De este modo, la señal cuadrada de pulsos generada por el sensor Hall oscila entre 0V y 3.3V, protegiendo las entradas GPIO del ESP32 contra sobretensiones destructivas.
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjeta 2: Implementación en Código C++ -->
+      <div class="card">
+        <div class="card-title">
+          <span>💻 Código de Lectura con Interrupciones (C++)</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+          El conteo se realiza por hardware mediante interrupciones en flanco de subida (<code class="kw">RISING</code>), garantizando cero pérdida de pulsos durante el giro de la bomba NEMA 34.
+        </p>
+
+        <div class="code-block">
+<span class="cmt">// Pines de caudalímetros</span>
+<span class="kw">const uint8_t</span> <span class="var">PIN_CAUDAL_PERMEADO</span>  = <span class="num">27</span>; <span class="cmt">// GPIO 27</span>
+<span class="kw">const uint8_t</span> <span class="var">PIN_CAUDAL_RETENTADO</span> = <span class="num">14</span>; <span class="cmt">// GPIO 14</span>
+
+<span class="kw">volatile unsigned long</span> <span class="var">pulsosPermeado</span>  = <span class="num">0</span>;
+<span class="kw">volatile unsigned long</span> <span class="var">pulsosRetentado</span> = <span class="num">0</span>;
+
+<span class="cmt">// Rutinas de servicio de interrupción (ISR en IRAM)</span>
+<span class="kw">void</span> <span class="fn">IRAM_ATTR</span> <span class="fn">isrPermeado</span>() {
+  <span class="var">pulsosPermeado</span>++;
+}
+
+<span class="kw">void</span> <span class="fn">IRAM_ATTR</span> <span class="fn">isrRetentado</span>() {
+  <span class="var">pulsosRetentado</span>++;
+}
+
+<span class="kw">void</span> <span class="fn">setup</span>() {
+  <span class="fn">pinMode</span>(<span class="var">PIN_CAUDAL_PERMEADO</span>, <span class="var">INPUT_PULLUP</span>);
+  <span class="fn">pinMode</span>(<span class="var">PIN_CAUDAL_RETENTADO</span>, <span class="var">INPUT_PULLUP</span>);
+
+  <span class="fn">attachInterrupt</span>(<span class="fn">digitalPinToInterrupt</span>(<span class="var">PIN_CAUDAL_PERMEADO</span>), <span class="var">isrPermeado</span>, <span class="var">RISING</span>);
+  <span class="fn">attachInterrupt</span>(<span class="fn">digitalPinToInterrupt</span>(<span class="var">PIN_CAUDAL_RETENTADO</span>), <span class="var">isrRetentado</span>, <span class="var">RISING</span>);
+}
+
+<span class="cmt">// Cálculo de Caudal instantáneo: Q (L/min) = (Pulsos / 98) * (60 / dt)</span>
+<span class="kw">float</span> <span class="fn">calcularCaudalLMin</span>(<span class="kw">unsigned long</span> <span class="var">pulsos</span>, <span class="kw">float</span> <span class="var">deltaSegundos</span>) {
+  <span class="kw">return</span> (<span class="var">pulsos</span> / <span class="num">98.0</span>) * (<span class="num">60.0</span> / <span class="var">deltaSegundos</span>);
+}
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    function setHighlight(mode) {
+      // Actualizar botones activos
+      const buttons = document.querySelectorAll('.btn-filter');
+      buttons.forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const wires = document.querySelectorAll('.wire');
+      
+      wires.forEach(w => {
+        w.classList.remove('wire-highlight', 'wire-dimmed');
+        
+        if (mode === 'all') {
+          // Normal
+        } else if (mode === 'perm') {
+          if (w.classList.contains('wire-perm')) {
+            w.classList.add('wire-highlight');
+          } else {
+            w.classList.add('wire-dimmed');
+          }
+        } else if (mode === 'ret') {
+          if (w.classList.contains('wire-ret')) {
+            w.classList.add('wire-highlight');
+          } else {
+            w.classList.add('wire-dimmed');
+          }
+        } else if (mode === 'power') {
+          if (w.classList.contains('wire-power')) {
+            w.classList.add('wire-highlight');
+          } else {
+            w.classList.add('wire-dimmed');
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

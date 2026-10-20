@@ -49,6 +49,8 @@ private:
   float _actual = 0.0f;
   float _rpmGuardada = RPM_INICIO;
   uint32_t _fActual = 0;
+  uint32_t _tDetenido_ms = 0;
+  uint32_t _tEnable_ms = 0;
 
   float    _mlPorVuelta  = ML_POR_VUELTA;
   uint16_t _pulsosPorRev = PULSOS_POR_REV;

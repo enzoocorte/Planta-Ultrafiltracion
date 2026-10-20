@@ -104,6 +104,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       transition: all 0.2s;
     }
     button:hover { filter: brightness(1.15); }
+    button:active { transform: scale(0.96); filter: brightness(1.3); }
     .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .go { background: var(--success); color: #04301c; }
     .no { background: var(--danger); color: #3d0808; }
@@ -252,15 +253,18 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
 
     <!-- CARD 1: CONTROL DE BOMBA PERISTÁLTICA -->
     <div class="card">
-      <div class="row" style="margin-bottom:4px">
+      <div class="row" style="margin-bottom:4px; gap:6px; flex-wrap:wrap">
         <h1 style="text-align:left; margin-bottom:0">PLANTA UF • UNSa 2026</h1>
-        <button class="btn-dev" onclick="toggleDev()">🛠️ Calibración / Factores K</button>
+        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+          <button class="btn-dev" style="background:#0284c7; color:#fff;" onclick="toggleSwitches()">⚙️ Switches DM860</button>
+          <button class="btn-dev" onclick="toggleDev()">🛠️ Calibración / Factores K</button>
+        </div>
       </div>
       <p class="sub" style="text-align:left">Medición Continua en Tiempo Real • Seguimiento de Formación de Torta</p>
 
       <div class="disp">
         <div class="rpm" id="rpm">0.0</div>
-        <u>RPM INSTANTÁNEA (OBJETIVO: <span id="obj_rpm_lbl" style="color:var(--primary)">25</span> RPM)</u>
+        <u>RPM INSTANTÁNEA (OBJETIVO: <span id="obj_rpm_lbl" style="color:var(--primary)">50</span> RPM)</u>
         <div class="pill off" id="pil">DETENIDA</div>
       </div>
 
@@ -268,9 +272,9 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
 
       <div class="row">
         <span>Consigna de Operación:</span>
-        <span><b id="lc" style="color:var(--primary)">25</b> RPM</span>
+        <span><b id="lc" style="color:var(--primary)">50</b> RPM</span>
       </div>
-      <input type="range" id="sl" min="15" max="100" step="1" value="25">
+      <input type="range" id="sl" min="15" max="100" step="1" value="50">
 
       <div class="grid">
         <button class="rpm-btn" data-rpm="20" onclick="setR(20)">20 RPM</button>
@@ -282,9 +286,62 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       </div>
 
       <div class="btns">
-        <button class="go" onclick="cmd('START')">▶ ARRANCAR</button>
-        <button class="no" onclick="cmd('STOP')">⏹ PARAR</button>
+        <button class="go" id="btn_start" onclick="cmd('START')">▶ ARRANCAR</button>
+        <button class="no" id="btn_stop" onclick="cmd('STOP')">⏹ PARAR</button>
         <button class="dir" id="bd" onclick="cmd('DIR')">🔄 HORARIO (FILTRACIÓN)</button>
+      </div>
+    </div>
+
+    <!-- CARD COLAPSABLE: GUÍA OFICIAL DE SWITCHES DEL DRIVER DM860 -->
+    <div class="card" id="card_switches" style="display:none; border:1px solid #0284c7; background:#071426;">
+      <div class="row" style="margin-bottom:8px">
+        <b style="font-size:12px; color:#38bdf8">⚙️ CONFIGURACIÓN OFICIAL DE DIP SWITCHES — DRIVER LEADSHINE DM860</b>
+        <button style="padding:2px 8px; font-size:10px; background:#1e293b; color:#94a3b8; border:1px solid #334155" onclick="toggleSwitches()">✖ Cerrar</button>
+      </div>
+      <p style="font-size:10px; color:var(--muted); margin-bottom:10px;">
+        Posición física de los 8 microinterruptores del driver DM860 para Motor Paso a Paso NEMA 34 (4.5 Nm) y Bomba Peristáltica (3200 pulsos/rev).
+      </p>
+
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-bottom:10px;">
+        <!-- Bloque 1: SW1-SW3 Corriente -->
+        <div style="background:#0b1d36; border:1px solid #1e3a5f; border-radius:8px; padding:8px;">
+          <div style="font-size:10px; font-weight:700; color:#38bdf8; margin-bottom:4px">1. CORRIENTE (SW1 - SW3)</div>
+          <div style="font-size:12px; font-weight:800; color:#fff">4.9A Pico / 3.5A RMS</div>
+          <div style="font-size:9px; color:#94a3b8; margin:3px 0;">(Opción 5.6A: OFF, ON, OFF)</div>
+          <div style="display:flex; gap:3px; font-size:9px; font-weight:800; margin-top:6px;">
+            <span style="background:#16a34a; color:#fff; padding:2px 5px; border-radius:4px;">SW1: ON</span>
+            <span style="background:#dc2626; color:#fff; padding:2px 5px; border-radius:4px;">SW2: OFF</span>
+            <span style="background:#dc2626; color:#fff; padding:2px 5px; border-radius:4px;">SW3: OFF</span>
+          </div>
+        </div>
+
+        <!-- Bloque 2: SW4 Reposo Frío -->
+        <div style="background:#06231d; border:1px solid #059669; border-radius:8px; padding:8px;">
+          <div style="font-size:10px; font-weight:700; color:#34d399; margin-bottom:4px">2. REPOSO FRÍO (SW4) ⭐</div>
+          <div style="font-size:12px; font-weight:800; color:#34d399">HALF CURRENT (50%)</div>
+          <div style="font-size:9px; color:#a7f3d0; margin:3px 0;">¡Evita sobrecalentamiento!</div>
+          <div style="display:flex; gap:3px; font-size:9px; font-weight:800; margin-top:6px;">
+            <span style="background:#16a34a; color:#fff; padding:2px 7px; border-radius:4px; font-size:10px;">SW4: ON (Half)</span>
+          </div>
+        </div>
+
+        <!-- Bloque 3: SW5-SW8 Micropasos -->
+        <div style="background:#0b1d36; border:1px solid #1e3a5f; border-radius:8px; padding:8px;">
+          <div style="font-size:10px; font-weight:700; color:#facc15; margin-bottom:4px">3. MICROPASOS (SW5 - SW8)</div>
+          <div style="font-size:12px; font-weight:800; color:#fff">3200 Pulsos / Rev (1/16)</div>
+          <div style="font-size:9px; color:#94a3b8; margin:3px 0;">Calibrado con cil = 13.55 mL/rev</div>
+          <div style="display:flex; gap:3px; font-size:9px; font-weight:800; margin-top:6px; flex-wrap:wrap;">
+            <span style="background:#16a34a; color:#fff; padding:2px 4px; border-radius:4px;">SW5: ON</span>
+            <span style="background:#dc2626; color:#fff; padding:2px 4px; border-radius:4px;">SW6: OFF</span>
+            <span style="background:#16a34a; color:#fff; padding:2px 4px; border-radius:4px;">SW7: ON</span>
+            <span style="background:#16a34a; color:#fff; padding:2px 4px; border-radius:4px;">SW8: ON</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:10px; background:#040d1a; padding:6px 8px; border-radius:6px; border-left:3px solid #38bdf8; color:#94a3b8">
+        📌 <b>Posición Física Oficial de Palanquitas en el DM860:</b><br>
+        [SW1: <b style="color:#34d399">ON</b>] &nbsp; [SW2: <b style="color:#f87171">OFF</b>] &nbsp; [SW3: <b style="color:#f87171">OFF</b>] &nbsp; [SW4: <b style="color:#34d399">ON</b>] &nbsp; | &nbsp; [SW5: <b style="color:#34d399">ON</b>] &nbsp; [SW6: <b style="color:#f87171">OFF</b>] &nbsp; [SW7: <b style="color:#34d399">ON</b>] &nbsp; [SW8: <b style="color:#34d399">ON</b>]
       </div>
     </div>
 
@@ -422,6 +479,19 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       <p style="font-size:10px; color:var(--muted); margin-bottom:8px;">
         Ingreso visual de Manómetros Bourdon de Glicerina (P₁, P₂) y Temperatura (T). El microcontrolador calcula en vivo TMP, factor TCF (viscosidad Vogel), flujo J₂₀ y resistencias hidráulicas R_total y R_torta en cada muestra.
       </p>
+
+      <!-- SELECTOR Y MONITOREO DE TEMPERATURA (SENSOR DS18B20 EN D4 vs MANUAL) -->
+      <div style="background:#07101b; padding:8px 10px; border-radius:8px; border:1px solid #13273e; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; font-weight:700; color:#fff">🌡️ Medición de Temperatura:</span>
+          <span class="badge" id="badge_sensor_temp" style="font-size:10px; padding:3px 6px; background:#065f46; color:#34d399;">🟢 SONDA D4 ACTIVA</span>
+          <span style="font-size:11px; color:#94a3b8">En vivo: <b id="val_temp_live" style="color:#38bdf8; font-size:13px">20.0</b> °C</span>
+        </div>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <button id="btn_temp_auto" style="padding:4px 8px; font-size:10px; font-weight:700; background:#0284c7; color:#fff; border-radius:5px; border:none;" onclick="setTempModo(true)">⚡ Sonda DS18B20 (Auto)</button>
+          <button id="btn_temp_man" style="padding:4px 8px; font-size:10px; font-weight:700; background:#1e293b; color:#94a3b8; border-radius:5px; border:1px solid #334155;" onclick="setTempModo(false)">✏️ Ingreso Manual</button>
+        </div>
+      </div>
 
       <div style="display:grid; grid-template-columns: repeat(3, 1fr) auto; gap:6px; align-items:end; margin-bottom:10px; background:#07101b; padding:8px; border-radius:8px; border:1px solid #13273e;">
         <div>
@@ -602,6 +672,61 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     let lastStableFa = 0;
     let lastStableFp = 0;
     let soloAlimActivo = false;
+    let switchesOpen = false;
+    let modoTempAuto = true;
+
+    function toggleSwitches() {
+      switchesOpen = !switchesOpen;
+      $('card_switches').style.display = switchesOpen ? 'block' : 'none';
+      if (switchesOpen) {
+        $('card_switches').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function setTempModo(auto) {
+      modoTempAuto = auto;
+      cmd(auto ? 'TEMP_AUTO_ON' : 'TEMP_AUTO_OFF');
+      actualizarEstiloTemp();
+      if (auto) {
+        showToast("🌡️ Sonda DS18B20 en D4 activada: actualización automática de temperatura en vivo.");
+      } else {
+        showToast("✏️ Modo manual: escribe la temperatura en °C y haz clic en Aplicar.");
+      }
+    }
+
+    function actualizarEstiloTemp() {
+      const bAuto = $('btn_temp_auto');
+      const bMan = $('btn_temp_man');
+      if (bAuto && bMan) {
+        if (modoTempAuto) {
+          bAuto.style.background = '#059669';
+          bAuto.style.border = '2px solid #34d399';
+          bAuto.style.boxShadow = '0 0 10px rgba(52, 211, 153, 0.6)';
+          bAuto.style.color = '#fff';
+          bAuto.style.fontWeight = '800';
+          bMan.style.background = '#1e293b';
+          bMan.style.border = '1px solid #334155';
+          bMan.style.boxShadow = 'none';
+          bMan.style.color = '#94a3b8';
+          bMan.style.fontWeight = 'normal';
+        } else {
+          bMan.style.background = '#d97706';
+          bMan.style.border = '2px solid #fbbf24';
+          bMan.style.boxShadow = '0 0 10px rgba(251, 191, 36, 0.6)';
+          bMan.style.color = '#fff';
+          bMan.style.fontWeight = '800';
+          bAuto.style.background = '#1e293b';
+          bAuto.style.border = '1px solid #334155';
+          bAuto.style.boxShadow = 'none';
+          bAuto.style.color = '#94a3b8';
+          bAuto.style.fontWeight = 'normal';
+        }
+      }
+      if ($('inp_temp')) {
+        $('inp_temp').readOnly = modoTempAuto;
+        $('inp_temp').style.opacity = modoTempAuto ? '0.75' : '1.0';
+      }
+    }
 
     // Historial en vivo para el gráfico de formación de torta (últimos 120 puntos)
     let histT = [];
@@ -626,9 +751,11 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     function updateRpmHighlight(v) {
       document.querySelectorAll('.rpm-btn').forEach(btn => {
         const isMatch = Math.abs(parseFloat(btn.dataset.rpm) - parseFloat(v)) < 0.1;
-        btn.style.border = isMatch ? '1px solid var(--primary)' : '1px solid transparent';
-        btn.style.background = isMatch ? '#1a2c4e' : '#22304e';
-        btn.style.color = isMatch ? 'var(--primary)' : 'var(--text)';
+        btn.style.border = isMatch ? '2px solid #60a5fa' : '1px solid #334155';
+        btn.style.background = isMatch ? '#2563eb' : '#1e293b';
+        btn.style.boxShadow = isMatch ? '0 0 12px rgba(37, 99, 235, 0.6)' : 'none';
+        btn.style.color = isMatch ? '#ffffff' : '#94a3b8';
+        btn.style.fontWeight = isMatch ? '900' : 'normal';
       });
     }
 
@@ -829,10 +956,14 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     };
     $('sl').onchange = e => setR(e.target.value);
 
+    let pollBusy = false;
     setInterval(() => {
+      if (pollBusy) return;
+      pollBusy = true;
       fetch('/status')
         .then(r => r.json())
         .then(d => {
+          pollBusy = false;
           rawStatus = d;
           $('rpm').innerText = d.rpm.toFixed(1);
           $('obj_rpm_lbl').innerText = d.obj_rpm.toFixed(0);
@@ -840,7 +971,44 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           $('ip').innerText = d.ip;
           $('pil').className = 'pill ' + (d.inv ? 'inv' : d.on ? 'on' : 'off');
           $('pil').innerText = d.inv ? 'INVIRTIENDO' : d.on ? '🟢 EN MARCHA' : 'DETENIDA';
-          $('bd').innerText = d.dir ? '🔄 HORARIO (FILTRACIÓN)' : '🔄 ANTIHORARIO (RETROLAVADO)';
+
+          // Cambio dinámico de color en botones de Bomba (Marcha / Parada / Sentido)
+          const bStart = $('btn_start');
+          const bStop = $('btn_stop');
+          if (bStart && bStop) {
+            if (d.on) {
+              bStart.style.background = '#16a34a';
+              bStart.style.border = '2px solid #4ade80';
+              bStart.style.boxShadow = '0 0 14px rgba(74, 222, 128, 0.6)';
+              bStart.style.color = '#fff';
+              bStart.innerText = '🟢 EN MARCHA';
+              bStop.style.background = '#3b1212';
+              bStop.style.border = '1px solid #7f1d1d';
+              bStop.style.boxShadow = 'none';
+              bStop.style.color = '#fca5a5';
+              bStop.innerText = '⏹ PARAR';
+            } else {
+              bStart.style.background = '#064e3b';
+              bStart.style.border = '1px solid #047857';
+              bStart.style.boxShadow = 'none';
+              bStart.style.color = '#86efac';
+              bStart.innerText = '▶ ARRANCAR';
+              bStop.style.background = '#dc2626';
+              bStop.style.border = '2px solid #f87171';
+              bStop.style.boxShadow = '0 0 12px rgba(220, 38, 38, 0.6)';
+              bStop.style.color = '#fff';
+              bStop.innerText = '⏹ DETENIDA';
+            }
+          }
+
+          if ($('bd')) {
+            $('bd').innerText = d.dir ? '🔄 HORARIO (FILTRACIÓN)' : '🔄 ANTIHORARIO (RETROLAVADO)';
+            $('bd').style.background = d.dir ? '#0284c7' : '#d97706';
+            $('bd').style.border = d.dir ? '2px solid #38bdf8' : '2px solid #fbbf24';
+            $('bd').style.boxShadow = d.dir ? '0 0 10px rgba(56, 189, 248, 0.4)' : '0 0 10px rgba(251, 191, 36, 0.4)';
+            $('bd').style.color = '#fff';
+          }
+
           $('al').classList.toggle('vis', d.cruce || d.q_alim > 1600);
           $('ba').classList.toggle('vis', !d.alim_ok);
           $('bp').classList.toggle('vis', !d.perm_ok);
@@ -848,8 +1016,19 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
           soloAlimActivo = !!d.solo_alim;
           const bsa = $('btn_solo_alim');
           if (bsa) {
-            bsa.innerText = soloAlimActivo ? '🔒 Perm Bloqueado' : '🔒 Solo Alim';
-            bsa.style.background = soloAlimActivo ? '#0369a1' : '#1e293b';
+            if (soloAlimActivo) {
+              bsa.innerText = '🔒 Perm Bloqueado (ACTIVO)';
+              bsa.style.background = '#0284c7';
+              bsa.style.border = '2px solid #38bdf8';
+              bsa.style.boxShadow = '0 0 10px rgba(56, 189, 248, 0.5)';
+              bsa.style.color = '#fff';
+            } else {
+              bsa.innerText = '🔒 Solo Alim (OFF)';
+              bsa.style.background = '#1e293b';
+              bsa.style.border = '1px solid #475569';
+              bsa.style.boxShadow = 'none';
+              bsa.style.color = '#94a3b8';
+            }
           }
 
           if ($('lbl_estado_perm')) {
@@ -910,10 +1089,30 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
             $('pill_darcy').innerText = d.darcy_ok ? 'DARCY ACTIVO' : 'SIN TMP / PERM';
           }
 
+          // Actualización de temperatura y sensor DS18B20 en GPIO 4
+          if (d.temp_auto !== undefined && !$('inp_temp').dataset.manTouched) {
+            modoTempAuto = !!d.temp_auto;
+            actualizarEstiloTemp();
+          }
+          if ($('val_temp_live')) {
+            $('val_temp_live').innerText = (d.temp !== undefined) ? d.temp.toFixed(1) : '--';
+          }
+          if ($('badge_sensor_temp')) {
+            if (d.ds18b20) {
+              $('badge_sensor_temp').innerText = '🟢 SONDA D4 ACTIVA';
+              $('badge_sensor_temp').style.background = '#065f46';
+              $('badge_sensor_temp').style.color = '#34d399';
+            } else {
+              $('badge_sensor_temp').innerText = '⚪ SONDA NO DETECTADA';
+              $('badge_sensor_temp').style.background = '#3f1d1d';
+              $('badge_sensor_temp').style.color = '#f87171';
+            }
+          }
+
           if (!document.activeElement || (document.activeElement.id !== 'inp_p1' && document.activeElement.id !== 'inp_p2' && document.activeElement.id !== 'inp_temp')) {
             if ($('inp_p1') && d.p1 !== undefined && !$('inp_p1').dataset.touched) $('inp_p1').value = d.p1.toFixed(2);
             if ($('inp_p2') && d.p2 !== undefined && !$('inp_p2').dataset.touched) $('inp_p2').value = d.p2.toFixed(2);
-            if ($('inp_temp') && d.temp !== undefined && !$('inp_temp').dataset.touched) $('inp_temp').value = d.temp.toFixed(1);
+            if ($('inp_temp') && d.temp !== undefined && (modoTempAuto || !$('inp_temp').dataset.touched)) $('inp_temp').value = d.temp.toFixed(1);
           }
 
           // Actualizar gráfico en tiempo real cada 2 segundos mientras la bomba está encendida
@@ -980,8 +1179,8 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
             tbody.innerHTML = trHtml;
           }
         })
-        .catch(() => {});
-    }, 500);
+        .catch(() => { pollBusy = false; });
+    }, 600);
   </script>
 </body>
 </html>

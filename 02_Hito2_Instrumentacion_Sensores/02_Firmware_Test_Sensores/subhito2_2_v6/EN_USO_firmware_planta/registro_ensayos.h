@@ -75,7 +75,6 @@ public:
     _estadoSesion |= FALLO_CONTROL;
   }
 
-  // CORRECCIÓN: Usa ultimaMuestra() en lugar de capturar() para no vaciar los contadores del loop de 1s
   bool iniciar(const Caudalimetro& a, const Caudalimetro& p, double rpm) {
     if (!_filas) {
       if (!begin()) return false;
@@ -122,7 +121,6 @@ public:
     return true;
   }
 
-  // CORRECCIÓN: Usa ultimaMuestra() para evitar doble captura destructiva
   bool finalizar(const Caudalimetro& a, const Caudalimetro& p, double rpm) {
     if (!_activo || !std::isfinite(rpm) || rpm < 0.0) return false;
 

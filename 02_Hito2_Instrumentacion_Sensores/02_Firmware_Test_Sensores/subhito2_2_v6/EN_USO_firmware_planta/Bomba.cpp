@@ -8,24 +8,35 @@
 
 void Bomba::begin() {
   pinMode(PIN_DIR, OUTPUT);
-  pinMode(PIN_ENA, OUTPUT);
-  digitalWrite(PIN_ENA, LOW); // ENA en LOW: Driver DM860 habilitado normalmente
-  fijarSentido(true);         // Sentido horario por defecto (Filtración)
+  digitalWrite(PIN_DIR, LOW);
+  fijarSentido(true); // Sentido horario por defecto (Filtración)
 
+  pinMode(PIN_ENA, OUTPUT);
+  digitalWrite(PIN_ENA, LOW); // Habilitar driver DM860
+
+  // Inicializar temporizador LEDC para el pin de pulsos
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
   ledcAttach(PIN_PUL, 800, 10);
-  ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF (motor detenido sin pulsos)
+  ledcWrite(PIN_PUL, 0); // Reposo seguro: Duty 0 = nivel bajo continuo sin ningún pulso
 #else
   ledcSetup(0, 800, 10);
   ledcAttachPin(PIN_PUL, 0);
   ledcWrite(0, 0);
 #endif
+
+  _enMarcha = false;
+  _enEmergencia = false;
+  _actual = 0.0f;
+  _fActual = 0;
+  _tDetenido_ms = millis();
 }
 
 void Bomba::arrancar() {
-  if (_enEmergencia) return; // Bloqueado si hay parada de emergencia activa
+  _enEmergencia = false;      // Desbloqueo ante orden de arranque
   _enMarcha = true;
-  digitalWrite(PIN_ENA, LOW); // Asegura habilitación del driver DM860
+  _tDetenido_ms = 0;
+  digitalWrite(PIN_ENA, LOW); // Activa driver
+  _tEnable_ms = millis();
   if (_objetivo < RPM_MIN) {
     _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
   }
@@ -51,12 +62,10 @@ void Bomba::paradaEmergencia() {
 #else
   ledcWrite(0, 0);
 #endif
-  digitalWrite(PIN_ENA, HIGH); // Corte físico instantáneo en el DM860 (< 1 ms)
 }
 
 void Bomba::rearmarEmergencia() {
   _enEmergencia = false;
-  digitalWrite(PIN_ENA, LOW);
   _actual = 0.0f;
   _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
 }
@@ -98,33 +107,48 @@ void Bomba::tick(float dt) {
 #else
     ledcWrite(0, 0);
 #endif
-    digitalWrite(PIN_ENA, HIGH);
     return;
+  }
+
+  // P0-2: Validación y limitación de dt para proteger la cinemática del NEMA 34
+  if (!(dt > 0.0f)) return;
+  if (dt > DT_MAX_RAMPA_S) dt = DT_MAX_RAMPA_S; // Nunca avanza más de 0.10s si el loop se demora
+
+  // Gestión de reposo del driver Leadshine DM860
+  if (!_enMarcha && _actual <= 0.0f) {
+    if (_tDetenido_ms == 0) {
+      _tDetenido_ms = millis();
+    }
+  } else if (_enMarcha) {
+    _tDetenido_ms = 0;
+    digitalWrite(PIN_ENA, LOW); // Mantener habilitado con torque activo
   }
 
   float objetivo = _enMarcha ? _objetivo : 0.0f;
 
-  if (_actual < objetivo) {
-    // Si la bomba está arrancando desde 0, iniciamos suavemente en 1.0 RPM (~53 Hz LEDC)
-    if (_actual < 1.0f) {
-      _actual = 1.0f;
+  if (_enMarcha && _actual < objetivo) {
+    // Despegue inicial fluido: arranca en RPM_DESPEGUE (6.0 RPM = 320 Hz)
+    // eliminando el arrastre lento de 1 RPM y la zona de resonancia/calentamiento
+    if (_actual < RPM_DESPEGUE) {
+      _actual = RPM_DESPEGUE;
     }
 
-    // Rampa de aceleración progresiva
-    float tasaAcel = ACEL_NOMINAL_RPM_S;
-    if (_actual < 10.0f) {
-      tasaAcel = ACEL_ARRANQUE_RPM_S + (_actual / 10.0f) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
-    }
+    // Rampa de aceleración ágil y fluida (~1.3s para alcanzar la consigna de trabajo)
     float delta = objetivo - _actual;
-    if (delta < 3.0f) {
-      tasaAcel = fmaxf(0.8f, tasaAcel * (delta / 3.0f));
+    float tasaAcel = ACEL_NOMINAL_RPM_S;
+    if (_actual < 12.0f) {
+      tasaAcel = ACEL_ARRANQUE_RPM_S + ((_actual - RPM_DESPEGUE) / (12.0f - RPM_DESPEGUE)) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
+    }
+    // Suavizado en la llegada a la consigna
+    if (delta < 2.0f) {
+      tasaAcel = fmaxf(3.0f, tasaAcel * (delta / 2.0f));
     }
     _actual = fminf(objetivo, _actual + tasaAcel * dt);
 
   } else if (_actual > objetivo) {
     // Desaceleración / Frenado
     if (!_enMarcha) {
-      // PARADA RÁPIDA: Frenado ágil en menos de 1.5s
+      // Parada rápida controlada en menos de 0.8s
       _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
       if (_actual < 1.0f) {
         _actual = 0.0f;
@@ -134,7 +158,7 @@ void Bomba::tick(float dt) {
       float tasaDecel = DESACEL_AJUSTE_RPM_S;
       float delta = _actual - objetivo;
       if (delta < 3.0f) {
-        tasaDecel = fmaxf(1.0f, tasaDecel * (delta / 3.0f));
+        tasaDecel = fmaxf(2.0f, tasaDecel * (delta / 3.0f));
       }
       _actual = fmaxf(objetivo, _actual - tasaDecel * dt);
     }
@@ -153,36 +177,30 @@ void Bomba::tick(float dt) {
     _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
   }
 
-  // Generación de pulsos PWM por hardware LEDC
-  if (_actual >= 1.0f) {
+  // Generación de pulsos PWM por hardware LEDC (solo si la bomba está en marcha)
+  if (_enMarcha && _actual >= 1.0f) {
     uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
     if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
 
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    if (_fActual == 0) {
-      _fActual = f;
-      ledcChangeFrequency(PIN_PUL, f, 10);
-      ledcWrite(PIN_PUL, 512); // Iniciar generación al 50% duty cycle
-    } else if (abs((int32_t)f - (int32_t)_fActual) >= 2) {
+    if (f != _fActual) {
       uint32_t retF = ledcChangeFrequency(PIN_PUL, f, 10);
       if (retF > 0) _fActual = retF;
-      ledcWrite(PIN_PUL, 512);
+      else _fActual = f;
     }
+    ledcWrite(PIN_PUL, 512); // Duty 50% = emitiendo tren de pulsos
 #else
-    if (_fActual == 0) {
-      _fActual = f;
-      ledcSetup(0, f, 10);
-      ledcWrite(0, 512);
-    } else if (abs((int32_t)f - (int32_t)_fActual) >= 2) {
+    if (f != _fActual) {
       uint32_t retF = ledcSetup(0, f, 10);
       if (retF > 0) _fActual = retF;
-      ledcWrite(0, 512);
+      else _fActual = f;
     }
+    ledcWrite(0, 512);
 #endif
-  } else if (_fActual != 0) {
-    // Corte inmediato de pulsos al detenerse
+  } else {
+    // Corte inmediato y seguro de pulsos al detenerse o en reposo (Duty 0 = GND constante)
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
-    ledcWrite(PIN_PUL, 0); // Reposo: LOW -> Opto OFF
+    ledcWrite(PIN_PUL, 0);
 #else
     ledcWrite(0, 0);
 #endif
