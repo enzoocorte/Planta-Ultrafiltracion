@@ -62,6 +62,7 @@ void Bomba::detener() {
 
 void Bomba::paradaEmergencia() {
   _enEmergencia = true;
+  digitalWrite(PIN_ENA, HIGH); // Corte fisico instantaneo en driver DM860 (< 1 ms)
   _enMarcha = false;
   _invirtiendo = false;
   _actual = 0.0f;
@@ -76,6 +77,7 @@ void Bomba::paradaEmergencia() {
 
 void Bomba::rearmarEmergencia() {
   _enEmergencia = false;
+  digitalWrite(PIN_ENA, LOW); // Restablece habilitacion de potencia
   _actual = 0.0f;
   _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
 }
@@ -123,6 +125,11 @@ void Bomba::tick(float dt) {
   // P0-2: Validación y limitación de dt para proteger la cinemática del NEMA 34
   if (!(dt > 0.0f)) return;
   if (dt > DT_MAX_RAMPA_S) dt = DT_MAX_RAMPA_S; // Nunca avanza más de 0.10s si el loop se demora
+
+  // P0-3: Tiempo de establecimiento del driver DM860 tras habilitar ENA (100 ms)
+  if (_enMarcha && (millis() - _tEnable_ms) < TIEMPO_ENA_MS) {
+    return;
+  }
 
   // Gestión de reposo del driver Leadshine DM860
   if (!_enMarcha && _actual <= 0.0f) {
