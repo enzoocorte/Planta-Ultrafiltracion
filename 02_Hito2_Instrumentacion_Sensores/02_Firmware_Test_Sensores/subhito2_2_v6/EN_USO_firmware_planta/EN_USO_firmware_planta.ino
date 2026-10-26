@@ -260,15 +260,48 @@ uint32_t tLoop = 0;
 uint32_t tCaudal = 0;
 uint32_t tDatalogger = 0;
 
+// Parámetros y Límites del Modo Administrador
+float rpmInicioCustom     = RPM_INICIO; // Consigna inicial al arrancar (50 RPM)
+bool  modoParadaSeca      = false;      // false = Rampa suave, true = Parada instantánea
+float dimmerArranquePct   = 50.0f;      // 0 a 100% de fluidez/aceleración de arranque
+float qAlimMax_mLmin      = 1400.0f;    // Límite caudalímetro alimentación máx
+float qAlimMin_mLmin      = 0.0f;       // Límite inferior sequedad (0 = off)
+float qPermMax_mLmin      = 800.0f;     // Límite caudalímetro permeado máx
+float tempMax_C           = 35.0f;      // Límite temperatura máxima (membrana FX100)
+float tmpMax_bar          = 0.60f;      // Límite PTM máxima
+bool  autoParadaLimites   = false;      // Parada preventiva automática si se sobrepasan límites
+
+// V6.6: Ensayo manual (botones "Iniciar/Detener Ensayo" del Modo Administrador).
+// Mientras está activo, los arranques/paradas de la bomba NO abren ni cierran ensayos
+// automáticamente (permite, p. ej., un retrolavado dentro del mismo ensayo).
+bool    ensayoManualActivo     = false;
+uint8_t segFueraDeLimite       = 0;     // Persistencia del enclavamiento (evita disparos por un pico aislado)
+constexpr uint8_t SEG_PERSISTENCIA_LIMITE = 3;
+
 // ------------------------------------------------------------------------------
 // GESTIÓN DE PREFERENCES (MEMORIA FLASH NVS CON AUTO-SANACIÓN)
 // ------------------------------------------------------------------------------
-void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul,
+                          float rpmIni, bool stopSeco, float acelPct,
+                          float qMax, float qMin, float tMax, float ptmMax, bool autoStop) {
   prefs.putFloat("k_alim", ka);
   prefs.putFloat("k_perm", kp);
   prefs.putFloat("ml_rev", ml);
   prefs.putUShort("pul_rev", pul);
-  Serial.println("[NVS] Parametros guardados en memoria Flash con exito.");
+  prefs.putFloat("rpm_ini", rpmIni);
+  prefs.putBool("stop_seco", stopSeco);
+  prefs.putFloat("acel_pct", acelPct);
+  prefs.putFloat("q_max", qMax);
+  prefs.putFloat("q_min", qMin);
+  prefs.putFloat("temp_max", tMax);
+  prefs.putFloat("tmp_max", ptmMax);
+  prefs.putBool("auto_stop", autoStop);
+  Serial.println("[NVS] Todos los parámetros y límites guardados en memoria Flash con éxito.");
+}
+
+void guardarParametrosNVS(float ka, float kp, float ml, uint16_t pul) {
+  guardarParametrosNVS(ka, kp, ml, pul, rpmInicioCustom, modoParadaSeca, dimmerArranquePct,
+                       qAlimMax_mLmin, qAlimMin_mLmin, tempMax_C, tmpMax_bar, autoParadaLimites);
 }
 
 void cargarParametrosNVS() {
@@ -279,6 +312,24 @@ void cargarParametrosNVS() {
   float ml = prefs.getFloat("ml_rev", ML_POR_VUELTA);
   uint16_t pul = prefs.getUShort("pul_rev", PULSOS_POR_REV);
 
+  rpmInicioCustom   = prefs.getFloat("rpm_ini", RPM_INICIO);
+  modoParadaSeca    = prefs.getBool("stop_seco", false);
+  dimmerArranquePct = prefs.getFloat("acel_pct", 50.0f);
+  qAlimMax_mLmin    = prefs.getFloat("q_max", 1400.0f);
+  qAlimMin_mLmin    = prefs.getFloat("q_min", 0.0f);
+  qPermMax_mLmin    = prefs.getFloat("q_perm_max", 800.0f);
+  tempMax_C         = prefs.getFloat("temp_max", 35.0f);
+  tmpMax_bar        = prefs.getFloat("tmp_max", 0.60f);
+  autoParadaLimites = prefs.getBool("auto_stop", false);
+
+  // V6.6: saneamiento de parámetros de administrador leídos de NVS (flash vacía o corrupta)
+  if (!std::isfinite(rpmInicioCustom)   || rpmInicioCustom < RPM_MIN || rpmInicioCustom > RPM_MAX) rpmInicioCustom = RPM_INICIO;
+  if (!std::isfinite(dimmerArranquePct) || dimmerArranquePct < 5.0f || dimmerArranquePct > 100.0f) dimmerArranquePct = 50.0f;
+  if (!std::isfinite(qAlimMax_mLmin)    || qAlimMax_mLmin <= 100.0f || qAlimMax_mLmin > 3000.0f)   qAlimMax_mLmin = 1400.0f;
+  if (!std::isfinite(qAlimMin_mLmin)    || qAlimMin_mLmin < 0.0f    || qAlimMin_mLmin > 1000.0f)   qAlimMin_mLmin = 0.0f;
+  if (!std::isfinite(tempMax_C)         || tempMax_C < 20.0f        || tempMax_C > 60.0f)          tempMax_C = 35.0f;
+  if (!std::isfinite(tmpMax_bar)        || tmpMax_bar < 0.1f        || tmpMax_bar > 2.0f)          tmpMax_bar = 0.60f;
+
   bool actualizarNvs = (ver != VERSION_CALIBRACION);
   if (!std::isfinite(ka) || ka < 50.0f || ka > 500.0f || actualizarNvs) { ka = K_ALIMENTACION; actualizarNvs = true; }
   if (!std::isfinite(kp) || kp < 50.0f || kp > 500.0f || actualizarNvs) { kp = K_PERMEADO;     actualizarNvs = true; }
@@ -288,16 +339,20 @@ void cargarParametrosNVS() {
   if (actualizarNvs) {
     Serial.println("[NVS] Aplicando calibracion oficial Ensayos 2 y 3 (K=205.98 Hz/(L/min), Cilindrada=13.55 mL/rev)...");
     prefs.putUChar("cal_ver", VERSION_CALIBRACION);
-    guardarParametrosNVS(ka, kp, ml, pul);
+    guardarParametrosNVS(ka, kp, ml, pul, rpmInicioCustom, modoParadaSeca, dimmerArranquePct,
+                         qAlimMax_mLmin, qAlimMin_mLmin, tempMax_C, tmpMax_bar, autoParadaLimites);
   }
 
   sensorAlimentacion.setK(ka, fabsf(ka - K_ALIMENTACION) < 0.05f);
   sensorPermeado.setK(kp, false);
   bomba.setMlPorVuelta(ml);
   bomba.setPulsosPorRev(pul);
+  bomba.setRpmInicio(rpmInicioCustom);
+  bomba.setModoParadaSeca(modoParadaSeca);
+  bomba.setSuavidadArranquePct(dimmerArranquePct);
 
-  Serial.printf("\n[NVS] Parametros activos: K_Alim=%.2f | K_Perm=%.2f | mL/rev=%.4f | Pul/Rev=%u\n",
-                ka, kp, ml, pul);
+  Serial.printf("\n[NVS] Parametros activos: K_Alim=%.2f | K_Perm=%.2f | mL/rev=%.4f | Pul/Rev=%u | RPM_Ini=%.1f\n",
+                ka, kp, ml, pul, rpmInicioCustom);
 }
 
 double volumenPermeadoTotal_L() {
@@ -477,7 +532,12 @@ void handleStatus() {
   uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
   if (prog > 100) prog = 100;
 
-  char buf[1536];
+  char buf[2048];
+  bool sobreQMax = (qAlimEfectivo_mLmin > qAlimMax_mLmin);
+  bool subQMin   = (qAlimMin_mLmin > 5.0f && bomba.enMarcha() && bomba.enRegimenEstable() && qAlimEfectivo_mLmin < qAlimMin_mLmin);
+  bool sobreTemp = (temp_agua_C > tempMax_C);
+  bool sobreTMP  = (tmp_efectiva_bar > tmpMax_bar);
+
   int n = snprintf(buf, sizeof(buf),
     "{"
     "\"rpm\":%.1f,\"obj_rpm\":%.1f,\"on\":%s,\"inv\":%s,\"dir\":%s,\"en_regimen\":%s,\"emergencia\":%s,"
@@ -493,6 +553,9 @@ void handleStatus() {
     "\"modo_seco\":%s,\"solo_alim\":%s,\"ruido_seco\":%s,"
     "\"pump_ml\":%.1f,\"delta\":%.2f,\"j_lmh\":%.2f,\"cruce\":%s,"
     "\"k_alim\":%.2f,\"k_perm\":%.2f,\"qmin_alim\":%.2f,\"qmin_perm\":%.2f,\"ml_rev\":%.4f,\"pul_rev\":%u,"
+    "\"rpm_ini\":%.1f,\"stop_seco\":%s,\"acel_pct\":%.1f,"
+    "\"q_max\":%.1f,\"q_min\":%.1f,\"temp_max\":%.1f,\"tmp_max\":%.2f,\"auto_stop\":%s,"
+    "\"lim_q_excedido\":%s,\"lim_temp_excedido\":%s,\"lim_tmp_excedido\":%s,"
     "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
     "\"n_logs\":%u,\"ensayo_act\":%u,\"t_ensayo_s\":%lu,"
     "\"heap\":%u,\"maxblk\":%u,"
@@ -527,6 +590,14 @@ void handleStatus() {
     sensorAlimentacion.getK(), sensorPermeado.getK(),
     sensorAlimentacion.getQMinDetectable(), sensorPermeado.getQMinDetectable(),
     bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
+    bomba.getRpmInicio(),
+    bomba.getModoParadaSeca() ? "true" : "false",
+    bomba.getSuavidadArranquePct(),
+    qAlimMax_mLmin, qAlimMin_mLmin, tempMax_C, tmpMax_bar,
+    autoParadaLimites ? "true" : "false",
+    (sobreQMax || subQMin) ? "true" : "false",
+    sobreTemp ? "true" : "false",
+    sobreTMP ? "true" : "false",
     autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
     (unsigned)bufferCount, (unsigned)ensayoActualId, (unsigned long)t_act_s,
     ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
@@ -614,6 +685,27 @@ void handleCmd() {
     modoTempAuto = true;
   } else if (act == "TEMP_AUTO_OFF") {
     modoTempAuto = false;
+  } else if (act == "START_ENSAYO") {
+    // V6.6: cierra y registra el ensayo previo (antes se perdía de la tabla) y abre uno nuevo
+    if (tInicioEnsayo_ms > 0) finalizarEnsayoActual();
+    iniciarNuevoEnsayo(bomba.rpmObjetivo());   // nuevo ID, cronómetro a cero, volúmenes base
+    ensayoManualActivo = true;
+    if (bomba.enRegimenEstable()) {
+      fijarReferenciasTortaActuales();         // Q0 inmediato si ya hay régimen; si no, se captura solo a los 5 s
+    }
+    Serial.printf("[ENSAYO] Ensayo manual #%u INICIADO (Cronómetro a cero).\n", ensayoActualId);
+  } else if (act == "STOP_ENSAYO") {
+    // V6.6: registra el ensayo en la tabla (antes solo ponía el cronómetro a cero y seguía grabando con el mismo ID)
+    if (ensayoManualActivo || tInicioEnsayo_ms > 0) {
+      finalizarEnsayoActual();
+      Serial.printf("[ENSAYO] Ensayo #%u FINALIZADO.\n", ensayoActualId);
+    }
+    ensayoManualActivo = false;
+    if (bomba.enMarcha()) {
+      iniciarNuevoEnsayo(bomba.rpmObjetivo()); // la bomba sigue: vuelve el modo automático con ID nuevo
+    } else {
+      tInicioEnsayo_ms = 0;
+    }
   }
   server.send(200, "text/plain", "OK");
 }
@@ -760,10 +852,51 @@ void handleSetDev() {
   if (qmina >= 0.0f) sensorAlimentacion.setQMinDetectable(qmina);
   if (qminp >= 0.0f) sensorPermeado.setQMinDetectable(qminp);
 
+  // Parámetros de Administrador (Cinemática, Dimer y Límites)
+  if (server.hasArg("rpm_ini")) {
+    float r = server.arg("rpm_ini").toFloat();
+    if (r >= RPM_MIN && r <= RPM_MAX) {
+      rpmInicioCustom = r;
+      bomba.setRpmInicio(r);
+    }
+  }
+  if (server.hasArg("stop_seco")) {
+    modoParadaSeca = (server.arg("stop_seco") == "1");
+    bomba.setModoParadaSeca(modoParadaSeca);
+  }
+  if (server.hasArg("acel_pct")) {
+    float a = server.arg("acel_pct").toFloat();
+    if (a >= 5.0f && a <= 100.0f) {
+      dimmerArranquePct = a;
+      bomba.setSuavidadArranquePct(a);
+    }
+  }
+  if (server.hasArg("q_max")) {
+    float qm = server.arg("q_max").toFloat();
+    if (qm > 100.0f && qm <= 3000.0f) qAlimMax_mLmin = qm;
+  }
+  if (server.hasArg("q_min")) {
+    float qmin = server.arg("q_min").toFloat();
+    if (qmin >= 0.0f && qmin <= 1000.0f) qAlimMin_mLmin = qmin;
+  }
+  if (server.hasArg("temp_max")) {
+    float tm = server.arg("temp_max").toFloat();
+    if (tm >= 20.0f && tm <= 60.0f) tempMax_C = tm;
+  }
+  if (server.hasArg("tmp_max")) {
+    float pm = server.arg("tmp_max").toFloat();
+    if (pm >= 0.1f && pm <= 2.0f) tmpMax_bar = pm;
+  }
+  if (server.hasArg("auto_stop")) {
+    autoParadaLimites = (server.arg("auto_stop") == "1");
+  }
+
   bool saveNvs = (server.hasArg("save") && server.arg("save") == "1");
   if (saveNvs) {
     guardarParametrosNVS(sensorAlimentacion.getK(), sensorPermeado.getK(),
-                         bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+                         bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
+                         rpmInicioCustom, modoParadaSeca, dimmerArranquePct,
+                         qAlimMax_mLmin, qAlimMin_mLmin, tempMax_C, tmpMax_bar, autoParadaLimites);
   }
 
   server.send(200, "application/json", "{\"status\":\"ok\"}");
@@ -844,8 +977,21 @@ void handleResetDev() {
   sensorPermeado.setK(K_PERMEADO, false);
   bomba.setMlPorVuelta(ML_POR_VUELTA);
   bomba.setPulsosPorRev(PULSOS_POR_REV);
+  rpmInicioCustom   = RPM_INICIO;
+  modoParadaSeca    = false;
+  dimmerArranquePct = 50.0f;
+  qAlimMax_mLmin    = 1400.0f;
+  qAlimMin_mLmin    = 0.0f;
+  tempMax_C         = 35.0f;
+  tmpMax_bar        = 0.60f;
+  autoParadaLimites = false;
 
-  guardarParametrosNVS(K_ALIMENTACION, K_PERMEADO, ML_POR_VUELTA, PULSOS_POR_REV);
+  bomba.setRpmInicio(RPM_INICIO);
+  bomba.setModoParadaSeca(false);
+  bomba.setSuavidadArranquePct(50.0f);
+
+  guardarParametrosNVS(K_ALIMENTACION, K_PERMEADO, ML_POR_VUELTA, PULSOS_POR_REV,
+                       RPM_INICIO, false, 50.0f, 1400.0f, 0.0f, 35.0f, 0.60f, false);
   server.send(200, "application/json", "{\"status\":\"reset_ok\"}");
 }
 
@@ -944,6 +1090,7 @@ void handleClearCSV() {
   bufferCount = 0;
   numEnsayos = 0;
   ensayoActualId = 1;
+  ensayoManualActivo = false;
   tInicioEnsayo_ms = bomba.enMarcha() ? millis() : 0;
   volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
   volPermInicioEnsayo = (float)volumenPermeadoTotal_L();
@@ -1043,20 +1190,24 @@ void setup() {
 
   cargarParametrosNVS();
 
-  WiFi.disconnect(true);
-  delay(100);
   WiFi.mode(WIFI_AP);
-  WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  delay(100);
 
   IPAddress local_IP(192, 168, 4, 1);
   IPAddress gateway(192, 168, 4, 1);
   IPAddress subnet(255, 255, 255, 0);
   WiFi.softAPConfig(local_IP, gateway, subnet);
-  WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4);
+  bool apOk = WiFi.softAP(SSID_AP, PASS_AP, 1, 0, 4);
+  if (!apOk) {
+    Serial.println("⚠️ [WIFI] Reintentando inicio de softAP...");
+    delay(200);
+    apOk = WiFi.softAP(SSID_AP, PASS_AP);
+  }
+  WiFi.setSleep(false);
   strlcpy(ipStr, WiFi.softAPIP().toString().c_str(), sizeof(ipStr));
 
   Serial.println("[WIFI] Punto de Acceso Estable Creado:");
+  Serial.printf("       Estado: %s\n", apOk ? "ACTIVO (Transmitiendo)" : "ERROR");
   Serial.printf("       SSID: %s | Pass: %s\n", SSID_AP, PASS_AP);
   Serial.printf("       IP AP: http://%s\n", WiFi.softAPIP().toString().c_str());
 
@@ -1118,12 +1269,12 @@ void loop() {
     bool enMarcha = bomba.enMarcha();
 
     if (enMarcha && !bombaEnMarchaAnterior) {
-      iniciarNuevoEnsayo(bomba.rpmObjetivo());
+      if (!ensayoManualActivo) iniciarNuevoEnsayo(bomba.rpmObjetivo()); // V6.6: en ensayo manual se continúa el mismo ID
       registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
     }
 
     if (!enMarcha && bombaEnMarchaAnterior) {
-      finalizarEnsayoActual();
+      if (!ensayoManualActivo) finalizarEnsayoActual();                  // V6.6: el ensayo manual se cierra con su botón
       registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
     }
 
@@ -1134,7 +1285,7 @@ void loop() {
   if (tAhora - tCaudal >= 1000) {
     tCaudal = tAhora;
 
-    // Lectura asincrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4) con filtro anti-parpadeo
+    // Lectura asíncrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4) con filtro anti-parpadeo
     static uint8_t fallosConsecutivosDS18 = 0;
     float tLeida = 0.0f;
     if (DS18B20_Native::leerTemperatura(tLeida)) {
@@ -1229,12 +1380,32 @@ void loop() {
 
           float kpActual = sensorPermeado.getK();
           guardarParametrosNVS(sensorAlimentacion.getK(), kpActual,
-                               bomba.getMlPorVuelta(), bomba.getPulsosPorRev());
+                               bomba.getMlPorVuelta(), bomba.getPulsosPorRev(),
+                               rpmInicioCustom, modoParadaSeca, dimmerArranquePct,
+                               qAlimMax_mLmin, qAlimMin_mLmin, tempMax_C, tmpMax_bar, autoParadaLimites);
 
           autoCalibrando = false;
           autoCalMensaje = "✅ Auto-Calibracion OK: K_Alim=" + String(sensorAlimentacion.getK(), 2) + " Hz/(L/min)";
         }
       }
+    }
+
+    // Verificación de enclavamiento por límites de seguridad configurados en Modo Administrador
+    bool sobreQMax = (qAlimEfectivo_mLmin > qAlimMax_mLmin);
+    bool subQMin   = (qAlimMin_mLmin > 5.0f && bomba.enMarcha() && bomba.enRegimenEstable() && qAlimEfectivo_mLmin < qAlimMin_mLmin);
+    bool sobreTemp = (temp_agua_C > tempMax_C);
+    bool sobreTMP  = (tmp_efectiva_bar > tmpMax_bar);
+    if (autoParadaLimites && bomba.enMarcha() && (sobreQMax || subQMin || sobreTemp || sobreTMP)) {
+      // V6.6: exige 3 s consecutivos fuera de límite (un pico de pulsación del rodillo no debe parar la planta)
+      if (++segFueraDeLimite >= SEG_PERSISTENCIA_LIMITE) {
+        segFueraDeLimite = 0;
+        bomba.detener();
+        Serial.printf("[SEGURIDAD] Parada preventiva automática por límites:%s%s%s%s\n",
+                      sobreQMax ? " Q_Alim>Qmax" : "", subQMin ? " Q_Alim<Qmin" : "",
+                      sobreTemp ? " Temp>Tmax" : "", sobreTMP ? " TMP>TMPmax" : "");
+      }
+    } else {
+      segFueraDeLimite = 0;
     }
 
     Serial.printf("[TELEMETRIA] RPM:%4.1f | Q_Alim:%5.1f mL/min | Q_Perm:%5.1f mL/min | T:%4.1f C | TMP:%.2f bar | J20:%4.2f LMH | R_torta:%.2e m^-1\n",

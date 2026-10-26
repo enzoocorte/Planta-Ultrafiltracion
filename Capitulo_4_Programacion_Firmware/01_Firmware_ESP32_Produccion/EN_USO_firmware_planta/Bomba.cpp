@@ -38,7 +38,7 @@ void Bomba::arrancar() {
   digitalWrite(PIN_ENA, LOW); // Activa driver
   _tEnable_ms = millis();
   if (_objetivo < RPM_MIN) {
-    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : _rpmInicio;
   }
 }
 
@@ -47,6 +47,16 @@ void Bomba::detener() {
   _invirtiendo = false;
   if (_objetivo >= RPM_MIN) {
     _rpmGuardada = _objetivo;
+  }
+  if (_paradaSeca) {
+    _actual = 0.0f;
+    _objetivo = 0.0f;
+    _fActual = 0;
+#if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
+    ledcWrite(PIN_PUL, 0);
+#else
+    ledcWrite(0, 0);
+#endif
   }
 }
 
@@ -69,7 +79,7 @@ void Bomba::rearmarEmergencia() {
   _enEmergencia = false;
   digitalWrite(PIN_ENA, LOW); // Restablece habilitacion de potencia
   _actual = 0.0f;
-  _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+  _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : _rpmInicio; // V6.6: respeta RPM de inicio configurada
 }
 
 bool Bomba::setRPM(float rpm) {
@@ -90,7 +100,7 @@ void Bomba::toggleSentido() {
     fijarSentido(!_horario);
   } else {
     _invirtiendo = true;
-    _rpmGuardada = (_objetivo >= RPM_MIN) ? _objetivo : RPM_INICIO;
+    _rpmGuardada = (_objetivo >= RPM_MIN) ? _objetivo : _rpmInicio;
     _objetivo = 0.0f;
   }
 }
@@ -140,25 +150,33 @@ void Bomba::tick(float dt) {
       _actual = RPM_DESPEGUE;
     }
 
-    // Rampa de aceleración ágil y fluida (~1.3s para alcanzar la consigna de trabajo)
+    // Rampa de aceleración ajustada por el dimmer de fluidez (0% a 100%)
+    float factorAcel = constrain(_suavidadArranquePct, 5.0f, 100.0f) / 50.0f; // 50% = nominal (1.0)
+    float acelArranque = constrain(ACEL_ARRANQUE_RPM_S * factorAcel, 3.0f, 40.0f);
+    float acelNominal  = constrain(ACEL_NOMINAL_RPM_S  * factorAcel, 5.0f, 60.0f);
+
     float delta = objetivo - _actual;
-    float tasaAcel = ACEL_NOMINAL_RPM_S;
+    float tasaAcel = acelNominal;
     if (_actual < 12.0f) {
-      tasaAcel = ACEL_ARRANQUE_RPM_S + ((_actual - RPM_DESPEGUE) / (12.0f - RPM_DESPEGUE)) * (ACEL_NOMINAL_RPM_S - ACEL_ARRANQUE_RPM_S);
+      tasaAcel = acelArranque + ((_actual - RPM_DESPEGUE) / (12.0f - RPM_DESPEGUE)) * (acelNominal - acelArranque);
     }
     // Suavizado en la llegada a la consigna
     if (delta < 2.0f) {
-      tasaAcel = fmaxf(3.0f, tasaAcel * (delta / 2.0f));
+      tasaAcel = fmaxf(2.0f, tasaAcel * (delta / 2.0f));
     }
     _actual = fminf(objetivo, _actual + tasaAcel * dt);
 
   } else if (_actual > objetivo) {
     // Desaceleración / Frenado
     if (!_enMarcha) {
-      // Parada rápida controlada en menos de 0.8s
-      _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
-      if (_actual < 1.0f) {
+      if (_paradaSeca) {
         _actual = 0.0f;
+      } else {
+        // Parada rápida controlada en menos de 0.8s
+        _actual = fmaxf(0.0f, _actual - FRENADO_PARADA_RPM_S * dt);
+        if (_actual < 1.0f) {
+          _actual = 0.0f;
+        }
       }
     } else {
       // Reducción suave de velocidad en marcha
@@ -181,7 +199,7 @@ void Bomba::tick(float dt) {
     _fActual = 0;
     fijarSentido(!_horario);
     _invirtiendo = false;
-    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : _rpmInicio;
   }
 
   // Generación de pulsos PWM por hardware LEDC (solo si la bomba está en marcha)

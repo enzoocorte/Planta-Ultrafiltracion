@@ -35,6 +35,21 @@ public:
   void     setPulsosPorRev(uint16_t p) { if (p >= 200) _pulsosPorRev = p; }
   uint16_t getPulsosPorRev() const     { return _pulsosPorRev; }
 
+  // V6.6: si la bomba está detenida, la RPM de inicio pasa a ser también la consigna
+  // del próximo arranque (antes quedaba ignorada porque _objetivo ya valía 50 RPM).
+  void  setRpmInicio(float rpm) {
+    if (!std::isfinite(rpm) || rpm < RPM_MIN || rpm > RPM_MAX) return;
+    _rpmInicio = rpm;
+    if (!_enMarcha && !_invirtiendo) { _objetivo = rpm; _rpmGuardada = rpm; }
+  }
+  float getRpmInicio() const            { return _rpmInicio; }
+
+  void  setModoParadaSeca(bool seca)    { _paradaSeca = seca; }
+  bool  getModoParadaSeca() const       { return _paradaSeca; }
+
+  void  setSuavidadArranquePct(float p) { _suavidadArranquePct = constrain(p, 5.0f, 100.0f); }
+  float getSuavidadArranquePct() const  { return _suavidadArranquePct; }
+
   void tick(float dt);
 
 private:
@@ -44,10 +59,13 @@ private:
   bool _horario = true;
   bool _invirtiendo = false;
   bool _enEmergencia = false;
+  bool _paradaSeca = false;
 
   float _objetivo = RPM_INICIO;
   float _actual = 0.0f;
   float _rpmGuardada = RPM_INICIO;
+  float _rpmInicio = RPM_INICIO;
+  float _suavidadArranquePct = 50.0f; // 50% = rampa nominal calibrada
   uint32_t _fActual = 0;
   uint32_t _tDetenido_ms = 0;
   uint32_t _tEnable_ms = 0;
