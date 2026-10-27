@@ -88,77 +88,77 @@ A partir del análisis exhaustivo del documento preliminar y del material fotogr
          \====== [ VÁLVULA DE PURGA ] =======/
 ```
 
-#### Modificaciones Mecánicas a Realizar:
+#### Modificaciones Mecánicas a Realizar (Auditadas por Argon):
 1. **Reemplazo del Motor por Motorreductor de Potencia para 25 Litros:**
-   * Descartar motores de juguete o subdimensionados (< 5 kg·cm). Para mover una masa líquida de **$25\text{ Litros}$ ($25\text{ kg}$)** con paleta pesada de acero a velocidades de hasta **$100\text{ RPM}$**, se requiere un **motorreductor DC 12V con torque nominal de $15 \text{ a } 25\text{ kg}\cdot\text{cm}$ ($1.5 - 2.5\text{ Nm}$)** y potencia de **$25 \text{ a } 40\text{ W}$** (modelos tipo Sinfín-Corona 5840-31ZY / GW600 o JGB37-550/555 reforzado).
-   * Controlable por modulación PWM desde el ESP32 mediante puente H L298N en modo canales paralelos ($3.5\text{ A}$). *(Consultar memoria de cálculo completa en `03_Hito3_Reactor_Sedimentador_Agitador/02_Firmware_Control_Agitador/Guia_Dimensionamiento_Motorreductor_y_Torque_Agitador.md`)*.
-2. **Sistema de Guía en Tapa (Cojinete central):**
-   * Perforar el centro de la tapa a Ø10 mm.
-   * Montar un **pasamuros o portabuje de Delrin/Teflón o buje de bronce fosforoso autolubricado** para estabilizar el vástago de 32 cm. Esto elimina cualquier vibración o cabeceo excéntrico.
-3. **Acople Motor-Vástago:**
-   * Utilizar un **acople elástico de aluminio tipo mandíbula (Jaw coupling) o acople helicoidal ranurado** de Ø interior de un lado igual al eje del motor (típicamente 4 mm) y del otro lado mecanizado a 4 mm.
-   * *Resolución del extremo roscado:* **No es necesario cortar la rosca**. Se puede colocar una tuerca autoblocante M4 como tope axial y fijar el acople elástico con los prisioneros Allen sobre la sección lisa o bien roscar una cupla adaptadora de bronce hembra M4 a eje cilíndrico liso.
+   * Descartar motores de juguete o subdimensionados (< 5 kg·cm). Para mover una masa líquida de **\text{ Litros}$ (\text{ kg}$)** con paleta de acero a velocidades de hasta **\text{ RPM}$**, se requiere un **motorreductor DC 12V con torque nominal de  \text{ a } 35\text{ kg}\cdot\text{cm}$ (.0 - 3.5\text{ Nm}$)** y potencia de ** \text{ a } 40\text{ W}$** (modelo Sinfín-Corona 5840-31ZY con eje D de 8 mm o motor de limpiaparabrisas automotriz 12V con masa aislada de chasis).
+   * Controlable por modulación PWM ultrasónica (\text{ kHz}$) desde el ESP32 mediante driver MOSFET **BTS7960 (43A)** con rampa *soft-start* de 2.5 s alojado en el maletín.
+2. **Sistema de Guía en Tapa (Chumacera KFL08 y Montaje Excéntrico Anti-Vórtice):**
+   * **Perforación Excéntrica:** Perforar la tapa desmontable a ** - 35\text{ mm}$ desplazada del centro geométrico**. Esto rompe la simetría rotacional del fluido y anula el vórtice central sin necesidad de soldar bafles interiores en la cuba.
+   * Montar sobre la tapa una placa sándwich de **Grilón / Nylon de 120 × 120 mm ( - 10\text{ mm}$ de espesor)** que absorbe vibraciones ('efecto tambor') y aísla eléctricamente.
+   * Fijar una **chumacera bridada autoalineante tipo KFL08 (para eje Ø 8 mm)** en acero/fundición de zinc que absorbe el 100% de los esfuerzos axiales y radiales de la paleta.
+3. **Acople Motor-Eje:**
+   * Utilizar un **acoplamiento elástico tipo spider / mandíbula (Jaw coupling)** de 8 mm a 8 mm con elastómero amortiguador central.
+   * Elevar el motor sobre 4 separadores/espárragos roscados M6 de 50 mm (torreta abierta).
+   * Eje: Varilla redonda calibrada de **Acero Inoxidable AISI 304 Ø 8 mm (tolerancia h9)** de 1 m de largo. Paleta ubicada ** - 8\text{ cm}$ por encima del inicio del fondo cónico de 60°**.
 4. **Modificación de la Tapa y Manijas:**
    * Desoldar la manija plana central actual.
-   * Instalar una **torreta o puente soporte elevado en chapa doblada (perfil U invertido)** fijado a la tapa con tornillos M4 para sostener firmemente el motorreductor alineado con el centro.
-   * Soldar **dos manijas tipo puente en los laterales exteriores de la tapa**, permitiendo destapar el tanque de forma rápida y segura sin traccionar del motor ni del eje.
+   * Soldar o fijar **dos manijas tipo puente en los laterales exteriores de la tapa**, permitiendo destapar el tanque de forma rápida y segura sin traccionar del motor ni del eje.
+   * Sondas de instrumentación: Instalar dos prensaestopas plásticos (PG7 para DS18B20 y PG9 para electrodos TDS) en la **tapa superior**, ingresando suspendidas al líquido sin perforar la chapa bajo nivel de agua.
 5. **Nivelación de la Base:**
-   * En los extremos de las 4 patas metálicas (34, 30, 29, 33 cm), cortar las patas más largas o soldar una planchuela base con una tuerca soldada roscada de **3/8” o M10**.
-   * Instalar **4 regatones de nivelación basculantes con base de goma antideslizante**. Esto permite calibrar la horizontalidad perfecta en cualquier piso del laboratorio y amortiguar vibraciones.
-6. **Tomas Hidráulicas del Sedimentador:**
-   * *Entrada superior (Tapa):* Conexión rápida para manguera de recirculación/retrolavado.
-   * *Salida lateral (h = 5 cm desde la unión cilíndro-cono):* Niple roscado de 1/2" soldado o pasamuros para manguera de succión hacia la bomba peristáltica (garantiza tomar agua clarificada sin arrastrar el lodo decantado).
-   * *Purga inferior (vértice del cono):* Válvula esférica de 1/2" existente para evacuación y limpieza periódica de sedimentos.
+   * En los extremos de las patas metálicas, instalar **4 regatones de nivelación basculantes con base de goma antideslizante (rosca M10)** para calibrar la horizontalidad perfecta en el laboratorio.
+6. **Tomas Hidráulicas del Sedimentador (Mecanizado Inox 304):**
+   * **Perforación:** Se utiliza **mecha escalonada cónica de Cobalto HSS-Co (M35 al 5%)** a bajas revoluciones (**350 a 400 RPM**) con lubricación constante de aceite de corte pesado (no usar WD-40) y taco de madera de respaldo interno.
+   * **Salida de Succión (h = 5 a 8 cm sobre la unión cilíndro-cono):** Pasamuros de bronce o acero inox de 1/2' con contratuerca y **doble junta plana de Silicona Sanitaria / EPDM de 3 mm** (absorbe la curvatura del cilindro) respaldada con arandelas planas de inox. Inmediatamente a la salida se rosca **1x Válvula esférica de 1/2'** para poder desconectar el maletín sin vaciar los 25L.
+   * **Retorno de Retentado (Superior):** Pasamuros de 1/4' con cañito interno adherido a la pared para descarga laminar sin espuma.
+   * **Purga inferior (vértice del cono):** Válvula esférica de 1/2' de paso total para evacuación y limpieza periódica de barros de bentonita.
 
 ---
 
-### 3.2 MÓDULO 2: CAJA DE FILTRACIÓN Y CONTROL ("MALETÍN")
+### 3.2 MÓDULO 2: CAJA DE FILTRACIÓN Y CONTROL ('MALETÍN')
 
-```
+`
                       450 mm
         +-----------------------------------+  ^
         | [MANIJA REBATIBLE REFORZADA]      |  |
         | [TECHO: CHAPA MACIZA N°18]        |  |
         |===================================|  |
-        | LATERAL IZQ.      | FONDO:        |  |
-        | (Ventilación)     | - Prefiltro   |  |
-        |                   | - Membrana UF |  | 450 mm
-        | [Caja Estanca     | - Manómetros  |  |
-        |  ESP32/Drivers]   | - Sensores P  |  |
+        | ZONA HÚMEDA (60%) | ZONA SECA(40%)|  |
+        | (Frente)          | (Fondo Perfor)|  | 450 mm
         |                   |               |  |
-        | [Bomba            | LATERAL DER:  |  |
-        |  Peristáltica]    | - Fuente 12V  |  |
-        |                   | - Térmica 220V|  |
+        | - FX100 Vertical  | - Trafo 24VAC |  |
+        | - Manómetros P1/P2| - Driver DM860|  |
+        | - Válvula Aguja   | - Fuente 12V  |  |
+        | - Caudalím YF-S401| - Caja IP65   |  |
+        | - Bomba MBP-2000  |   (ESP32/BTS) |  |
         |-------------------+---------------|  |
-        | FRENTE: Puerta con visor acrílico |  |
-        | BASE: Chapa sólida con encastres  |  v
+        | FRENTE: Puerta Policarbonato 4 mm |  |
+        | BASE: Fenólico 18mm con 4 drenajes|  v
         +-----------------------------------+
         <-------------- 450 mm ------------->
-```
+`
 
-#### Especificaciones Constructivas:
+#### Especificaciones Constructivas y Segregación Estanca (Auditadas por Argon):
 * **Estructura Portante:** Bastidor cúbico de 450 × 450 × 450 mm en **tubo estructural cuadrado de 20 × 20 mm × 1.2 mm** de espesor.
-* **Caras Laterales y Ventilación:**
-  * **Lateral Izquierdo (Mando & Bombeo):**
-    * Chapa perforada de acero SAE 1010 N°18 (agujeros Ø3 a 5 mm paso alternado).
-    * Bomba peristáltica montada en panel inferior con salida de cabezal hacia el frente o fondo.
-    * Caja estanca plástica IP65 (160 × 120 × 75 mm) que encierra el microcontrolador ESP32, driver de la bomba (A4988 / TB6600 o controlador PWM), relés y bornes de conexión.
-  * **Lateral Posterior (Fondo Hidráulico):**
-    * Chapa perforada para soporte mediante abrazaderas tipo *clamp* plásticas o metálicas.
-    * Montaje del **Prefiltro de sedimentos** (vaso de 10" o 5" con cartucho de polipropileno expandido de 5 µm).
-    * Montaje del **Módulo de Membrana de Ultrafiltración (UF)** de fibra hueca tubular o encapsulada.
-    * Transductores de presión digital (0-5 V o I2C) y/o manómetros analógicos de glicerina para monitorear la presión transmembrana (TMP).
-  * **Lateral Derecho (Alimentación Eléctrica):**
-    * Chapa perforada para evacuación térmica de la fuente.
-    * Fuente conmutada 220V AC a 12V DC (10A o 15A) montada en carril DIN o soporte aislado.
-    * Conector de entrada C14 (interlock) con portafusible integrado e interruptor bipolar luminoso de encendido general.
-  * **Cara Frontal (Acceso y Seguridad):**
-    * Puerta abisagrada con marco de perfil ángulo 15×15 mm o tubo 15×15 mm.
-    * Cierre mediante falleba o traba a presión con imán de neodimio.
-    * Panel frontal de acrílico o policarbonato transparente de 3 mm para inspección visual directa del flujo, bomba y filtros sin abrir el gabinete.
-  * **Base y Techo:**
-    * **Base:** Chapa sólida SAE 1010 N°16 (1.6 mm) plegada con pestañas perimetrales soldadas al bastidor para máxima rigidez y contención de goteos accidentales.
-    * **Techo:** Chapa sólida SAE 1010 N°18 (1.2 mm) con **manija central de acero rebatible para baúl** reforzada internamente con una planchuela de distribución de carga de 25 × 3 mm soldada a los travesaños del techo.
+* **Base Antivibratoria y Drenaje:** Placa de multilaminado fenólico marino de **18 mm** barnizada. Posee **4 perforaciones de Ø 12 mm en la zona húmeda** para evacuación instantánea por gravedad ante cualquier fuga accidental. Motor NEMA 34 montado sobre **4 tacos silentblocks de goma M5 macho-hembra**. Base apoyada sobre 4 patas de goma de 30 mm.
+* **Tabique Vertical de Segregación:** Un tabique divisorio interno (fenólico de 10-12 mm o chapa plegada) segrega el maletín en dos compartimentos estancos:
+  1. **Zona Húmeda / Proceso (Frontal, 60% del volumen):**
+     * Cartucho dializador **Fresenius FX100** montado verticalmente con 2 abrazaderas acolchadas de goma de 2'.
+     * Manómetros Bourdon de glicerina P1 y P2 (0-1 bar) montados en Tees de 1/4' orientados hacia el frente mediante sellador anaeróbico (Trabasil RM2 / Loctite 542).
+     * **Válvula de aguja de 1/4'** conectada a la Tee de P2 mediante niple hexagonal 1/4' M-M para control micrométrico de TMP.
+     * Caudalímetro YF-S401 conectado con manguera de silicona de 6 mm y asegurado con precintos plásticos (no abrazaderas metálicas).
+     * Cabezal de bomba MBP-2000 con **tubo de silicona gruesa (pared ≥ 3 mm) o Norprene** (nunca PVC cristal dentro de los rodillos).
+  2. **Zona Seca / Eléctrica (Trasera, 40% del volumen):**
+     * Ventilada naturalmente mediante las 2 caras de chapa perforada.
+     * **Transformador 220V a 24V AC** elevado sobre perfiles U de aluminio (no toca el piso) con fusible lento de 6A/8A en secundario.
+     * **Driver Leadshine DM860** montado con su disipador expuesto a la corriente de aire.
+     * **Fuente conmutada 12V DC (10A)** para el agitador y lógica.
+     * **Caja estanca plástica IP65 (150 × 110 × 70 mm)** alojando exclusivamente la lógica sensible: ESP32 DevKit V1, Step-Down LM2596 (5.00V) y driver MOSFET BTS7960 (43A). Todos los cables ingresan por la cara inferior de la caja IP65 mediante prensaestopas PG9/PG11 con **bucle de goteo (*drip loop*)**.
+* **Cara Frontal (Inspección y Seguridad):** Puerta abisagrada de **Policarbonato compacto de 3 o 4 mm** (resistente a impactos y fatiga por vibración, no se quiebra como el acrílico) con cierre rápido tipo *toggle latch* (traba de baúl).
+* **Cara Lateral Sólida (Panel Pasamuros y Conectividad):**
+  * Pasamuros de succión 1/2' y retorno de retentado 1/4'.
+  * Salida de permeado 1/4' por la base inferior hacia el bidón rodante.
+  * Conector circular industrial **GX16 de 4 pines** (2 hilos 12V PWM motor + 2 hilos boya con pull-up 2k2, capacitor 100nF y resistencia en serie de 470 Ω).
+  * Entrada C14 interlock 220V con fusible y tecla bipolar luminosa.
 
 ---
 

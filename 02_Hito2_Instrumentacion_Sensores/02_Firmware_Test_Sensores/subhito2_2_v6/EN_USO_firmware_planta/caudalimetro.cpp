@@ -278,6 +278,11 @@ Caudalimetro::Muestra Caudalimetro::capturar(bool bombaEmpuja) {
       if (m.q_mLmin > _cfg.qMaxOperativo_mLmin) {
         m.q_mLmin = _cfg.qMaxOperativo_mLmin;
       }
+      // V6.7: aplica el umbral mínimo detectable configurado (antes se guardaba pero nunca se usaba).
+      // Por debajo de este caudal la turbina no gira de forma confiable: se informa 0.
+      if (m.q_mLmin < _cfg.qMinDetectable_mLmin) {
+        m.q_mLmin = 0.0;
+      }
     }
   }
 

@@ -248,11 +248,14 @@ ModeloDarcy modeloDarcy;
 ResultadoDarcy resultadoDarcy;
 
 // Variables de Presión Primaria Manométrica y Modelo de Darcy (Subhito 2.4)
-float p1_manometro_bar  = 0.30f; // Manómetro Bourdon P1 (Alimentación)
-float p2_manometro_bar  = 0.20f; // Manómetro Bourdon P2 (Retentado)
+// V6.7: arrancan en 0. Antes valían P1=0.30 / P2=0.20 por defecto, lo que generaba una TMP ficticia
+// de 0.25 bar y el CSV registraba J20 y R_torta calculados con presiones NO medidas.
+// Con TMP = 0 el modelo de Darcy queda "no válido" hasta que el operador cargue P1 y P2 en el SCADA.
+float p1_manometro_bar  = 0.00f; // Manómetro Bourdon P1 (Alimentación) — ingreso manual desde SCADA
+float p2_manometro_bar  = 0.00f; // Manómetro Bourdon P2 (Retentado)    — ingreso manual desde SCADA
 float p3_manometro_bar  = 0.00f; // Contrapresión Permeado / Columna hidrostática
 float temp_agua_C       = 20.0f; // Temperatura de proceso (°C) — actualizada por DS18B20 en D4 o Web SCADA
-float tmp_efectiva_bar  = 0.25f; // TMP = ((P1 + P2) / 2) - P3
+float tmp_efectiva_bar  = 0.00f; // TMP = ((P1 + P2) / 2) - P3
 bool  ds18b20_activo    = false;
 bool  modoTempAuto      = true;  // true = Medición continua con sonda DS18B20 en D4; false = Manual
 
@@ -266,7 +269,6 @@ bool  modoParadaSeca      = false;      // false = Rampa suave, true = Parada in
 float dimmerArranquePct   = 50.0f;      // 0 a 100% de fluidez/aceleración de arranque
 float qAlimMax_mLmin      = 1400.0f;    // Límite caudalímetro alimentación máx
 float qAlimMin_mLmin      = 0.0f;       // Límite inferior sequedad (0 = off)
-float qPermMax_mLmin      = 800.0f;     // Límite caudalímetro permeado máx
 float tempMax_C           = 35.0f;      // Límite temperatura máxima (membrana FX100)
 float tmpMax_bar          = 0.60f;      // Límite PTM máxima
 bool  autoParadaLimites   = false;      // Parada preventiva automática si se sobrepasan límites
@@ -317,7 +319,6 @@ void cargarParametrosNVS() {
   dimmerArranquePct = prefs.getFloat("acel_pct", 50.0f);
   qAlimMax_mLmin    = prefs.getFloat("q_max", 1400.0f);
   qAlimMin_mLmin    = prefs.getFloat("q_min", 0.0f);
-  qPermMax_mLmin    = prefs.getFloat("q_perm_max", 800.0f);
   tempMax_C         = prefs.getFloat("temp_max", 35.0f);
   tmpMax_bar        = prefs.getFloat("tmp_max", 0.60f);
   autoParadaLimites = prefs.getBool("auto_stop", false);

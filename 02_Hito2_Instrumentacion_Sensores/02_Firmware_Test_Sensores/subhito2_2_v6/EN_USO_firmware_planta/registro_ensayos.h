@@ -79,7 +79,9 @@ public:
     if (!_filas) {
       if (!begin()) return false;
     }
-    if (_activo || _sesion >= MAX_SESIONES || _n + 2 > MAX_FILAS ||
+    // V6.7: se quitó el tope de 20 sesiones (cada arranque de bomba abre una; se agotaba en una jornada).
+    // El límite real es la memoria: MAX_FILAS filas (~25 min a 10 s). Exportar y limpiar entre campañas.
+    if (_activo || _n + 2 > MAX_FILAS ||
         !std::isfinite(rpm) || rpm < 0.0) {
       return false;
     }
