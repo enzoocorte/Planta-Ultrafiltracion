@@ -206,8 +206,8 @@ void Bomba::tick(float dt) {
     _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : _rpmInicio;
   }
 
-  // Generación de pulsos PWM por hardware LEDC (solo si la bomba está en marcha)
-  if (_enMarcha && _actual >= 1.0f) {
+  // Generación de pulsos PWM por hardware LEDC (mientras el motor deba girar y no haya emergencia)
+  if (!_enEmergencia && _actual >= 1.0f) {
     uint32_t f = (uint32_t)(_actual * (float)_pulsosPorRev / 60.0f);
     if (f < 50) f = 50; // Límite de seguridad mínimo del temporizador LEDC de ESP32
 

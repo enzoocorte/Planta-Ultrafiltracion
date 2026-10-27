@@ -224,7 +224,6 @@ double  volPermManualAcum_L = 0.0;
 bool    autoCalibrando = false;
 uint8_t autoCalMuestras = 0;
 float   autoCalSumFrecAlim = 0.0f;
-float   autoCalSumFrecPerm = 0.0f;
 String  autoCalMensaje = "";
 
 // Instanciación de componentes principales
@@ -362,7 +361,7 @@ double volumenPermeadoTotal_L() {
 }
 
 bool bombaGirandoReal() {
-  return bomba.enMarcha();
+  return bomba.enMarcha() || (bomba.rpmActual() > 0.5f);
 }
 
 float rpmRealConfirmada() {
@@ -461,7 +460,10 @@ void finalizarEnsayoActual() {
 
     Serial.printf("\n<<< [ENSAYO #%u FINALIZADO] Consigna: %.1f RPM | Duracion: %us | Muestras: %u | Merma Alim: %.1f%% | Merma Perm: %.1f%% >>>\n\n",
                   ensayoActualId, bomba.rpmObjetivo(), duracion_s, muestrasEnsayoActual, mermaAlim_pct, mermaPerm_pct);
+    ensayoActualId++;
   }
+  tInicioEnsayo_ms = 0;
+  muestrasEnsayoActual = 0;
 }
 
 void reiniciarReferenciasTorta() {
@@ -490,8 +492,8 @@ void fijarReferenciasTortaActuales() {
 }
 
 void iniciarNuevoEnsayo(float consignaRpm) {
-  if (muestrasEnsayoActual > 0) {
-    ensayoActualId++;
+  if (tInicioEnsayo_ms > 0) {
+    finalizarEnsayoActual();
   }
   muestrasEnsayoActual = 0;
   tInicioEnsayo_ms = millis();
@@ -691,7 +693,6 @@ void handleCmd() {
     // V6.6: registra el ensayo en la tabla (antes solo ponía el cronómetro a cero y seguía grabando con el mismo ID)
     if (ensayoManualActivo || tInicioEnsayo_ms > 0) {
       finalizarEnsayoActual();
-      Serial.printf("[ENSAYO] Ensayo #%u FINALIZADO.\n", ensayoActualId);
     }
     ensayoManualActivo = false;
     if (bomba.enMarcha()) {
@@ -903,7 +904,6 @@ void handleIniciarAutoCal() {
   autoCalibrando = true;
   autoCalMuestras = 0;
   autoCalSumFrecAlim = 0.0f;
-  autoCalSumFrecPerm = 0.0f;
   autoCalMensaje = "";
   server.send(200, "application/json", "{\"status\":\"iniciada\"}");
 }
@@ -1361,7 +1361,6 @@ void loop() {
     if (autoCalibrando) {
       if (bomba.enRegimenEstable()) {
         autoCalSumFrecAlim += sensorAlimentacion.frecuencia_Hz();
-        autoCalSumFrecPerm += sensorPermeado.frecuencia_Hz();
         autoCalMuestras++;
 
         if (autoCalMuestras >= MUESTRAS_AUTO_CAL) {

@@ -585,6 +585,32 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     </div>
     <button class="btn-dir" id="btn_dir" onclick="cmd('DIR')">🔄 HORARIO (FILTRACIÓN TANGENCIAL)</button>
 
+    <!-- V6.7: PARADA DE EMERGENCIA (corte físico de ENA en el DM860) — había desaparecido de la interfaz -->
+    <div class="action-row">
+      <button class="btn-act" id="btn_emerg" style="background:#7f1d1d; color:#fff; border:2px solid #ef4444;" onclick="cmd('EMERGENCY')">🛑 EMERGENCIA</button>
+      <button class="btn-act" id="btn_rearm" style="background:#1e293b; color:#fbbf24; border:1px solid #d97706;" onclick="cmd('REARM')">🔓 REARMAR</button>
+    </div>
+
+    <!-- V6.7: CARGA MANUAL DE MEDICIONES (manómetros y probeta) — necesarias para TMP, Darcy y Q_perm -->
+    <div class="card">
+      <div class="card-title">✍️ Mediciones Manuales del Operador</div>
+      <div class="form-group">
+        <label>P1 Manómetro Entrada:</label>
+        <div><input type="number" id="in_p1" step="0.01" min="0" max="6" placeholder="0.00"> <small>bar</small></div>
+      </div>
+      <div class="form-group">
+        <label>P2 Manómetro Retentado:</label>
+        <div><input type="number" id="in_p2" step="0.01" min="0" max="6" placeholder="0.00"> <small>bar</small></div>
+      </div>
+      <button class="btn-save" style="margin-top:4px;" onclick="enviarPresiones()">📊 Aplicar Presiones (calcula TMP y Darcy)</button>
+      <div class="form-group" style="margin-top:6px;">
+        <label>Q Permeado por probeta:</label>
+        <div><input type="number" id="in_qperm" step="0.1" min="0" max="500" placeholder="0 = sensor"> <small>mL/min</small></div>
+      </div>
+      <button class="btn-save" style="background:#10b981; margin-top:4px;" onclick="enviarPermManual()">🧪 Aplicar Q Permeado (0 = volver a sensor)</button>
+      <button class="btn-act" style="width:100%; margin-top:6px; background:#1e293b; color:#cbd5e1; border:1px solid #334155; font-size:11px; padding:6px;" onclick="cmd('RESET_VOL')">↺ Poner Volúmenes a Cero</button>
+    </div>
+
     <div class="footer">ESP32 UF UNSa • AP: <b>192.168.4.1</b> • mDNS: <b>bomba.local</b></div>
   </div>
 
@@ -915,6 +941,50 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
         .then(r => { if (r.ok) showToast('Comando ejecutado: ' + act); });
     }
 
+    // V6.7: envío de presiones manométricas -> el ESP32 recalcula TMP y el modelo de Darcy
+    function enviarPresiones() {
+      const p1 = parseFloat($('in_p1').value), p2 = parseFloat($('in_p2').value);
+      if (isNaN(p1) || isNaN(p2) || p1 < 0 || p2 < 0) { showToast('Ingresa P1 y P2 en bar', true); return; }
+      fetch(`/set_presion?p1=${p1}&p2=${p2}`)
+        .then(r => r.json())
+        .then(d => showToast(`TMP = ${d.tmp.toFixed(2)} bar` + (d.darcy_ok ? '' : ' (Darcy requiere Q_perm > 0)')))
+        .catch(() => showToast('Error enviando presiones', true));
+    }
+
+    // V6.7: caudal de permeado medido con probeta (el YF-S401 no gira por debajo de ~300 mL/min)
+    function enviarPermManual() {
+      const q = parseFloat($('in_qperm').value);
+      if (isNaN(q) || q < 0 || q > 500) { showToast('Q permeado entre 0 y 500 mL/min', true); return; }
+      fetch('/set_perm_manual?qp=' + q)
+        .then(r => { if (r.ok) showToast(q > 0 ? `Q_perm manual = ${q} mL/min` : 'Permeado vuelve a sensor'); });
+    }
+
+    // V6.7: carga UNA vez los parámetros guardados en el ESP32 dentro de los formularios.
+    // Antes los formularios mostraban valores fijos del HTML (205.98, 13.55, 50...) y al presionar
+    // "Guardar" se pisaba la calibración real guardada en la memoria NVS.
+    let formsSincronizados = false;
+    function sincronizarFormularios(d) {
+      $('adm_ka').value = d.k_alim.toFixed(2);
+      $('adm_kp').value = d.k_perm.toFixed(2);
+      $('adm_ml').value = d.ml_rev.toFixed(2);
+      $('adm_pul').value = d.pul_rev;
+      $('adm_rpm_ini').value = d.rpm_ini;
+      $('adm_q_max').value = d.q_max;
+      $('adm_q_min').value = d.q_min;
+      $('adm_temp_max').value = d.temp_max;
+      $('adm_tmp_max').value = d.tmp_max;
+      $('adm_auto_stop').checked = d.auto_stop;
+      $('dimmer_slider').value = d.acel_pct;
+      $('dimmer_val_lbl').innerText = d.acel_pct.toFixed(0);
+      $('dimmer_rate_lbl').innerText = (12.0 * (d.acel_pct / 50.0)).toFixed(1);
+      modoParadaSeca = d.stop_seco;
+      $('btn_stop_rampa').classList.toggle('active', !d.stop_seco);
+      $('btn_stop_seco').classList.toggle('active', d.stop_seco);
+      if (d.p1 > 0) $('in_p1').value = d.p1.toFixed(2);
+      if (d.p2 > 0) $('in_p2').value = d.p2.toFixed(2);
+      formsSincronizados = true;
+    }
+
     // Dimer de fluidez de arranque (0% a 100%)
     let dimmerTimer = null;
     function onDimmerChange(val) {
@@ -969,14 +1039,25 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       const v = parseFloat($('cal_vol_ml').value);
       const t = parseFloat($('cal_tiempo_s').value);
       if (!v || !t || t <= 0) { showToast('Ingresa volumen (mL) y tiempo (s)', true); return; }
-      const qReal = (v / t) * 60; // mL/min
+      const qReal = (v / t) * 60.0; // Caudal real en probeta (mL/min)
+      const qSensor = parseFloat($('op_qa').innerText); // Caudal suavizado actual (Mediana + EMA)
+      const kActual = parseFloat($('adm_ka').value);
       const fActual = parseFloat($('op_fa').innerText);
-      if (fActual > 1.0) {
+
+      if (qSensor > 5.0 && kActual > 10.0) {
+        const nuevoK = kActual * (qSensor / qReal);
+        const nuevaCil = qReal / Math.max(1.0, parseFloat($('op_rpm_actual').innerText));
+        $('adm_ka').value = nuevoK.toFixed(2);
+        if (nuevaCil >= 1.0 && nuevaCil <= 50.0) {
+          $('adm_ml').value = nuevaCil.toFixed(2);
+        }
+        showToast(`Calculado K_Alim: ${nuevoK.toFixed(2)} Hz/(L/min) | Cil: ${nuevaCil.toFixed(2)} mL/rev`);
+      } else if (fActual > 1.0) {
         const nuevoK = (fActual * 1000.0) / qReal;
         $('adm_ka').value = nuevoK.toFixed(2);
         showToast(`Calculado K_Alim: ${nuevoK.toFixed(2)} Hz/(L/min)`);
       } else {
-        showToast('Enciende la bomba para recibir pulsos de frecuencia', true);
+        showToast('Enciende la bomba para recibir flujo en el sensor', true);
       }
     }
 
@@ -1059,6 +1140,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
         const res = await fetch('/status');
         const d = await res.json();
         pollBusy = false;
+        if (!formsSincronizados) sincronizarFormularios(d);
 
         // Actualizar datos del Operador
         $('op_qa').innerText = d.q_alim.toFixed(1);

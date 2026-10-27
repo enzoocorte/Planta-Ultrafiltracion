@@ -15,7 +15,7 @@ El presente documento constituye el diseño conceptual, estructural y metodológ
 El sistema se concibe bajo el paradigma de **Diseño para Fabricación y Ensamble (DFM/DFA)**, dividiendo la planta en **tres (3) módulos autónomos e interconectables**:
 1. **Módulo 1 — Sedimentador / Coagulador:** Decantador cónico de acero inoxidable con agitación controlada y purga inferior.
 2. **Módulo 2 — Caja de Filtración y Control:** Gabinete cúbico portátil tipo maletín (450 × 450 × 450 mm) con bomba peristáltica, prefiltración, membrana UF, sensores e instrumentación ESP32.
-3. **Módulo 3 — Torre/Carro de Permeado y Soporte:** Estructura móvil rodante (700 mm de altura) con base para tanque acumulador de permeado (bidón PEAD ~20-25 L) y brazos superiores para encastre y fijación rápida de la caja de filtración.
+3. **Módulo 3 — Torre/Carro de Permeado y Soporte:** Estructura móvil rodante (700 mm de altura) con base para tanque acumulador de permeado (bidón PEAD de 50 L) y brazos superiores para encastre y fijación rápida de la caja de filtración.
 
 El objetivo central para la tesis de Ingeniería Industrial es demostrar **viabilidad técnico-económica**, **ergonomía industrial**, **seguridad de operación** (segregación eléctrica/hidráulica) y **modularidad logística** (facilidad de transporte y mantenimiento).
 
@@ -56,7 +56,7 @@ A partir del análisis exhaustivo del documento preliminar y del material fotogr
   * Dos brazos superiores para recibir la caja de filtro de 45 cm.
   * Chapa trasera sólida y base con ruedas.
 * **Diagnóstico Crítico de Ingeniería:**
-  1. **Análisis de Centro de Gravedad y Vuelco:** Al colocar la caja de 45×45 cm (~15 kg) a 70 cm del suelo, el centro de gravedad del conjunto queda elevado (~90 cm). Si el bidón inferior de 20-25 L está vacío, el carro podría ser vulnerable a vuelco ante un empuje accidental.
+  1. **Análisis de Centro de Gravedad y Vuelco:** Al colocar la caja de 45×45 cm (~15 kg) a 70 cm del suelo, el centro de gravedad del conjunto queda elevado (~90 cm). Si el bidón inferior de 50 L está vacío, el carro podría ser vulnerable a vuelco ante un empuje accidental.
      * *Solución:* La distancia entre ejes de las ruedas debe ser de al menos 420 × 420 mm, y se deben emplear 4 ruedas de 50 mm (2 de ellas con freno total de doble acción: rueda + giro de horquilla).
   2. **Ergonomía Operativa:** Con el carro a 70 cm y la caja de 45 cm encima, la altura de trabajo de la puerta frontal y los controles se ubica entre **70 cm y 115 cm**. Esta altura es **antropométricamente perfecta** para un operario de pie (percentil 5 a 95 según normas IRAM/ISO de ergonomía), evitando flexiones lumbares.
 
@@ -177,7 +177,7 @@ A partir del análisis exhaustivo del documento preliminar y del material fotogr
         |                   |  |
         |   [ ALOJAMIENTO   |  |
         |     DEL BIDÓN     |  |
-        |      PEAD 20L     |  |
+        |      PEAD 50L     |  |
         |     PERMEADO ]    |  |
         |                   |  |
         |===================|  |
@@ -223,7 +223,7 @@ Para evitar la corrosión típica del acero al carbono en contacto con salpicadu
 
 ### 4.2 Selección de Chapas:
 * **Laterales y Fondo de Caja (Módulo 2):** Chapa perforada SAE 1010 N°18 (espesor 1.25 mm), perforación redonda de 4 mm al tresbolillo (40% de área abierta). Otorga excelente rigidez, disipación de calor del transformador y bomba, y visibilidad interior.
-* **Bases de Apoyo (Caja y Carro):** Chapa lisa SAE 1010 N°16 (espesor 1.6 mm) para soportar las cargas puntuales de los componentes y el bidón lleno de 25 kg.
+* **Bases de Apoyo (Caja y Carro):** Chapa lisa SAE 1010 N°16 (espesor 1.6 mm) para soportar las cargas puntuales de los componentes y el bidón lleno de 50 kg.
 
 ### 4.3 Componentes Plásticos y Grado Sanitario:
 * **Mangueras de Proceso:** Manguera flexible de silicona de grado alimenticio/sanitario (especialmente para el tramo de compresión en la bomba peristáltica) y mangueras de polietileno/poliuretano de 8 mm OD con conexiones rápidas neumáticas/hidráulicas tipo *push-in* de poliacetal o acero inoxidable.

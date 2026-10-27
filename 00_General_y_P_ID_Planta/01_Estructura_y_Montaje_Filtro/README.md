@@ -26,7 +26,7 @@ Diseñar, validar y construir el bastidor físico modular de la planta piloto ba
  │   SEDIMENTADOR    │             │       Y CONTROL       │          │   PERMEADO Y SOPORTE  │
  ├───────────────────┤             ├───────────────────────┤          ├───────────────────────┤
  │ • Tanque Inox     │  Manguera   │ • Bomba Peristáltica  │ Manguera │ • Tanque Permeado     │
- │ • Base Trípode    │ ──────────► │ • Membrana FX100      │ ───────► │   (Bidón PEAD 20-25L) │
+ │ • Base Trípode    │ ──────────► │ • Membrana FX100      │ ───────► │   (Bidón PEAD 50L) │
  │ • Agitador + Boya │  Aspiración │ • Caja Estanca IP65   │ Permeado │ • Ruedas con Freno    │
  │ • Purga de Fondo  │             │   (ESP32 + Drivers)   │          │ • Encastre Caja Mod 2 │
  └───────────────────┘             └───────────────────────┘          └───────────────────────┘
