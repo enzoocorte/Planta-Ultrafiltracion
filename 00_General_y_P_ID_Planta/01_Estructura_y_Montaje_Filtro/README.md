@@ -52,6 +52,7 @@ Diseñar, validar y construir el bastidor físico modular de la planta piloto ba
 
 | Archivo | Formato / Tipo | Descripción y Función Técnica |
 | :--- | :--- | :--- |
+| **[ORDEN_DE_TRABAJO_HERRERIA_MALETIN.md](./ORDEN_DE_TRABAJO_HERRERIA_MALETIN.md)** | Documento Markdown | **Pliego técnico y orden de corte para herrería:** medidas 500x350x350 mm, planilla de cortes de caño 20x20, refuerzo de manija, orejas para base de madera y tapa trasera desmontable. |
 | **[`DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md`](./DOCUMENTO_MAESTRO_ESTRUCTURA_FILTRO.md)** | Documento Markdown | **Memoria técnica exhaustiva de ingeniería:** diagnóstico dimensional, análisis de esbeltez de eje, cálculo de potencia de agitación, segregación IP65, hojas de proceso y costos de manufactura. |
 | **[`Estructura para el modulo de ultrafiltracion.docx`](./Estructura%20para%20el%20modulo%20de%20ultrafiltracion.docx)** | Documento Word | Especificación preliminar de requerimientos mecánicos y cortes de chapa. |
 | **[`guia_visual_estructura.html`](./guia_visual_estructura.html)** | Visualizador 3D (Three.js) | Maqueta virtual interactiva en 3D para rotar, orbitar y despiezar los módulos mecánicos en el navegador. |
