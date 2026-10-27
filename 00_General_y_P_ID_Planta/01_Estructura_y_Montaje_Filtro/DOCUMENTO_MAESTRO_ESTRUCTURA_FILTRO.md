@@ -114,51 +114,51 @@ A partir del análisis exhaustivo del documento preliminar y del material fotogr
 
 ---
 
-### 3.2 MÓDULO 2: CAJA DE FILTRACIÓN Y CONTROL ('MALETÍN')
+### 3.2 MÓDULO 2: CAJA DE FILTRACIÓN Y CONTROL ('MALETÍN SKID')
 
-`
-                      450 mm
+```
+                      350 mm
         +-----------------------------------+  ^
         | [MANIJA REBATIBLE REFORZADA]      |  |
-        | [TECHO: CHAPA MACIZA N°18]        |  |
+        | [TECHO: CHAPA / FENÓLICO MARINO]  |  |
         |===================================|  |
-        | ZONA HÚMEDA (60%) | ZONA SECA(40%)|  |
-        | (Frente)          | (Fondo Perfor)|  | 450 mm
-        |                   |               |  |
-        | - FX100 Vertical  | - Trafo 24VAC |  |
+        | FACHADA EXTERIOR  | INTERIOR SECO |  |
+        | (Zona Húmeda)     | (Ventilado)   |  | 500 mm
+        |                   |               |  | (Altura libre
+        | - FX100 Vertical  | - NEMA 34     |  |  para FX100)
+        |   (Clamps 2")     | - Trafo 24VAC |  |
         | - Manómetros P1/P2| - Driver DM860|  |
-        | - Válvula Aguja   | - Fuente 12V  |  |
+        | - Válvula Aguja   | - Cargador 5V |  |
         | - Caudalím YF-S401| - Caja IP65   |  |
-        | - Bomba MBP-2000  |   (ESP32/BTS) |  |
+        | - Cabezal MBP2000 |   (ESP32/BTS) |  |
         |-------------------+---------------|  |
-        | FRENTE: Puerta Policarbonato 4 mm |  |
-        | BASE: Fenólico 18mm con 4 drenajes|  v
+        | BASE: Fenólico 18mm + Patas Goma  |  v
         +-----------------------------------+
-        <-------------- 450 mm ------------->
-`
+        <-------------- 350 mm ------------->
+```
 
-#### Especificaciones Constructivas y Segregación Estanca (Auditadas por Argon):
-* **Estructura Portante:** Bastidor cúbico de 450 × 450 × 450 mm en **tubo estructural cuadrado de 20 × 20 mm × 1.2 mm** de espesor.
-* **Base Antivibratoria y Drenaje:** Placa de multilaminado fenólico marino de **18 mm** barnizada. Posee **4 perforaciones de Ø 12 mm en la zona húmeda** para evacuación instantánea por gravedad ante cualquier fuga accidental. Motor NEMA 34 montado sobre **4 tacos silentblocks de goma M5 macho-hembra**. Base apoyada sobre 4 patas de goma de 30 mm.
-* **Tabique Vertical de Segregación:** Un tabique divisorio interno (fenólico de 10-12 mm o chapa plegada) segrega el maletín en dos compartimentos estancos:
-  1. **Zona Húmeda / Proceso (Frontal, 60% del volumen):**
-     * Cartucho dializador **Fresenius FX100** montado verticalmente con 2 abrazaderas acolchadas de goma de 2'.
-     * Manómetros Bourdon de glicerina P1 y P2 (0-1 bar) montados en Tees de 1/4' orientados hacia el frente mediante sellador anaeróbico (Trabasil RM2 / Loctite 542).
-     * **Válvula de aguja de 1/4'** conectada a la Tee de P2 mediante niple hexagonal 1/4' M-M para control micrométrico de TMP.
-     * Caudalímetro YF-S401 conectado con manguera de silicona de 6 mm y asegurado con precintos plásticos (no abrazaderas metálicas).
-     * Cabezal de bomba MBP-2000 con **tubo de silicona gruesa (pared ≥ 3 mm) o Norprene** (nunca PVC cristal dentro de los rodillos).
-  2. **Zona Seca / Eléctrica (Trasera, 40% del volumen):**
-     * Ventilada naturalmente mediante las 2 caras de chapa perforada.
-     * **Transformador 220V a 24V AC** elevado sobre perfiles U de aluminio (no toca el piso) con fusible lento de 6A/8A en secundario.
-     * **Driver Leadshine DM860** montado con su disipador expuesto a la corriente de aire.
-     * **Fuente conmutada 12V DC (10A)** para el agitador y lógica.
-     * **Caja estanca plástica IP65 (150 × 110 × 70 mm)** alojando exclusivamente la lógica sensible: ESP32 DevKit V1, Step-Down LM2596 (5.00V) y driver MOSFET BTS7960 (43A). Todos los cables ingresan por la cara inferior de la caja IP65 mediante prensaestopas PG9/PG11 con **bucle de goteo (*drip loop*)**.
-* **Cara Frontal (Inspección y Seguridad):** Puerta abisagrada de **Policarbonato compacto de 3 o 4 mm** (resistente a impactos y fatiga por vibración, no se quiebra como el acrílico) con cierre rápido tipo *toggle latch* (traba de baúl).
-* **Cara Lateral Sólida (Panel Pasamuros y Conectividad):**
-  * Pasamuros de succión 1/2' y retorno de retentado 1/4'.
-  * Salida de permeado 1/4' por la base inferior hacia el bidón rodante.
-  * Conector circular industrial **GX16 de 4 pines** (2 hilos 12V PWM motor + 2 hilos boya con pull-up 2k2, capacitor 100nF y resistencia en serie de 470 Ω).
+#### Especificaciones Constructivas y Reingeniería de Fachada Exterior (500 × 350 × 350 mm):
+* **Geometría y Dimensiones Optimizadas:** Bastidor vertical de **500 mm (Alto) × 350 mm (Ancho) × 350 mm (Profundidad)**.
+  * *Ventaja de los 500 mm de altura:* El cartucho dializador Fresenius FX100 mide **320 mm** de longitud; al sumar los acoples del Hospital Oñativia y los radios de curvatura de las mangueras de 1/4" sin estrangulamiento, se requiere un vano vertical libre mínimo de **420 a 450 mm**. Los 500 mm de altura vertical garantizan un tendido hidráulico rectilíneo, libre de codos forzados y profesional.
+  * *Ventaja de la huella compacta (350 × 350 mm):* Reduce el peso muerto del maletín a menos de **11 kg** y minimiza el espacio ocupado en la mesada de laboratorio.
+* **Segregación Estanca por Gravedad (Fachada Exterior de Proceso):**
+  * **Zona Húmeda / Proceso (Frontal Exterior):** Todos los componentes con fluidos a presión se montan rígidamente en la **cara frontal exterior** sobre una placa de fenólico marino barnizado o chapa protegida:
+    * Cartucho dializador **Fresenius FX100** montado verticalmente con 2 abrazaderas acolchadas de goma de 2".
+    * Manómetros Bourdon de glicerina P1 y P2 (0–1 bar) montados en Tees de 1/4" orientados al operador.
+    * **Válvula de aguja de 1/4"** conectada a la Tee de P2 mediante niple hexagonal 1/4" M-M para control micrométrico de TMP.
+    * Caudalímetro YF-S401 fijado con manguera de silicona de 6 mm y precintos plásticos chicos.
+    * Cabezal de rodillos de la bomba peristáltica MBP-2000 asomando hacia la fachada exterior (o conectado mediante pasamuros estancos inmediatos para succión y descarga).
+    * *Cero riesgo eléctrico:* Cualquier goteo durante el recambio del filtro, retrolavados o purgas cae por gravedad al exterior (sobre una bandeja de goteo de mesada) y **jamás entra en contacto con los circuitos eléctricos**.
+  * **Zona Seca / Eléctrica (Interior del Maletín):**
+    * Al no contener mangueras presurizadas internas, el interior es un recinto **100% seco y ventilado**.
+    * Motor paso a paso NEMA 34 atornillado rígidamente sobre tacos antivibratorios (silentblocks).
+    * **Transformador 220V a 24V AC** elevado sobre perfiles U de aluminio, protegido por portafusible aéreo con fusible lento de 6A en el secundario.
+    * **Driver Leadshine DM860** fijado directamente contra el panel lateral de chapa perforada para disipación térmica por convección natural.
+    * **Alimentación ESP32:** Cargador USB homologado de 5.0V / 2.0A conectado internamente a los 220V (evita el problema de auto-apagado de los powerbanks comerciales).
+    * **Caja estanca plástica IP65 chica (150 × 110 × 70 mm):** Alojando exclusivamente el ESP32 NodeMCU-32S, borneras de señal y driver BTS7960 para el agitador, con prensaestopas inferiores y bucle de goteo (*drip loop*).
+* **Panel de Conexiones Lateral:**
   * Entrada C14 interlock 220V con fusible y tecla bipolar luminosa.
+  * Conector industrial GX16 de 4 pines para conexión remota del motorreductor del sedimentador y la boya de nivel.
 
 ---
 

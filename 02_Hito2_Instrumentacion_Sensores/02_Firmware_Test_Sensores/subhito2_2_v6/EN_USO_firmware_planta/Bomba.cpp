@@ -44,13 +44,17 @@ void Bomba::arrancar() {
 
 void Bomba::detener() {
   _enMarcha = false;
-  _invirtiendo = false;
-  if (_objetivo >= RPM_MIN) {
+  if (_invirtiendo) {
+    // Si el usuario detiene la bomba mientras estaba frenando para invertir giro,
+    // restauramos la consigna guardada para que el SCADA no muestre obj_rpm = 0.0
+    _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : _rpmInicio;
+    _invirtiendo = false;
+  } else if (_objetivo >= RPM_MIN) {
     _rpmGuardada = _objetivo;
   }
+
   if (_paradaSeca) {
     _actual = 0.0f;
-    _objetivo = 0.0f;
     _fActual = 0;
 #if defined(ESP_ARDUINO_VERSION) && (ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0))
     ledcWrite(PIN_PUL, 0);

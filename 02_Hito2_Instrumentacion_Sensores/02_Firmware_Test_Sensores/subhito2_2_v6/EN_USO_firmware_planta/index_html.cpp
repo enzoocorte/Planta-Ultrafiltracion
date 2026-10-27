@@ -1039,14 +1039,25 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       const v = parseFloat($('cal_vol_ml').value);
       const t = parseFloat($('cal_tiempo_s').value);
       if (!v || !t || t <= 0) { showToast('Ingresa volumen (mL) y tiempo (s)', true); return; }
-      const qReal = (v / t) * 60; // mL/min
+      const qReal = (v / t) * 60.0; // Caudal real en probeta (mL/min)
+      const qSensor = parseFloat($('op_qa').innerText); // Caudal suavizado actual (Mediana + EMA)
+      const kActual = parseFloat($('adm_ka').value);
       const fActual = parseFloat($('op_fa').innerText);
-      if (fActual > 1.0) {
+
+      if (qSensor > 5.0 && kActual > 10.0) {
+        const nuevoK = kActual * (qSensor / qReal);
+        const nuevaCil = qReal / Math.max(1.0, parseFloat($('op_rpm_actual').innerText));
+        $('adm_ka').value = nuevoK.toFixed(2);
+        if (nuevaCil >= 1.0 && nuevaCil <= 50.0) {
+          $('adm_ml').value = nuevaCil.toFixed(2);
+        }
+        showToast(`Calculado K_Alim: ${nuevoK.toFixed(2)} Hz/(L/min) | Cil: ${nuevaCil.toFixed(2)} mL/rev`);
+      } else if (fActual > 1.0) {
         const nuevoK = (fActual * 1000.0) / qReal;
         $('adm_ka').value = nuevoK.toFixed(2);
         showToast(`Calculado K_Alim: ${nuevoK.toFixed(2)} Hz/(L/min)`);
       } else {
-        showToast('Enciende la bomba para recibir pulsos de frecuencia', true);
+        showToast('Enciende la bomba para recibir flujo en el sensor', true);
       }
     }
 

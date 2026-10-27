@@ -202,6 +202,7 @@ uint16_t ensayoActualId = 1;
 
 // Variables de estado del ensayo actual
 uint32_t tInicioEnsayo_ms = 0;
+uint16_t muestrasEnsayoActual = 0; // Cuenta muestras reales aunque el buffer circular de 300 dé la vuelta
 float volAlimInicioEnsayo = 0.0f;
 float volPermInicioEnsayo = 0.0f;
 bool  bombaEnMarchaAnterior = false;
@@ -421,9 +422,10 @@ void guardarMuestraDatalogger() {
   if (bufferCount < MAX_REGISTROS) {
     bufferCount++;
   }
+  muestrasEnsayoActual++;
 
   Serial.printf("[LOG #%u][Ensayo %u] t=%us | RPM=%.1f | Q_Alim=%.1f | Q_Perm=%.1f | TMP=%.2f bar | T=%.1f C | J20=%.2f LMH | R_torta=%.2e m^-1\n",
-                (unsigned int)bufferCount, ensayoActualId, t_rel_s, reg.rpm,
+                (unsigned int)muestrasEnsayoActual, ensayoActualId, t_rel_s, reg.rpm,
                 reg.q_alim, reg.q_perm, reg.tmp_bar, reg.temp_c, reg.j20_lmh, reg.r_torta);
 }
 
@@ -433,17 +435,12 @@ void guardarMuestraDatalogger() {
 void finalizarEnsayoActual() {
   if (!bufferLog) return;
   uint32_t duracion_s = (tInicioEnsayo_ms > 0) ? ((millis() - tInicioEnsayo_ms) / 1000) : 0;
-  uint16_t muestrasEnsayo = 0;
-  for (size_t i = 0; i < bufferCount; i++) {
-    if (bufferLog[i].id_ensayo == ensayoActualId) muestrasEnsayo++;
-  }
 
-  if (muestrasEnsayo == 0 && duracion_s >= 5) {
+  if (muestrasEnsayoActual == 0 && duracion_s >= 5) {
     guardarMuestraDatalogger();
-    muestrasEnsayo = 1;
   }
 
-  if (muestrasEnsayo > 0) {
+  if (muestrasEnsayoActual > 0) {
     if (numEnsayos >= MAX_ENSAYOS) {
       for (size_t i = 0; i < MAX_ENSAYOS - 1; i++) {
         listaEnsayos[i] = listaEnsayos[i + 1];
@@ -455,15 +452,15 @@ void finalizarEnsayoActual() {
     listaEnsayos[numEnsayos].rpm_consigna     = bomba.rpmObjetivo();
     listaEnsayos[numEnsayos].t_inicio_ms      = tInicioEnsayo_ms;
     listaEnsayos[numEnsayos].duracion_s       = duracion_s;
-    listaEnsayos[numEnsayos].muestras         = muestrasEnsayo;
+    listaEnsayos[numEnsayos].muestras         = muestrasEnsayoActual;
     listaEnsayos[numEnsayos].vol_alim         = sensorAlimentacion.volumen_L() - volAlimInicioEnsayo;
     listaEnsayos[numEnsayos].vol_perm         = (float)volumenPermeadoTotal_L() - volPermInicioEnsayo;
     listaEnsayos[numEnsayos].merma_alim_final = mermaAlim_pct;
     listaEnsayos[numEnsayos].merma_perm_final = mermaPerm_pct;
     numEnsayos++;
 
-    Serial.printf("\n<<< [ENSAYO #%u FINALIZADO] Consigna: %.1f RPM | Duracion: %us | Merma Alim: %.1f%% | Merma Perm: %.1f%% >>>\n\n",
-                  ensayoActualId, bomba.rpmObjetivo(), duracion_s, mermaAlim_pct, mermaPerm_pct);
+    Serial.printf("\n<<< [ENSAYO #%u FINALIZADO] Consigna: %.1f RPM | Duracion: %us | Muestras: %u | Merma Alim: %.1f%% | Merma Perm: %.1f%% >>>\n\n",
+                  ensayoActualId, bomba.rpmObjetivo(), duracion_s, muestrasEnsayoActual, mermaAlim_pct, mermaPerm_pct);
   }
 }
 
@@ -493,15 +490,10 @@ void fijarReferenciasTortaActuales() {
 }
 
 void iniciarNuevoEnsayo(float consignaRpm) {
-  uint16_t muestrasPrevias = 0;
-  if (bufferLog) {
-    for (size_t i = 0; i < bufferCount; i++) {
-      if (bufferLog[i].id_ensayo == ensayoActualId) muestrasPrevias++;
-    }
-  }
-  if (muestrasPrevias > 0) {
+  if (muestrasEnsayoActual > 0) {
     ensayoActualId++;
   }
+  muestrasEnsayoActual = 0;
   tInicioEnsayo_ms = millis();
   volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
   volPermInicioEnsayo = (float)volumenPermeadoTotal_L();
@@ -1091,6 +1083,7 @@ void handleClearCSV() {
   bufferCount = 0;
   numEnsayos = 0;
   ensayoActualId = 1;
+  muestrasEnsayoActual = 0;
   ensayoManualActivo = false;
   tInicioEnsayo_ms = bomba.enMarcha() ? millis() : 0;
   volAlimInicioEnsayo = sensorAlimentacion.volumen_L();
@@ -1287,20 +1280,21 @@ void loop() {
     tCaudal = tAhora;
 
     // Lectura asíncrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4) con filtro anti-parpadeo
-    static uint8_t fallosConsecutivosDS18 = 0;
-    float tLeida = 0.0f;
-    if (DS18B20_Native::leerTemperatura(tLeida)) {
-      ds18b20_activo = true;
-      fallosConsecutivosDS18 = 0;
-      if (modoTempAuto) {
+    // Solo interroga el bus 1-Wire si el modo automático está activo
+    if (modoTempAuto) {
+      static uint8_t fallosConsecutivosDS18 = 0;
+      float tLeida = 0.0f;
+      if (DS18B20_Native::leerTemperatura(tLeida)) {
+        ds18b20_activo = true;
+        fallosConsecutivosDS18 = 0;
         temp_agua_C = tLeida;
+      } else {
+        if (++fallosConsecutivosDS18 >= 3) {
+          ds18b20_activo = false;
+        }
       }
-    } else {
-      if (++fallosConsecutivosDS18 >= 3) {
-        ds18b20_activo = false;
-      }
+      DS18B20_Native::iniciarConversion(); // Inicia la conversión para el próximo segundo
     }
-    DS18B20_Native::iniciarConversion(); // Inicia la conversión para el próximo segundo
 
     bool bombaEmpuja = (bomba.rpmActual() > 1.0f);
     float qBomba = bomba.caudalTeorico_mLmin();
