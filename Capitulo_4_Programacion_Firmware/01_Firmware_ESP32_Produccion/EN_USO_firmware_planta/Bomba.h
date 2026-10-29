@@ -8,7 +8,17 @@
 // - Control de frecuencia por hardware LEDC PWM (Driver DM860 en Cátodo Común)
 // - Rampa progresiva de arranque suave (sin golpe de ariete ni pérdida de pasos)
 // - Parada rápida en < 1.5s y corte físico de emergencia por pin ENA (< 1 ms)
+// - Modo Mantenimiento Preventivo: Vaivén bidireccional anti-sequedad / anti-aplastamiento,
+//   jogging manual para cambio de manguera y guardián standby de rotación de rodillos.
 // ==============================================================================
+
+enum ModoMantenimiento {
+  MANT_INACTIVO = 0,
+  MANT_VAIVEN,
+  MANT_JOG_FWD,
+  MANT_JOG_REV,
+  MANT_GUARDIAN_SHIFT
+};
 
 class Bomba {
 public:
@@ -20,13 +30,25 @@ public:
   bool setRPM(float rpm);
   void toggleSentido();
 
+  // Modo Mantenimiento Preventivo
+  void iniciarVaiven(uint32_t duracion_s = 60);
+  void detenerMantenimiento();
+  void iniciarJog(bool adelante);
+  void detenerJog();
+  void ejecutarGuardianShift();
+
+  ModoMantenimiento modoMantenimiento() const { return _modoMantenimiento; }
+  bool enMantenimiento() const { return _modoMantenimiento != MANT_INACTIVO; }
+  uint32_t tiempoRestanteVaiven_s() const;
+  const char* estadoMantenimientoStr() const;
+
   float rpmActual() const           { return _actual; }
   float rpmObjetivo() const         { return _objetivo; }
   bool  enMarcha() const            { return _enMarcha; }
   bool  invirtiendo() const         { return _invirtiendo; }
   bool  sentidoHorario() const      { return _horario; }
   bool  enEmergencia() const        { return _enEmergencia; }
-  bool  enRegimenEstable() const    { return (_enMarcha && !_enEmergencia && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
+  bool  enRegimenEstable() const    { return (_enMarcha && !_enEmergencia && _modoMantenimiento == MANT_INACTIVO && fabsf(_actual - _objetivo) < 0.3f && _actual > 5.0f); }
   float caudalTeorico_mLmin() const { return _actual * _mlPorVuelta; }
 
   void  setMlPorVuelta(float ml)    { if (ml > 0.1f) _mlPorVuelta = ml; }
@@ -54,6 +76,11 @@ private:
   bool _invirtiendo = false;
   bool _enEmergencia = false;
   bool _paradaSeca = false;
+
+  ModoMantenimiento _modoMantenimiento = MANT_INACTIVO;
+  uint32_t _tFinVaiven_ms = 0;
+  uint32_t _tFaseVaiven_ms = 0;
+  uint8_t  _faseVaiven = 0;
 
   float _objetivo = RPM_INICIO;
   float _actual = 0.0f;

@@ -414,6 +414,18 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
 
     /* FOOTER */
     .footer { text-align: center; font-size: 10px; color: #475569; margin-top: 10px; }
+
+    /* MANTENIMIENTO PREVENTIVO */
+    .jog-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    .btn-jog { background: #1e293b; border: 1px solid #475569; color: #f8fafc; font-weight: 700; padding: 12px; font-size: 12px; border-radius: 8px; cursor: pointer; text-align: center; user-select: none; }
+    .btn-jog:active { background: #2563eb; border-color: #60a5fa; color: #fff; }
+    .progress-bar-bg { background: #0f172a; border-radius: 6px; height: 16px; overflow: hidden; border: 1px solid #334155; margin-top: 6px; }
+    .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #10b981 0%, #f59e0b 70%, #ef4444 100%); transition: width 0.3s; }
+    .vaiven-box { background: #090d16; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; text-align: center; margin-top: 8px; }
+    .vaiven-status { font-size: 13px; font-weight: 800; color: #38bdf8; margin-bottom: 6px; }
+    .protocol-step { display: flex; gap: 10px; margin-bottom: 8px; font-size: 11px; line-height: 1.4; color: #cbd5e1; align-items: flex-start; }
+    .protocol-step b { color: #f8fafc; }
+    .protocol-num { min-width: 20px; height: 20px; background: #2563eb; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
   </style>
 </head>
 <body>
@@ -426,6 +438,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     <button class="tab-btn active" id="btn_tab_op" onclick="switchTab('op')">📱 Operación</button>
     <button class="tab-btn" id="btn_tab_adm" onclick="switchTab('adm')">⚙️ Administrador</button>
     <button class="tab-btn" id="btn_tab_gra" onclick="switchTab('gra')">📈 Gráficos</button>
+    <button class="tab-btn" id="btn_tab_man" onclick="switchTab('man')">🛠️ Mantenimiento</button>
   </nav>
 
   <!-- ========================================================================= -->
@@ -703,6 +716,93 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
   </div>
 
   <!-- ========================================================================= -->
+  <!-- 4. VISTA MANTENIMIENTO PREVENTIVO (PROTECCIÓN DE MANGUERA Y EQUIPO)        -->
+  <!-- ========================================================================= -->
+  <div class="view" id="tab_man">
+
+    <!-- ALERTA TÉCNICA ROTURA DE MANGUERA -->
+    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; border-radius: 8px; padding: 10px; margin-bottom: 12px; font-size: 11px; line-height: 1.4; color: #fca5a5;">
+      <b>⚠️ PREVENCIÓN DE FALLA POR DESUSO:</b> La compresión estática continua de los rodillos sobre mangueras secas (sin lubricación con grasa de silicona) produce adherencia interna de paredes, pérdida de resiliencia ("compression set") y desgarro por fatiga mecánica al arrancar. Utilice los ciclos de vaivén y el guardián de reposo.
+    </div>
+
+    <!-- TARJETA 1: CICLO DE VAIVÉN PREVENTIVO -->
+    <div class="card">
+      <div class="card-title">🔄 CICLO DE VAIVÉN PREVENTIVO (ANTI-SEQUEDAD)</div>
+      <div style="font-size:11px; color:var(--muted); line-height:1.4;">
+        Oscila suavemente los rodillos en vaivén (2.5 rev adelante / pausa / 2.5 rev atrás a 25 RPM). Masajea el elastómero, despega paredes internas y redistribuye la grasa lubricante con <b>caudal neto 0 mL</b>.
+      </div>
+      <div class="vaiven-box">
+        <div class="vaiven-status" id="man_status_txt">Inactivo</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">Tiempo restante: <b id="man_t_rest" style="color:#fff">0</b> s</div>
+        <button class="btn btn-primary" id="btn_vaiven" style="width:100%; padding:12px; font-size:13px;" onclick="toggleVaiven()">▶️ Iniciar Ciclo de Vaivén (60s)</button>
+      </div>
+      <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="chk_guardian" onchange="toggleGuardian(this.checked)" style="transform:scale(1.2); cursor:pointer;">
+        <label for="chk_guardian" style="font-size:11px; color:#cbd5e1; cursor:pointer;">
+          <b>🛡️ Guardián Standby Activo:</b> Mover rodillos 120° tras cada 2h de reposo para cambiar puntos de contacto.
+        </label>
+      </div>
+    </div>
+
+    <!-- TARJETA 2: JOGGING MANUAL PARA MANTENIMIENTO / CAMBIO DE MANGUERA -->
+    <div class="card">
+      <div class="card-title">🕹️ JOGGING MANUAL (POSICIONADOR DE RODILLOS)</div>
+      <div style="font-size:11px; color:var(--muted); line-height:1.4;">
+        Avanza o retrocede lentamente a 18 RPM para colocar grasa de silicona grado médico o facilitar el enhebrado de una nueva manguera peristáltica en el cabezal.
+      </div>
+      <div class="jog-grid">
+        <button class="btn-jog" onmousedown="jogStart(false)" onmouseup="jogStop()" ontouchstart="jogStart(false)" ontouchend="jogStop()">⏪ Jog Atrás (18 RPM)</button>
+        <button class="btn-jog" onmousedown="jogStart(true)" onmouseup="jogStop()" ontouchstart="jogStart(true)" ontouchend="jogStop()">Jog Adelante ⏩ (18 RPM)</button>
+      </div>
+    </div>
+
+    <!-- TARJETA 3: HORÍMETRO DE VIDA ÚTIL DE MANGUERA -->
+    <div class="card">
+      <div class="card-title">⏳ HORÍMETRO Y VIDA ÚTIL DE MANGUERA</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+        <div style="font-size:12px; color:var(--muted)">Horas de marcha acumuladas:</div>
+        <div style="font-size:16px; font-weight:800; color:#38bdf8"><span id="man_hrs">0.0</span> / <span id="man_max_hrs">150.0</span> h</div>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="man_hrs_bar"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:9px; color:var(--muted); margin-top:2px;">
+        <span>0 h (Nueva)</span>
+        <span>100 h (Inspección)</span>
+        <span>150 h (Límite fatiga)</span>
+      </div>
+      <button class="btn btn-secondary" style="margin-top:10px; width:100%; font-size:11px;" onclick="resetHorasManguera()">🔄 Resetear Contador al Cambiar Manguera</button>
+    </div>
+
+    <!-- TARJETA 4: PROTOCOLO TÉCNICO OFICIAL DE MANTENIMIENTO PREVENTIVO (UNSa 2026) -->
+    <div class="card">
+      <div class="card-title">📋 PROTOCOLO DE MANTENIMIENTO PREVENTIVO (UNSa)</div>
+      <div class="protocol-step">
+        <div class="protocol-num">1</div>
+        <div><b>Desoclusión Inmediata tras Ensayo:</b> Abrir la palanca o leva del cabezal para retirar la presión de los rodillos sobre la manguera durante el reposo.</div>
+      </div>
+      <div class="protocol-step">
+        <div class="protocol-num">2</div>
+        <div><b>Lubricación Periódica Externa:</b> Aplicar una película fina de grasa de silicona pura (Dow Corning 111 / Molykote 111) sobre la cara externa de la manguera y los rodillos cada 40 horas de bombeo.</div>
+      </div>
+      <div class="protocol-step">
+        <div class="protocol-num">3</div>
+        <div><b>Enjuague y Lavado Químico CIP:</b> Recircular agua destilada post-filtración para barrer sales y biomasa; aplicar solución de NaOCl 50 ppm o NaOH 0.05M ante fouling persistente.</div>
+      </div>
+      <div class="protocol-step">
+        <div class="protocol-num">4</div>
+        <div><b>Preservación de Membrana FX100:</b> Rellenar el módulo con solución de metabisulfito de sodio (Na2S2O5) al 1% p/v, sellar bocas y refrigerar a 4-8 °C para prevenir biocrecimiento.</div>
+      </div>
+      <div class="protocol-step">
+        <div class="protocol-num">5</div>
+        <div><b>Inspección de Caudalímetros YF-S401:</b> Enjuagar a contracorriente con agua desmineralizada para expulsar suciedad o sedimentos que frenen las microturbinas.</div>
+      </div>
+    </div>
+
+    <div class="footer">Tesis UNSa 2026 • Módulo de Mantenimiento Preventivo y Confiabilidad Operativa</div>
+  </div>
+
+  <!-- ========================================================================= -->
   <!-- JAVASCRIPT HMI ENGINE                                                    -->
   <!-- ========================================================================= -->
   <script>
@@ -721,7 +821,7 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     // Cambiar Pestañas
     function switchTab(t) {
       currentTab = t;
-      ['op', 'adm', 'gra'].forEach(k => {
+      ['op', 'adm', 'gra', 'man'].forEach(k => {
         $('tab_' + k).classList.toggle('active', k === t);
         $('btn_tab_' + k).classList.toggle('active', k === t);
       });
@@ -735,6 +835,41 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       el.style.borderColor = isError ? '#ef4444' : '#818cf8';
       el.style.display = 'block';
       setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    // =========================================================================
+    // MODO MANTENIMIENTO PREVENTIVO
+    // =========================================================================
+    let vaivenActivo = false;
+
+    function toggleVaiven() {
+      if (vaivenActivo) {
+        cmd('MANT_VAIVEN_STOP');
+        showToast('Vaivén preventivo detenido.');
+      } else {
+        cmd('MANT_VAIVEN_START');
+        showToast('Iniciando ciclo de vaivén preventivo (60s)...');
+      }
+    }
+
+    function jogStart(fwd) {
+      cmd(fwd ? 'MANT_JOG_FWD' : 'MANT_JOG_REV');
+    }
+
+    function jogStop() {
+      cmd('MANT_JOG_STOP');
+    }
+
+    function toggleGuardian(enable) {
+      cmd(enable ? 'GUARDIAN_ON' : 'GUARDIAN_OFF');
+      showToast(enable ? 'Guardián Standby activado.' : 'Guardián Standby desactivado.');
+    }
+
+    function resetHorasManguera() {
+      if (confirm('¿Confirmar reinicio de horas de manguera a 0.0 h tras reemplazarla?')) {
+        cmd('RESET_HORAS_MANGUERA');
+        showToast('Horímetro de manguera reiniciado a 0.0 h.');
+      }
     }
 
     // =========================================================================
@@ -1063,6 +1198,31 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
               </tr>`;
             });
             tb.innerHTML = trHtml;
+          }
+        }
+
+        // Actualizar datos de Mantenimiento
+        if ($('man_status_txt')) {
+          $('man_status_txt').innerText = d.mant_txt || 'Inactivo';
+          $('man_t_rest').innerText = d.mant_t_rest || 0;
+          vaivenActivo = (d.mant_modo === 1);
+          const bV = $('btn_vaiven');
+          if (vaivenActivo) {
+            bV.innerText = `⏹️ Detener Vaivén (${d.mant_t_rest}s)`;
+            bV.style.background = '#dc2626';
+          } else {
+            bV.innerText = '▶️ Iniciar Ciclo de Vaivén (60s)';
+            bV.style.background = '';
+          }
+
+          $('man_hrs').innerText = d.hrs_mang ? d.hrs_mang.toFixed(1) : '0.0';
+          $('man_max_hrs').innerText = d.max_hrs_mang ? d.max_hrs_mang.toFixed(0) : '150';
+          const maxH = d.max_hrs_mang || 150;
+          const pctHrs = Math.min(100, ((d.hrs_mang || 0) / maxH) * 100);
+          $('man_hrs_bar').style.width = pctHrs + '%';
+
+          if ($('chk_guardian') && document.activeElement !== $('chk_guardian')) {
+            $('chk_guardian').checked = d.guardian_sb;
           }
         }
       } catch (err) {

@@ -271,6 +271,13 @@ float tempMax_C           = 35.0f;      // Límite temperatura máxima (membrana
 float tmpMax_bar          = 0.60f;      // Límite PTM máxima
 bool  autoParadaLimites   = false;      // Parada preventiva automática si se sobrepasan límites
 
+// Parámetros y Monitoreo de Mantenimiento Preventivo
+float    horasManguera             = 0.0f;   // Horas de marcha acumuladas de la manguera peristáltica
+uint32_t segundosMangueraAcum      = 0;      // Acumulador de segundos para el horímetro
+bool     guardianStandby           = true;   // Desplazamiento periódico de rodillos en reposo para evitar aplastamiento
+uint32_t tUltimaActividadBomba_ms  = 0;      // Timestamp para reposo del Guardián Standby
+constexpr float HORAS_MAX_MANGUERA = 150.0f; // Umbral de fatiga y fatiga superficial recomendada
+
 // ------------------------------------------------------------------------------
 // GESTIÓN DE PREFERENCES (MEMORIA FLASH NVS CON AUTO-SANACIÓN)
 // ------------------------------------------------------------------------------
@@ -314,6 +321,11 @@ void cargarParametrosNVS() {
   tempMax_C         = prefs.getFloat("temp_max", 35.0f);
   tmpMax_bar        = prefs.getFloat("tmp_max", 0.60f);
   autoParadaLimites = prefs.getBool("auto_stop", false);
+
+  horasManguera     = prefs.getFloat("hrs_mang", 0.0f);
+  if (!std::isfinite(horasManguera) || horasManguera < 0.0f) horasManguera = 0.0f;
+  guardianStandby   = prefs.getBool("guard_sb", true);
+  tUltimaActividadBomba_ms = millis();
 
   bool actualizarNvs = (ver != VERSION_CALIBRACION);
   if (!std::isfinite(ka) || ka < 50.0f || ka > 500.0f || actualizarNvs) { ka = K_ALIMENTACION; actualizarNvs = true; }
@@ -517,7 +529,7 @@ void handleStatus() {
   uint8_t prog = (uint8_t)((autoCalMuestras * 100) / MUESTRAS_AUTO_CAL);
   if (prog > 100) prog = 100;
 
-  char buf[2048];
+  char buf[2560];
   bool sobreQMax = (qAlimEfectivo_mLmin > qAlimMax_mLmin);
   bool subQMin   = (qAlimMin_mLmin > 5.0f && bomba.enMarcha() && bomba.enRegimenEstable() && qAlimEfectivo_mLmin < qAlimMin_mLmin);
   bool sobreTemp = (temp_agua_C > tempMax_C);
@@ -542,6 +554,7 @@ void handleStatus() {
     "\"q_max\":%.1f,\"q_min\":%.1f,\"temp_max\":%.1f,\"tmp_max\":%.2f,\"auto_stop\":%s,"
     "\"lim_q_excedido\":%s,\"lim_temp_excedido\":%s,\"lim_tmp_excedido\":%s,"
     "\"auto_cal\":%s,\"auto_cal_prog\":%u,\"auto_cal_res\":\"%s\","
+    "\"mant_modo\":%d,\"mant_txt\":\"%s\",\"mant_t_rest\":%lu,\"guardian_sb\":%s,\"hrs_mang\":%.1f,\"max_hrs_mang\":%.1f,"
     "\"n_logs\":%u,\"ensayo_act\":%u,\"t_ensayo_s\":%lu,"
     "\"heap\":%u,\"maxblk\":%u,"
     "\"ensayos\":[",
@@ -584,6 +597,8 @@ void handleStatus() {
     sobreTemp ? "true" : "false",
     sobreTMP ? "true" : "false",
     autoCalibrando ? "true" : "false", prog, autoCalMensaje.c_str(),
+    (int)bomba.modoMantenimiento(), bomba.estadoMantenimientoStr(), (unsigned long)bomba.tiempoRestanteVaiven_s(),
+    guardianStandby ? "true" : "false", horasManguera, HORAS_MAX_MANGUERA,
     (unsigned)bufferCount, (unsigned)ensayoActualId, (unsigned long)t_act_s,
     ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT)
   );
@@ -638,6 +653,31 @@ void handleCmd() {
     bomba.paradaEmergencia();
   } else if (act == "REARM") {
     bomba.rearmarEmergencia();
+  } else if (act == "MANT_VAIVEN_START") {
+    bomba.iniciarVaiven(60);
+    tUltimaActividadBomba_ms = millis();
+  } else if (act == "MANT_VAIVEN_STOP") {
+    bomba.detenerMantenimiento();
+    tUltimaActividadBomba_ms = millis();
+  } else if (act == "MANT_JOG_FWD") {
+    bomba.iniciarJog(true);
+    tUltimaActividadBomba_ms = millis();
+  } else if (act == "MANT_JOG_REV") {
+    bomba.iniciarJog(false);
+    tUltimaActividadBomba_ms = millis();
+  } else if (act == "MANT_JOG_STOP") {
+    bomba.detenerJog();
+    tUltimaActividadBomba_ms = millis();
+  } else if (act == "GUARDIAN_ON") {
+    guardianStandby = true;
+    prefs.putBool("guard_sb", true);
+  } else if (act == "GUARDIAN_OFF") {
+    guardianStandby = false;
+    prefs.putBool("guard_sb", false);
+  } else if (act == "RESET_HORAS_MANGUERA") {
+    horasManguera = 0.0f;
+    segundosMangueraAcum = 0;
+    prefs.putFloat("hrs_mang", 0.0f);
   } else if (act == "MODO_SECO_ON") {
     sensorPermeado.setModoSeco(true);
     sensorAlimentacion.setModoSeco(true);
@@ -1237,12 +1277,12 @@ void loop() {
 
     bool enMarcha = bomba.enMarcha();
 
-    if (enMarcha && !bombaEnMarchaAnterior) {
+    if (enMarcha && !bombaEnMarchaAnterior && !bomba.enMantenimiento()) {
       iniciarNuevoEnsayo(bomba.rpmObjetivo());
       registroEnsayos.iniciar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
     }
 
-    if (!enMarcha && bombaEnMarchaAnterior) {
+    if (!enMarcha && bombaEnMarchaAnterior && !bomba.enMantenimiento()) {
       finalizarEnsayoActual();
       registroEnsayos.finalizar(sensorAlimentacion, sensorPermeado, bomba.rpmActual());
     }
@@ -1253,6 +1293,27 @@ void loop() {
   // 2. Adquisición en tiempo real y cálculo de merma por torta cada 1000 ms (1 segundo)
   if (tAhora - tCaudal >= 1000) {
     tCaudal = tAhora;
+
+    // Actualización de horímetro y standby de manguera
+    if (bomba.rpmActual() > 1.0f) {
+      tUltimaActividadBomba_ms = millis();
+      segundosMangueraAcum++;
+      if (segundosMangueraAcum >= 60) {
+        segundosMangueraAcum = 0;
+        horasManguera += (1.0f / 60.0f);
+        static uint8_t minGuardar = 0;
+        if (++minGuardar >= 10) {
+          minGuardar = 0;
+          prefs.putFloat("hrs_mang", horasManguera);
+        }
+      }
+    } else if (guardianStandby && !bomba.enEmergencia() && !bomba.enMantenimiento() && !bomba.enMarcha()) {
+      if (millis() - tUltimaActividadBomba_ms >= 7200000UL) { // 2 horas de reposo
+        tUltimaActividadBomba_ms = millis();
+        bomba.ejecutarGuardianShift();
+        Serial.println(F("[MANTENIMIENTO] Guardián Standby: Rotación preventiva de 120° ejecutada para aliviar compresión estática."));
+      }
+    }
 
     // Lectura asíncrona no bloqueante de la sonda DS18B20 en GPIO 4 (D4) con filtro anti-parpadeo
     static uint8_t fallosConsecutivosDS18 = 0;

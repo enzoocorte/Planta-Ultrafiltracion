@@ -33,6 +33,7 @@ void Bomba::begin() {
 
 void Bomba::arrancar() {
   _enEmergencia = false;      // Desbloqueo ante orden de arranque
+  _modoMantenimiento = MANT_INACTIVO;
   _enMarcha = true;
   _tDetenido_ms = 0;
   digitalWrite(PIN_ENA, LOW); // Activa driver
@@ -45,6 +46,7 @@ void Bomba::arrancar() {
 void Bomba::detener() {
   _enMarcha = false;
   _invirtiendo = false;
+  _modoMantenimiento = MANT_INACTIVO;
   if (_objetivo >= RPM_MIN) {
     _rpmGuardada = _objetivo;
   }
@@ -62,6 +64,7 @@ void Bomba::detener() {
 
 void Bomba::paradaEmergencia() {
   _enEmergencia = true;
+  _modoMantenimiento = MANT_INACTIVO;
   digitalWrite(PIN_ENA, HIGH); // Corte fisico instantaneo en driver DM860 (< 1 ms)
   _enMarcha = false;
   _invirtiendo = false;
@@ -77,13 +80,94 @@ void Bomba::paradaEmergencia() {
 
 void Bomba::rearmarEmergencia() {
   _enEmergencia = false;
+  _modoMantenimiento = MANT_INACTIVO;
   digitalWrite(PIN_ENA, LOW); // Restablece habilitacion de potencia
   _actual = 0.0f;
   _objetivo = (_rpmGuardada >= RPM_MIN) ? _rpmGuardada : RPM_INICIO;
 }
 
+// ------------------------------------------------------------------------------
+// GESTIÓN DE MODO MANTENIMIENTO PREVENTIVO
+// ------------------------------------------------------------------------------
+void Bomba::iniciarVaiven(uint32_t duracion_s) {
+  if (_enEmergencia) return;
+  _modoMantenimiento = MANT_VAIVEN;
+  _tFinVaiven_ms = millis() + (duracion_s * 1000UL);
+  _tFaseVaiven_ms = millis();
+  _faseVaiven = 0;
+  _enMarcha = true;
+  _invirtiendo = false;
+  digitalWrite(PIN_ENA, LOW);
+  _tEnable_ms = millis();
+  fijarSentido(true); // Arranca adelante
+  _actual = RPM_DESPEGUE;
+  _objetivo = 25.0f;  // 25 RPM velocidad controlada para relubricación y flexión
+}
+
+void Bomba::detenerMantenimiento() {
+  _modoMantenimiento = MANT_INACTIVO;
+  detener();
+}
+
+void Bomba::iniciarJog(bool adelante) {
+  if (_enEmergencia) return;
+  _modoMantenimiento = adelante ? MANT_JOG_FWD : MANT_JOG_REV;
+  _enMarcha = true;
+  _invirtiendo = false;
+  digitalWrite(PIN_ENA, LOW);
+  _tEnable_ms = millis();
+  fijarSentido(adelante);
+  _actual = RPM_DESPEGUE;
+  _objetivo = 18.0f;  // 18 RPM para arrastre suave y seguro en cambio de manguera
+}
+
+void Bomba::detenerJog() {
+  if (_modoMantenimiento == MANT_JOG_FWD || _modoMantenimiento == MANT_JOG_REV) {
+    detenerMantenimiento();
+  }
+}
+
+void Bomba::ejecutarGuardianShift() {
+  if (_enEmergencia || _enMarcha) return;
+  _modoMantenimiento = MANT_GUARDIAN_SHIFT;
+  _tFinVaiven_ms = millis() + 1200; // 1.2 segundos a 18 RPM = ~130° de rotación
+  _enMarcha = true;
+  _invirtiendo = false;
+  digitalWrite(PIN_ENA, LOW);
+  _tEnable_ms = millis();
+  fijarSentido(true);
+  _actual = RPM_DESPEGUE;
+  _objetivo = 18.0f;
+}
+
+uint32_t Bomba::tiempoRestanteVaiven_s() const {
+  if (_modoMantenimiento != MANT_VAIVEN) return 0;
+  uint32_t now = millis();
+  if (now >= _tFinVaiven_ms) return 0;
+  return (uint32_t)((_tFinVaiven_ms - now) / 1000UL);
+}
+
+const char* Bomba::estadoMantenimientoStr() const {
+  switch (_modoMantenimiento) {
+    case MANT_VAIVEN:
+      if (_faseVaiven == 0) return "Vaivén: Avanzando (+)";
+      if (_faseVaiven == 1) return "Vaivén: Pausa intermedia";
+      if (_faseVaiven == 2) return "Vaivén: Retornando (-)";
+      if (_faseVaiven == 3) return "Vaivén: Pausa intermedia";
+      return "Vaivén Activo";
+    case MANT_JOG_FWD:
+      return "Jog Adelante (+)";
+    case MANT_JOG_REV:
+      return "Jog Atrás (-)";
+    case MANT_GUARDIAN_SHIFT:
+      return "Guardián Standby: Rotación 120°";
+    default:
+      return "Inactivo";
+  }
+}
+
 bool Bomba::setRPM(float rpm) {
-  if (!std::isfinite(rpm) || _enEmergencia) return false;
+  if (!std::isfinite(rpm) || _enEmergencia || _modoMantenimiento != MANT_INACTIVO) return false;
   float r = constrain(rpm, RPM_MIN, RPM_MAX);
   if (_invirtiendo) {
     _rpmGuardada = r;   // Almacena consigna si el usuario mueve el slider durante el frenado de inversión
@@ -139,6 +223,60 @@ void Bomba::tick(float dt) {
   } else if (_enMarcha) {
     _tDetenido_ms = 0;
     digitalWrite(PIN_ENA, LOW); // Mantener habilitado con torque activo
+  }
+
+  // Máquina de estados de Modo Mantenimiento
+  if (_modoMantenimiento == MANT_VAIVEN) {
+    if (millis() >= _tFinVaiven_ms) {
+      detenerMantenimiento();
+      return;
+    }
+    uint32_t dtFase = millis() - _tFaseVaiven_ms;
+    if (_faseVaiven == 0) { // Avanza (2.5s)
+      fijarSentido(true);
+      _objetivo = 25.0f;
+      if (dtFase >= 2500) {
+        _faseVaiven = 1;
+        _tFaseVaiven_ms = millis();
+        _objetivo = 0.0f;
+      }
+    } else if (_faseVaiven == 1) { // Pausa (0.8s)
+      _objetivo = 0.0f;
+      if (dtFase >= 800) {
+        _faseVaiven = 2;
+        _tFaseVaiven_ms = millis();
+        fijarSentido(false);
+        _objetivo = 25.0f;
+      }
+    } else if (_faseVaiven == 2) { // Retrocede (2.5s)
+      fijarSentido(false);
+      _objetivo = 25.0f;
+      if (dtFase >= 2500) {
+        _faseVaiven = 3;
+        _tFaseVaiven_ms = millis();
+        _objetivo = 0.0f;
+      }
+    } else { // Pausa (0.8s)
+      _objetivo = 0.0f;
+      if (dtFase >= 800) {
+        _faseVaiven = 0;
+        _tFaseVaiven_ms = millis();
+        fijarSentido(true);
+        _objetivo = 25.0f;
+      }
+    }
+  } else if (_modoMantenimiento == MANT_GUARDIAN_SHIFT) {
+    if (millis() >= _tFinVaiven_ms) {
+      detenerMantenimiento();
+      return;
+    }
+    _objetivo = 18.0f;
+  } else if (_modoMantenimiento == MANT_JOG_FWD) {
+    fijarSentido(true);
+    _objetivo = 18.0f;
+  } else if (_modoMantenimiento == MANT_JOG_REV) {
+    fijarSentido(false);
+    _objetivo = 18.0f;
   }
 
   float objetivo = _enMarcha ? _objetivo : 0.0f;
