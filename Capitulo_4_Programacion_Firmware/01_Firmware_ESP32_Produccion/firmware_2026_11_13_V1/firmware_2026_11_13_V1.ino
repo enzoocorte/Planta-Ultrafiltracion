@@ -1162,7 +1162,7 @@ void setup() {
   pinMode(PIN_PUL, OUTPUT);
   digitalWrite(PIN_PUL, LOW);  // Pin de pulsos amarrado a GND sin oscilación ni glitches
   pinMode(PIN_DIR, OUTPUT);
-  digitalWrite(PIN_DIR, LOW);  // Dirección predeterminada (Horario / Filtración)
+  digitalWrite(PIN_DIR, HIGH);  // Dirección predeterminada (Horario / Filtración)
 
   Serial.begin(115200);
   delay(500);
@@ -1214,7 +1214,7 @@ void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.setSleep(false);
   esp_wifi_set_ps(WIFI_PS_NONE); // Fuerza cero reposo de radio en ESP-IDF (evita caídas tras 30 min)
-  WiFi.setTxPower(WIFI_POWER_17dBm); // Potencia estable sin sobrecalentamiento térmico del LDO
+  WiFi.setTxPower(WIFI_POWER_15dBm); // Potencia estable de bajo pico de corriente (evita brownout en Step-Down/LDO)
 
   IPAddress local_IP(192, 168, 4, 1);
   IPAddress gateway(192, 168, 4, 1);

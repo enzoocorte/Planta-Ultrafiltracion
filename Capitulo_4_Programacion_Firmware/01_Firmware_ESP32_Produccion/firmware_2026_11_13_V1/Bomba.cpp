@@ -8,7 +8,7 @@
 
 void Bomba::begin() {
   pinMode(PIN_DIR, OUTPUT);
-  digitalWrite(PIN_DIR, LOW);
+  digitalWrite(PIN_DIR, HIGH);
   fijarSentido(true); // Sentido horario por defecto (Filtración)
 
   pinMode(PIN_ENA, OUTPUT);
@@ -191,8 +191,8 @@ void Bomba::toggleSentido() {
 
 void Bomba::fijarSentido(bool horario) {
   _horario = horario;
-  // Polaridad física validada en banco: LOW = Horario (Filtración), HIGH = Antihorario (Retrolavado)
-  digitalWrite(PIN_DIR, horario ? LOW : HIGH);
+  // Polaridad física validada en banco: HIGH = Horario (Filtración), LOW = Antihorario (Retrolavado)
+  digitalWrite(PIN_DIR, horario ? HIGH : LOW);
 }
 
 void Bomba::tick(float dt) {
