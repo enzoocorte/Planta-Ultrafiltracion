@@ -19,8 +19,8 @@ constexpr uint8_t PIN_ENA                = 23;  // DM860 ENA+ (ENA- a GND: HIGH 
 constexpr uint8_t PIN_LED_BOMBA          = 2;   // LED Azul Onboard (indicador de marcha)
 
 // Caudalímetros de Efecto Hall YF-S401 (Pull-up externo 4.7k a 3.3V en bornera verde)
-constexpr uint8_t PIN_SENSOR_ALIMENTACION = 14;  // Sensor de Alimentación (Borne 12 Sup - D14)
-constexpr uint8_t PIN_SENSOR_PERMEADO     = 27;  // Sensor de Permeado (Borne 11 Sup - D27)
+constexpr uint8_t PIN_SENSOR_ALIMENTACION = 27;  // Sensor de Alimentación único físico (P27 / D27)
+constexpr uint8_t PIN_SENSOR_PERMEADO     = 14;  // Sensor de Permeado (no conectado / bloqueado por software)
 
 // Sensor de Temperatura Sumergible DS18B20 (Protocolo 1-Wire con Pull-up 4.7k a 3.3V)
 constexpr uint8_t PIN_SENSOR_TEMP_DS18B20 = 4;   // Sonda Temperatura DS18B20 (Borne 8 Inf - D4)

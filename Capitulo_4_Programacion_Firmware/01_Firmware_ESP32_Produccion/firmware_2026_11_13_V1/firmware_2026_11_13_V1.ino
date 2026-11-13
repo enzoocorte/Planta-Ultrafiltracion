@@ -24,6 +24,9 @@
 
 #include <WiFi.h>
 #include <esp_wifi.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#include "esp_system.h"
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <DNSServer.h>
@@ -1156,6 +1159,9 @@ void handleExportMetrologia() {
 // SETUP DEL MICROCONTROLADOR ESP32
 // ------------------------------------------------------------------------------
 void setup() {
+  // Evita reinicios espureos por micro-caidas de tension (EMI / resonancia del driver a 50 RPM)
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
   // P0-1: Driver deshabilitado y líneas de control seguras desde el primer instante físico
   pinMode(PIN_ENA, OUTPUT);
   digitalWrite(PIN_ENA, HIGH); // Driver deshabilitado inicialmente durante bootloader y conexión WiFi
@@ -1167,7 +1173,8 @@ void setup() {
   Serial.begin(115200);
   delay(500);
 
-  Serial.println("\n==================================================");
+  Serial.printf("\n[BOOT] Motivo ultimo reinicio (esp_reset_reason): %d\n", (int)esp_reset_reason());
+  Serial.println("==================================================");
   Serial.println(" PLANTA PILOTO DE ULTRAFILTRACIÓN FX100 — UNSa   ");
   Serial.println(" Monitoreo en Tiempo Real de Formación de Torta   ");
   Serial.println("==================================================");
