@@ -23,6 +23,7 @@
  * ============================================================================== */
 
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <DNSServer.h>
@@ -1161,7 +1162,7 @@ void setup() {
   pinMode(PIN_PUL, OUTPUT);
   digitalWrite(PIN_PUL, LOW);  // Pin de pulsos amarrado a GND sin oscilación ni glitches
   pinMode(PIN_DIR, OUTPUT);
-  digitalWrite(PIN_DIR, HIGH); // Dirección predeterminada (Horario / Filtración - Invertido V1)
+  digitalWrite(PIN_DIR, LOW);  // Dirección predeterminada (Horario / Filtración)
 
   Serial.begin(115200);
   delay(500);
@@ -1203,11 +1204,17 @@ void setup() {
 
   cargarParametrosNVS();
 
-  WiFi.disconnect(true);
+  // Planta con 1 solo caudalímetro físico (Alimentación en GPIO 14):
+  // Se bloquea por defecto el canal de Permeado (GPIO 27) para evitar ruido EMI / falsas alarmas.
+  sensorPermeado.setBloqueado(true);
+
+  WiFi.persistent(false);
+  WiFi.disconnect(true, true);
   delay(100);
   WiFi.mode(WIFI_AP);
   WiFi.setSleep(false);
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  esp_wifi_set_ps(WIFI_PS_NONE); // Fuerza cero reposo de radio en ESP-IDF (evita caídas tras 30 min)
+  WiFi.setTxPower(WIFI_POWER_17dBm); // Potencia estable sin sobrecalentamiento térmico del LDO
 
   IPAddress local_IP(192, 168, 4, 1);
   IPAddress gateway(192, 168, 4, 1);
@@ -1443,6 +1450,19 @@ void loop() {
     tDatalogger = tAhora;
     if (bombaGirandoReal()) {
       guardarMuestraDatalogger();
+    }
+  }
+
+  // 4. Supervisor / Watchdog Wi-Fi AP cada 15 segundos (recupera el SSID ante glitches RF o calor)
+  static uint32_t tWifiWatchdog = 0;
+  if (tAhora - tWifiWatchdog >= 15000) {
+    tWifiWatchdog = tAhora;
+    if ((WiFi.getMode() & WIFI_AP) == 0 || WiFi.softAPIP()[0] == 0) {
+      Serial.println(F("[WIFI WATCHDOG] AP inactivo detectado. Reactivando Punto de Acceso..."));
+      WiFi.mode(WIFI_AP);
+      WiFi.setSleep(false);
+      esp_wifi_set_ps(WIFI_PS_NONE);
+      WiFi.softAP(SSID_AP, nullptr, 1, 0, 4);
     }
   }
 
