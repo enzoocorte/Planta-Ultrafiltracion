@@ -31,6 +31,7 @@
 #include <ESPmDNS.h>
 #include <DNSServer.h>
 #include <Preferences.h>
+#include <Update.h>
 #include "config.h"
 #include "caudalimetro.h"
 #include "registro_ensayos.h"
@@ -1256,6 +1257,53 @@ void setup() {
   server.on("/export_csv", HTTP_GET, handleExportCSV);
   server.on("/export_metrologia", HTTP_GET, handleExportMetrologia);
   server.on("/clear_csv", HTTP_GET, handleClearCSV);
+
+  // Carga inalámbrica de firmware (OTA HTTP vía Wi-Fi desde Modo Administración)
+  static String otaError = "";
+  server.on("/update", HTTP_POST, []() {
+    bool ok = (!Update.hasError() && otaError.length() == 0);
+    server.sendHeader("Connection", "close");
+    if (ok) {
+      server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Firmware cargado. Reiniciando ESP32...\"}");
+      Serial.println(F("[OTA] Actualizacion exitosa. Reiniciando ESP32..."));
+      delay(400);
+      ESP.restart();
+    } else {
+      String errMsg = otaError.length() > 0 ? otaError : String(Update.errorString());
+      server.send(500, "application/json", "{\"ok\":false,\"err\":\"" + errMsg + "\"}");
+      Serial.printf("[OTA ERROR] %s\n", errMsg.c_str());
+    }
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+      otaError = "";
+      bomba.paradaEmergencia(); // Corte de seguridad antes de escribir memoria Flash
+      Serial.printf("[OTA] Iniciando carga inalambrica: %s\n", upload.filename.c_str());
+      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+        otaError = Update.errorString();
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (otaError.length() == 0) {
+        if (upload.totalSize == 0 && upload.currentSize > 0 && upload.buf[0] != 0xE9) {
+          otaError = "Archivo invalido: sube el binario compilado (.ino.bin), no el .ino de texto";
+          Update.abort();
+        } else if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+          otaError = Update.errorString();
+        }
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (otaError.length() == 0) {
+        if (!Update.end(true)) {
+          otaError = Update.errorString();
+        }
+      } else {
+        Update.abort();
+      }
+    } else if (upload.status == UPLOAD_FILE_ABORTED) {
+      Update.abort();
+      otaError = "Carga abortada por el cliente";
+    }
+  });
 
   server.on("/generate_204", HTTP_GET, handleCaptivePortal);
   server.on("/gen_204", HTTP_GET, handleCaptivePortal);

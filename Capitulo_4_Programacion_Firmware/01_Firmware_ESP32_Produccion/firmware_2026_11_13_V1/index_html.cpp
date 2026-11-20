@@ -685,6 +685,24 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
       </p>
     </div>
 
+    <!-- TARJETA OTA: CARGA DE ARCHIVO .INO / .BIN POR WI-FI -->
+    <div class="card" style="border-color: rgba(56, 189, 248, 0.35);">
+      <div class="card-title" style="color:#38bdf8">📡 Carga de Archivo .ino (OTA por Wi-Fi)</div>
+      <p style="font-size:11px; color:var(--muted); line-height:1.4; margin-bottom:10px;">
+        Subí la nueva versión del firmware de forma inalámbrica sin cable USB.<br>
+        En Arduino IDE: <b>Programa → Exportar binarios compilados</b> y seleccioná el archivo <code>.ino.bin</code>. La bomba se detendrá automáticamente durante la actualización.
+      </p>
+      <div class="field-row" style="margin-bottom:8px;">
+        <label style="font-size:12px;">Archivo binario (.ino.bin)</label>
+        <input type="file" id="ota_file" accept=".bin,.ino" style="flex:1; max-width:240px; font-size:11px; color:var(--text);">
+      </div>
+      <div id="ota_bar_wrap" style="display:none; background:#1e293b; border-radius:6px; height:10px; overflow:hidden; margin-bottom:8px;">
+        <div id="ota_bar" style="width:0%; height:100%; background:linear-gradient(90deg, #0284c7, #10b981); transition:width 0.2s;"></div>
+      </div>
+      <div id="ota_status" style="font-size:11px; color:var(--muted); margin-bottom:8px;"></div>
+      <button class="btn-save" id="btn_ota" style="background:linear-gradient(135deg, #0284c7, #0369a1);" onclick="subirFirmwareOTA()">🚀 Subir y Actualizar por Wi-Fi</button>
+    </div>
+
   </div>
 
   <!-- ========================================================================= -->
@@ -1047,6 +1065,65 @@ const char INDEX_HTML[] PROGMEM = R"html(<!DOCTYPE html>
     function limpiarRegistros() {
       if (!confirm('¿Borrar todos los ensayos de la memoria de la planta?')) return;
       fetch('/clear_csv').then(() => showToast('Memoria de registros limpiada.'));
+    }
+
+    function subirFirmwareOTA() {
+      const inp = $('ota_file');
+      const stEl = $('ota_status');
+      const barWrap = $('ota_bar_wrap');
+      const bar = $('ota_bar');
+      const btn = $('btn_ota');
+      if (!inp || !inp.files || !inp.files.length) {
+        showToast('Seleccioná primero el archivo .ino.bin compilado.', true);
+        return;
+      }
+      const file = inp.files[0];
+      if (file.name.toLowerCase().endsWith('.ino')) {
+        showToast('Seleccionaste un .ino de texto. Exportá en Arduino IDE: Programa → Exportar binarios compilados (.ino.bin).', true);
+        stEl.innerText = '⚠️ Debe ser el archivo compilado .ino.bin (no el .ino de texto).';
+        stEl.style.color = '#f59e0b';
+        return;
+      }
+      if (!confirm('¿Actualizar firmware por Wi-Fi con "' + file.name + '"? La bomba se detendrá y el ESP32 se reiniciará.')) return;
+
+      const fd = new FormData();
+      fd.append('update', file, file.name);
+      const xhr = new XMLHttpRequest();
+      barWrap.style.display = 'block';
+      bar.style.width = '0%';
+      btn.disabled = true;
+      stEl.style.color = '#38bdf8';
+      stEl.innerText = 'Subiendo firmware al ESP32... 0%';
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const pct = Math.round((e.loaded / e.total) * 100);
+          bar.style.width = pct + '%';
+          stEl.innerText = 'Subiendo firmware al ESP32... ' + pct + '%';
+        }
+      };
+      xhr.onload = () => {
+        btn.disabled = false;
+        if (xhr.status === 200) {
+          bar.style.width = '100%';
+          stEl.style.color = '#10b981';
+          stEl.innerText = '✅ Firmware cargado con éxito. Reiniciando ESP32 (reconectá al Wi-Fi en ~10s)...';
+          showToast('Firmware actualizado. Reiniciando ESP32...');
+          setTimeout(() => location.reload(), 9000);
+        } else {
+          stEl.style.color = '#ef4444';
+          stEl.innerText = '❌ Error en carga OTA: ' + (xhr.responseText || xhr.status);
+          showToast('Error al subir firmware OTA', true);
+        }
+      };
+      xhr.onerror = () => {
+        btn.disabled = false;
+        stEl.style.color = '#ef4444';
+        stEl.innerText = '❌ Se perdió la conexión Wi-Fi durante la carga.';
+        showToast('Error de red en carga OTA', true);
+      };
+      xhr.open('POST', '/update', true);
+      xhr.send(fd);
     }
 
     // =========================================================================
